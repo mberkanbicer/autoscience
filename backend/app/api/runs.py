@@ -1,0 +1,148 @@
+"""Research run API endpoints."""
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..dependencies import get_db
+from ..services.research_run_service import ResearchRunService
+from ..schemas.research_run import (
+    ResearchRunCreate,
+    ResearchRunResponse,
+    ResearchRunEventResponse,
+    ToolCallResponse,
+)
+
+router = APIRouter()
+
+
+@router.get("", response_model=list[ResearchRunResponse])
+async def list_runs(
+    project_id: str = Query(...),
+    state: str | None = Query(None),
+    run_type: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """List research runs for a project."""
+    service = ResearchRunService(db)
+    runs = await service.list_runs(
+        project_id=project_id,
+        state=state,
+        run_type=run_type,
+        page=page,
+        per_page=per_page,
+    )
+    return runs
+
+
+@router.post("", response_model=ResearchRunResponse, status_code=201)
+async def create_run(
+    project_id: str = Query(...),
+    run_in: ResearchRunCreate = ...,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new research run."""
+    service = ResearchRunService(db)
+    run = await service.create_run(project_id=project_id, data=run_in)
+    return run
+
+
+@router.get("/{run_id}", response_model=ResearchRunResponse)
+async def get_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a research run."""
+    service = ResearchRunService(db)
+    run = await service.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.post("/{run_id}/start", response_model=ResearchRunResponse)
+async def start_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Start a research run."""
+    service = ResearchRunService(db)
+    run = await service.start_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.post("/{run_id}/pause", response_model=ResearchRunResponse)
+async def pause_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Pause a research run."""
+    service = ResearchRunService(db)
+    run = await service.pause_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.post("/{run_id}/resume", response_model=ResearchRunResponse)
+async def resume_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Resume a research run."""
+    service = ResearchRunService(db)
+    run = await service.resume_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.post("/{run_id}/complete", response_model=ResearchRunResponse)
+async def complete_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Complete a research run."""
+    service = ResearchRunService(db)
+    run = await service.complete_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.post("/{run_id}/cancel", response_model=ResearchRunResponse)
+async def cancel_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a research run."""
+    service = ResearchRunService(db)
+    run = await service.cancel_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.get("/{run_id}/events", response_model=list[ResearchRunEventResponse])
+async def get_run_events(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get events for a research run."""
+    service = ResearchRunService(db)
+    events = await service.get_run_events(run_id)
+    return events
+
+
+@router.get("/{run_id}/tools", response_model=list[ToolCallResponse])
+async def get_tool_calls(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get tool calls for a research run."""
+    service = ResearchRunService(db)
+    tool_calls = await service.get_tool_calls(run_id)
+    return tool_calls
