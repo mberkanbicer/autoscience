@@ -5,12 +5,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_db
 from ..services.research_run_service import ResearchRunService
+from ..services.audit_service import AuditService
+from ..services.snapshot_service import SnapshotService
 from ..schemas.research_run import (
     ResearchRunCreate,
     ResearchRunResponse,
     ResearchRunEventResponse,
     ToolCallResponse,
 )
+from ..schemas.research_state import ResearchState
+from ..schemas.audit import AuditLogResponse
 
 router = APIRouter()
 
@@ -45,6 +49,17 @@ async def create_run(
     """Create a new research run."""
     service = ResearchRunService(db)
     run = await service.create_run(project_id=project_id, data=run_in)
+
+    # Log the creation
+    audit = AuditService(db)
+    await audit.log_event(
+        event_type="run_created",
+        project_id=project_id,
+        run_id=run.id,
+        actor="user",
+        action=f"Created {run.run_type} research run",
+    )
+
     return run
 
 
@@ -71,6 +86,15 @@ async def start_run(
     run = await service.start_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # Log the start
+    audit = AuditService(db)
+    await audit.log_run_event(
+        run_id=run_id,
+        event_type="run_started",
+        actor="system",
+    )
+
     return run
 
 
@@ -84,6 +108,15 @@ async def pause_run(
     run = await service.pause_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # Log the pause
+    audit = AuditService(db)
+    await audit.log_run_event(
+        run_id=run_id,
+        event_type="run_paused",
+        actor="system",
+    )
+
     return run
 
 
@@ -97,6 +130,15 @@ async def resume_run(
     run = await service.resume_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # Log the resume
+    audit = AuditService(db)
+    await audit.log_run_event(
+        run_id=run_id,
+        event_type="run_resumed",
+        actor="system",
+    )
+
     return run
 
 
@@ -110,6 +152,15 @@ async def complete_run(
     run = await service.complete_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # Log the completion
+    audit = AuditService(db)
+    await audit.log_run_event(
+        run_id=run_id,
+        event_type="run_completed",
+        actor="system",
+    )
+
     return run
 
 
@@ -123,6 +174,15 @@ async def cancel_run(
     run = await service.cancel_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # Log the cancellation
+    audit = AuditService(db)
+    await audit.log_run_event(
+        run_id=run_id,
+        event_type="run_cancelled",
+        actor="system",
+    )
+
     return run
 
 
@@ -146,3 +206,29 @@ async def get_tool_calls(
     service = ResearchRunService(db)
     tool_calls = await service.get_tool_calls(run_id)
     return tool_calls
+
+
+@router.get("/{run_id}/snapshot", response_model=ResearchState)
+async def get_run_snapshot(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a complete snapshot of the run's current state."""
+    snapshot_service = SnapshotService(db)
+    state = await snapshot_service.create_snapshot(run_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return state
+
+
+@router.get("/{run_id}/audit", response_model=list[AuditLogResponse])
+async def get_run_audit_logs(
+    run_id: str,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get audit logs for a specific run."""
+    audit = AuditService(db)
+    logs = await audit.get_run_audit_logs(run_id, limit=limit, offset=offset)
+    return logs

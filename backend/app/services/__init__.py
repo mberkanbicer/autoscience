@@ -7,6 +7,8 @@ from .paper_service import PaperService
 from .skill_service import SkillService
 from .research_question_service import ResearchQuestionService, HypothesisService
 from .report_service import ReportService, KnowledgeService
+from .audit_service import AuditService
+from .snapshot_service import SnapshotService
 
 __all__ = [
     "ProjectService",
@@ -18,4 +20,6 @@ __all__ = [
     "HypothesisService",
     "ReportService",
     "KnowledgeService",
+    "AuditService",
+    "SnapshotService",
 ]

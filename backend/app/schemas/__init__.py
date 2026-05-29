@@ -42,11 +42,31 @@ from .report import (
     ResearchReportResponse,
     KnowledgeNoteCreate,
     KnowledgeNoteResponse,
-    AuditLogResponse,
-    ApprovalRequestResponse,
     DatasetResponse,
     AnalysisRunResponse,
     AnalysisArtifactResponse,
+)
+from .research_state import (
+    ResearchState,
+    RunType,
+    RunState,
+    RunBudget,
+    PaperSummary,
+    ClusterSummary,
+    ConflictSummary,
+    QuestionSummary,
+    HypothesisSummary,
+    ScoreSummary,
+    SkillSummary,
+    ToolCallRecord,
+    EventRecord,
+)
+from .audit import (
+    AuditLogResponse,
+    SystemEventResponse,
+    ApprovalRequestResponse,
+    ApprovalDecision,
+    ToolCallLogRequest,
 )
 
 __all__ = [
@@ -101,9 +121,27 @@ __all__ = [
     "ResearchReportResponse",
     "KnowledgeNoteCreate",
     "KnowledgeNoteResponse",
-    "AuditLogResponse",
-    "ApprovalRequestResponse",
     "DatasetResponse",
     "AnalysisRunResponse",
     "AnalysisArtifactResponse",
+    # Research State
+    "ResearchState",
+    "RunType",
+    "RunState",
+    "RunBudget",
+    "PaperSummary",
+    "ClusterSummary",
+    "ConflictSummary",
+    "QuestionSummary",
+    "HypothesisSummary",
+    "ScoreSummary",
+    "SkillSummary",
+    "ToolCallRecord",
+    "EventRecord",
+    # Audit
+    "AuditLogResponse",
+    "SystemEventResponse",
+    "ApprovalRequestResponse",
+    "ApprovalDecision",
+    "ToolCallLogRequest",
 ]
