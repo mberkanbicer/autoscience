@@ -3,6 +3,7 @@
 from .keyword_engine import KeywordExpansionEngine, KeywordExpansion, SearchPlan, SearchQueryPlan
 from .literature_engine import LiteratureEngine, LiteratureResult, RankedPaper
 from .paper_analysis import PaperAnalysisEngine, PaperAnalysisResult, Claim
+from .clustering import ClusteringEngine, ClusteringResult, PaperCluster
 from .deduplication import (
     deduplicate_papers,
     select_papers_for_analysis,
@@ -28,6 +29,10 @@ __all__ = [
     "PaperAnalysisEngine",
     "PaperAnalysisResult",
     "Claim",
+    # Clustering
+    "ClusteringEngine",
+    "ClusteringResult",
+    "PaperCluster",
     # Deduplication
     "deduplicate_papers",
     "select_papers_for_analysis",
