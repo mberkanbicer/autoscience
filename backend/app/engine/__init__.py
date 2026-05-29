@@ -5,6 +5,7 @@ from .literature_engine import LiteratureEngine, LiteratureResult, RankedPaper
 from .paper_analysis import PaperAnalysisEngine, PaperAnalysisResult, Claim
 from .clustering import ClusteringEngine, ClusteringResult, PaperCluster
 from .conflict_detection import ConflictDetectionEngine, ConflictDetectionResult, Conflict, Gap
+from .question_generation import QuestionGenerationEngine, QuestionGenerationResult, ResearchQuestion
 from .deduplication import (
     deduplicate_papers,
     select_papers_for_analysis,
@@ -39,6 +40,10 @@ __all__ = [
     "ConflictDetectionResult",
     "Conflict",
     "Gap",
+    # Question Generation
+    "QuestionGenerationEngine",
+    "QuestionGenerationResult",
+    "ResearchQuestion",
     # Deduplication
     "deduplicate_papers",
     "select_papers_for_analysis",
