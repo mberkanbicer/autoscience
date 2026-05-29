@@ -8,6 +8,7 @@ from .conflict_detection import ConflictDetectionEngine, ConflictDetectionResult
 from .question_generation import QuestionGenerationEngine, QuestionGenerationResult, ResearchQuestion
 from .hypothesis_generation import HypothesisGenerationEngine, HypothesisGenerationResult, Hypothesis
 from .validation_planning import ValidationPlanningEngine, ValidationPlanResult, ValidationPlan, DatasetCandidate
+from .scoring import IdeaScoringEngine, IdeaScore, ScoringResult
 from .deduplication import (
     deduplicate_papers,
     select_papers_for_analysis,
@@ -55,6 +56,10 @@ __all__ = [
     "ValidationPlanResult",
     "ValidationPlan",
     "DatasetCandidate",
+    # Scoring
+    "IdeaScoringEngine",
+    "IdeaScore",
+    "ScoringResult",
     # Deduplication
     "deduplicate_papers",
     "select_papers_for_analysis",
