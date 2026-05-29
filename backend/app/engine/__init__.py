@@ -9,6 +9,7 @@ from .question_generation import QuestionGenerationEngine, QuestionGenerationRes
 from .hypothesis_generation import HypothesisGenerationEngine, HypothesisGenerationResult, Hypothesis
 from .validation_planning import ValidationPlanningEngine, ValidationPlanResult, ValidationPlan, DatasetCandidate
 from .scoring import IdeaScoringEngine, IdeaScore, ScoringResult
+from .idle_cognition import IdleCognitionEngine, IdleCycleResult, IdleConfig
 from .deduplication import (
     deduplicate_papers,
     select_papers_for_analysis,
@@ -60,6 +61,10 @@ __all__ = [
     "IdeaScoringEngine",
     "IdeaScore",
     "ScoringResult",
+    # Idle Cognition
+    "IdleCognitionEngine",
+    "IdleCycleResult",
+    "IdleConfig",
     # Deduplication
     "deduplicate_papers",
     "select_papers_for_analysis",
