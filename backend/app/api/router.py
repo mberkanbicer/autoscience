@@ -9,6 +9,7 @@ from .papers import router as papers_router
 from .skills import router as skills_router
 from .questions import router as questions_router
 from .reports import router as reports_router
+from .research import router as research_router
 
 api_router = APIRouter()
 
@@ -20,3 +21,4 @@ api_router.include_router(papers_router, prefix="/papers", tags=["papers"])
 api_router.include_router(skills_router, prefix="/skills", tags=["skills"])
 api_router.include_router(questions_router, prefix="", tags=["questions"])
 api_router.include_router(reports_router, prefix="", tags=["reports"])
+api_router.include_router(research_router, prefix="/research", tags=["research"])
