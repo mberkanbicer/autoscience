@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 
 services:
   postgres:
@@ -7,9 +7,9 @@ services:
     environment:
       POSTGRES_DB: autoscience
       POSTGRES_USER: autoscience
-      POSTGRES_PASSWORD: autoscience
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-autoscience}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     container_name: autoscience-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,6 +31,45 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: autoscience-backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://autoscience:${POSTGRES_PASSWORD:-autoscience}@postgres:5432/autoscience
+      - DATABASE_URL_SYNC=postgresql://autoscience:${POSTGRES_PASSWORD:-autoscience}@postgres:5432/autoscience
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-http://host.docker.internal:11434}
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - CORS_ORIGINS=["http://localhost:3000"]
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../backend:/app
+      - artifacts_data:/app/artifacts
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: autoscience-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:
+  artifacts_data:
