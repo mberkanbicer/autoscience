@@ -12,6 +12,12 @@ const nextConfig = {
       },
     ];
   },
+  // Increase timeout for long-running research requests
+  experimental: {
+    serverComponentsExternalPackages: [],
+  },
+  // Proxy timeout (default is 30s, we need more for research)
+  httpTimeout: 300000, // 5 minutes
 };
 
 module.exports = nextConfig;
