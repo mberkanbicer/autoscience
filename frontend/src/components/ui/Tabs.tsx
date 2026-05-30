@@ -13,15 +13,21 @@ const TabsContext = createContext<TabsContextValue | undefined>(undefined);
 
 interface TabsProps {
   defaultValue: string;
+  onValueChange?: (value: string) => void;
   children: ReactNode;
   className?: string;
 }
 
-export function Tabs({ defaultValue, children, className }: TabsProps) {
+export function Tabs({ defaultValue, onValueChange, children, className }: TabsProps) {
   const [value, setValue] = useState(defaultValue);
 
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    onValueChange?.(newValue);
+  };
+
   return (
-    <TabsContext.Provider value={{ value, onValueChange: setValue }}>
+    <TabsContext.Provider value={{ value, onValueChange: handleChange }}>
       <div className={className}>{children}</div>
     </TabsContext.Provider>
   );
