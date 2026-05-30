@@ -1,7 +1,8 @@
 """Main API endpoint for research operations."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from ..dependencies import get_db
 from ..services.orchestrator import ResearchOrchestrator
@@ -15,19 +16,45 @@ router = APIRouter()
 settings = get_settings()
 
 
-def get_llm_router() -> LLMRouter:
-    """Get LLM router instance."""
+def get_llm_router(
+    openrouter_api_key: str | None = None,
+    openrouter_model: str | None = None,
+    openai_api_key: str | None = None,
+    openai_model: str | None = None,
+    anthropic_api_key: str | None = None,
+    anthropic_model: str | None = None,
+    default_provider: str | None = None,
+) -> LLMRouter:
+    """Get LLM router instance with API keys from headers or env."""
+    # Use header values if provided, otherwise fall back to env
+    or_key = openrouter_api_key or settings.openrouter_api_key
+    oa_key = openai_api_key or settings.openai_api_key
+    an_key = anthropic_api_key or settings.anthropic_api_key
+    
+    # Determine default provider
+    provider = default_provider or settings.default_llm_provider
+    
+    # If we have an API key from headers, use that provider as default
+    if or_key and not oa_key and not an_key:
+        provider = 'openrouter'
+    elif oa_key and not or_key and not an_key:
+        provider = 'openai'
+    elif an_key and not or_key and not oa_key:
+        provider = 'anthropic'
+    
     return create_default_router(
-        openai_api_key=settings.openai_api_key,
-        anthropic_api_key=settings.anthropic_api_key,
-        openrouter_api_key=settings.openrouter_api_key,
-        openrouter_default_model=settings.openrouter_default_model,
+        openai_api_key=oa_key,
+        openai_default_model=openai_model or settings.openai_default_model,
+        anthropic_api_key=an_key,
+        anthropic_default_model=anthropic_model or settings.anthropic_default_model,
+        openrouter_api_key=or_key,
+        openrouter_default_model=openrouter_model or settings.openrouter_default_model,
         openrouter_base_url=settings.openrouter_base_url,
         local_base_url=settings.local_llm_base_url,
         local_model=settings.local_llm_model,
         llamacpp_base_url=settings.llamacpp_base_url,
         llamacpp_model=settings.llamacpp_model,
-        default_provider=settings.default_llm_provider,
+        default_provider=provider,
     )
 
 
@@ -54,10 +81,31 @@ async def start_research_run(
     idea: str,
     run_type: str = "user_directed",
     flexibility: float = 0.6,
+    x_openrouter_api_key: Optional[str] = Header(None),
+    x_openrouter_model: Optional[str] = Header(None),
+    x_openai_api_key: Optional[str] = Header(None),
+    x_openai_model: Optional[str] = Header(None),
+    x_anthropic_api_key: Optional[str] = Header(None),
+    x_anthropic_model: Optional[str] = Header(None),
+    x_default_provider: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Start a research run."""
-    orchestrator = get_orchestrator(db)
+    llm_router = get_llm_router(
+        openrouter_api_key=x_openrouter_api_key,
+        openrouter_model=x_openrouter_model,
+        openai_api_key=x_openai_api_key,
+        openai_model=x_openai_model,
+        anthropic_api_key=x_anthropic_api_key,
+        anthropic_model=x_anthropic_model,
+        default_provider=x_default_provider,
+    )
+    
+    orchestrator = ResearchOrchestrator(
+        db=db,
+        llm_router=llm_router,
+        connector_manager=get_connector_manager(),
+    )
 
     try:
         state = await orchestrator.run_research(
@@ -77,6 +125,8 @@ async def start_research_run(
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

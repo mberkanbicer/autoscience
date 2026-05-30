@@ -49,10 +49,22 @@ export default function RunsPage() {
     if (!newRun.idea.trim()) return;
     setStarting(true);
     try {
+      // Get API settings from localStorage
+      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
+      
       // Create the run via the research endpoint
       const response = await fetch(`/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(newRun.idea)}&run_type=${newRun.run_type}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
+          'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+          'X-OpenAI-API-Key': apiSettings.openai_api_key || '',
+          'X-OpenAI-Model': apiSettings.openai_model || 'gpt-4o',
+          'X-Anthropic-API-Key': apiSettings.anthropic_api_key || '',
+          'X-Anthropic-Model': apiSettings.anthropic_model || 'claude-sonnet-4-20250514',
+          'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+        },
       });
       
       if (!response.ok) {
