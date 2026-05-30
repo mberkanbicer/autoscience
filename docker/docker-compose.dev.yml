@@ -71,8 +71,7 @@ services:
     image: node:18-alpine
     container_name: autoscience-frontend-dev
     working_dir: /app
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+    # No NEXT_PUBLIC_API_URL needed - using Next.js proxy
     ports:
       - "3000:3000"
     depends_on:

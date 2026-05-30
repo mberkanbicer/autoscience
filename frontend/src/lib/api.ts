@@ -1,6 +1,5 @@
 // API client for backend communication
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Uses Next.js proxy - all requests go to /api/... and get proxied to backend
 
 interface RequestOptions {
   method?: string;
@@ -14,7 +13,8 @@ async function request<T>(
 ): Promise<T> {
   const { method = 'GET', body, headers = {} } = options;
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  // Use relative URL - Next.js proxy will forward to backend
+  const response = await fetch(`/api${endpoint}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
