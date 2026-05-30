@@ -52,6 +52,60 @@ async def create_paper(
     return paper
 
 
+# IMPORTANT: /clusters and /conflicts must come BEFORE /{paper_id}
+# Otherwise FastAPI matches "clusters" as a paper_id
+
+@router.get("/clusters", response_model=list[PaperClusterResponse])
+async def list_clusters(
+    project_id: str = Query(...),
+    cluster_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """List paper clusters for a project."""
+    service = PaperService(db)
+    clusters = await service.list_clusters(project_id, cluster_type)
+    return clusters
+
+
+@router.get("/clusters/{cluster_id}", response_model=PaperClusterResponse)
+async def get_cluster(
+    cluster_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a cluster."""
+    service = PaperService(db)
+    cluster = await service.get_cluster(cluster_id)
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+    return cluster
+
+
+@router.get("/conflicts", response_model=list[ClusterConflictResponse])
+async def list_conflicts(
+    project_id: str = Query(...),
+    conflict_type: str | None = Query(None),
+    cluster_id: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """List conflicts for a project."""
+    service = PaperService(db)
+    conflicts = await service.list_conflicts(project_id, conflict_type, cluster_id)
+    return conflicts
+
+
+@router.get("/conflicts/{conflict_id}", response_model=ClusterConflictResponse)
+async def get_conflict(
+    conflict_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a conflict."""
+    service = PaperService(db)
+    conflict = await service.get_conflict(conflict_id)
+    if not conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+    return conflict
+
+
 @router.get("/{paper_id}", response_model=PaperResponse)
 async def get_paper(
     paper_id: str,
@@ -118,54 +172,3 @@ async def create_paper_analysis(
 
     analysis = await service.create_paper_analysis(paper_id, analysis_data)
     return analysis
-
-
-@router.get("/clusters", response_model=list[PaperClusterResponse])
-async def list_clusters(
-    project_id: str = Query(...),
-    cluster_type: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
-):
-    """List paper clusters for a project."""
-    service = PaperService(db)
-    clusters = await service.list_clusters(project_id, cluster_type)
-    return clusters
-
-
-@router.get("/clusters/{cluster_id}", response_model=PaperClusterResponse)
-async def get_cluster(
-    cluster_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Get a cluster."""
-    service = PaperService(db)
-    cluster = await service.get_cluster(cluster_id)
-    if not cluster:
-        raise HTTPException(status_code=404, detail="Cluster not found")
-    return cluster
-
-
-@router.get("/conflicts", response_model=list[ClusterConflictResponse])
-async def list_conflicts(
-    project_id: str = Query(...),
-    conflict_type: str | None = Query(None),
-    cluster_id: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
-):
-    """List conflicts for a project."""
-    service = PaperService(db)
-    conflicts = await service.list_conflicts(project_id, conflict_type, cluster_id)
-    return conflicts
-
-
-@router.get("/conflicts/{conflict_id}", response_model=ClusterConflictResponse)
-async def get_conflict(
-    conflict_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Get a conflict."""
-    service = PaperService(db)
-    conflict = await service.get_conflict(conflict_id)
-    if not conflict:
-        raise HTTPException(status_code=404, detail="Conflict not found")
-    return conflict
