@@ -72,7 +72,7 @@ services:
     container_name: autoscience-frontend-dev
     working_dir: /app
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://backend:8000
     ports:
       - "3000:3000"
     depends_on:
