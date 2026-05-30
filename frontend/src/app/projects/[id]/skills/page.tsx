@@ -25,7 +25,7 @@ export default function SkillsPage() {
 
   const loadSkills = async () => {
     try {
-      const data = await skillsApi.list(projectId);
+      const data = await skillsApi.list({ project_id: projectId });
       setSkills(data);
     } catch (error) {
       console.error('Failed to load skills:', error);
