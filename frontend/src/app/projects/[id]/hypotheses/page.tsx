@@ -4,9 +4,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Card } from '@/components/ui/Card';
+import { Badge, StatusBadge } from '@/components/ui/Badge';
+import { SkeletonCard } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { hypothesesApi } from '@/lib/api';
 import { Hypothesis } from '@/lib/types';
-import { truncate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { FlaskConical, Target, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export default function HypothesesPage() {
   const params = useParams();
@@ -30,77 +35,99 @@ export default function HypothesesPage() {
   };
 
   return (
-    <Layout>
-      <Header title="Hypotheses" />
+    <Layout projectId={projectId}>
+      <Header
+        title="Hypotheses"
+        subtitle={`${hypotheses.length} hypotheses formulated`}
+      />
 
       <div className="p-6">
         {loading ? (
-          <div className="text-center py-12">Loading...</div>
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         ) : hypotheses.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No hypotheses found</div>
+          <EmptyState
+            icon={<FlaskConical className="w-8 h-8 text-gray-400" />}
+            title="No hypotheses yet"
+            description="Hypotheses are generated from research questions during research runs."
+          />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {hypotheses.map((hypothesis) => (
-              <div
-                key={hypothesis.id}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition"
-              >
+              <Card key={hypothesis.id} className="p-6">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        hypothesis.status === 'validated'
-                          ? 'bg-green-100 text-green-800'
-                          : hypothesis.status === 'rejected'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}
-                    >
-                      {hypothesis.status}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      Confidence: {hypothesis.confidence?.toFixed(2) || 'N/A'}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      Version: {hypothesis.version}
-                    </span>
+                  <div className="flex-1">
+                    <p className="text-gray-900 font-medium mb-2">{hypothesis.statement}</p>
+                    {hypothesis.rationale && (
+                      <p className="text-sm text-gray-600 mb-3">{hypothesis.rationale}</p>
+                    )}
+                  </div>
+                  <div className="ml-4 flex-shrink-0">
+                    <StatusBadge status={hypothesis.status} />
                   </div>
                 </div>
 
-                <p className="text-gray-800 mb-4 font-medium">
-                  {hypothesis.statement}
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  {/* Independent Variables */}
+                  {hypothesis.independent_variables && hypothesis.independent_variables.length > 0 && (
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target size={14} className="text-blue-600" />
+                        <span className="text-xs font-medium text-blue-600 uppercase">Independent Variables</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {hypothesis.independent_variables.map((v, i) => (
+                          <Badge key={i} variant="info" size="sm">{v}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-700">Independent Variable:</span>
-                    <p className="text-gray-600">{hypothesis.independent_variable || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Dependent Variable:</span>
-                    <p className="text-gray-600">{hypothesis.dependent_variable || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Baseline:</span>
-                    <p className="text-gray-600">{hypothesis.baseline || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Metric:</span>
-                    <p className="text-gray-600">{hypothesis.metric || 'N/A'}</p>
-                  </div>
+                  {/* Dependent Variables */}
+                  {hypothesis.dependent_variables && hypothesis.dependent_variables.length > 0 && (
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle size={14} className="text-green-600" />
+                        <span className="text-xs font-medium text-green-600 uppercase">Dependent Variables</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {hypothesis.dependent_variables.map((v, i) => (
+                          <Badge key={i} variant="success" size="sm">{v}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {hypothesis.failure_condition && (
-                  <div className="mt-4 p-3 bg-red-50 rounded-lg">
-                    <span className="text-sm font-medium text-red-800">
-                      Failure Condition:
-                    </span>
-                    <p className="text-sm text-red-700 mt-1">
-                      {hypothesis.failure_condition}
-                    </p>
+                {/* Baseline Comparison */}
+                {hypothesis.baseline_comparison && (
+                  <div className="text-sm text-gray-600 mb-3">
+                    <span className="font-medium">Baseline:</span> {hypothesis.baseline_comparison}
                   </div>
                 )}
-              </div>
+
+                {/* Failure Conditions */}
+                {hypothesis.failure_conditions && hypothesis.failure_conditions.length > 0 && (
+                  <div className="bg-red-50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle size={14} className="text-red-600" />
+                      <span className="text-xs font-medium text-red-600 uppercase">Failure Conditions</span>
+                    </div>
+                    <ul className="text-sm text-red-700 space-y-1">
+                      {hypothesis.failure_conditions.map((condition, i) => (
+                        <li key={i}>• {condition}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="mt-4 text-xs text-gray-400">
+                  Created {formatDate(hypothesis.created_at)}
+                </div>
+              </Card>
             ))}
           </div>
         )}

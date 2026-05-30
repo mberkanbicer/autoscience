@@ -4,9 +4,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Badge } from '@/components/ui/Badge';
+import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/Table';
+import { SkeletonTable } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { papersApi } from '@/lib/api';
 import { Paper } from '@/lib/types';
-import { truncate } from '@/lib/utils';
+import { FileText, ExternalLink } from 'lucide-react';
 
 export default function PapersPage() {
   const params = useParams();
@@ -30,79 +34,75 @@ export default function PapersPage() {
   };
 
   return (
-    <Layout>
-      <Header title="Papers" />
+    <Layout projectId={projectId}>
+      <Header
+        title="Papers"
+        subtitle={`${papers.length} papers analyzed`}
+      />
 
       <div className="p-6">
         {loading ? (
-          <div className="text-center py-12">Loading...</div>
+          <SkeletonTable />
         ) : papers.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No papers found</div>
+          <EmptyState
+            icon={<FileText className="w-8 h-8 text-gray-400" />}
+            title="No papers yet"
+            description="Papers will be discovered and analyzed during research runs."
+          />
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Authors
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Year
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Citations
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {papers.map((paper) => (
-                  <tr key={paper.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {truncate(paper.title, 80)}
-                      </div>
-                      {paper.doi && (
-                        <div className="text-sm text-gray-500">DOI: {paper.doi}</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Authors</TableHead>
+                <TableHead>Year</TableHead>
+                <TableHead>Citations</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {papers.map((paper) => (
+                <TableRow key={paper.id}>
+                  <TableCell>
+                    <div className="max-w-lg">
+                      <p className="font-medium text-gray-900">{paper.title}</p>
+                      {paper.venue && (
+                        <p className="text-xs text-gray-500 mt-1">{paper.venue}</p>
                       )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {truncate(paper.authors.slice(0, 3).join(', '), 50)}
-                        {paper.authors.length > 3 && ` (+${paper.authors.length - 3})`}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{paper.year || 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {paper.citation_count || 0}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          paper.paper_type === 'review'
-                            ? 'bg-purple-100 text-purple-800'
-                            : paper.paper_type === 'dataset'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-xs truncate text-gray-600">
+                      {Array.isArray(paper.authors) ? paper.authors.slice(0, 2).join(', ') : paper.authors}
+                      {Array.isArray(paper.authors) && paper.authors.length > 2 && '...'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-gray-600">{paper.year || '—'}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-medium text-gray-900">{paper.citation_count || 0}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="info">{paper.paper_type || 'unknown'}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {paper.doi && (
+                      <a
+                        href={`https://doi.org/${paper.doi}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700"
                       >
-                        {paper.paper_type || 'research'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <ExternalLink size={16} />
+                      </a>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
     </Layout>

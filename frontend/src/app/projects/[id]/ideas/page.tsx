@@ -4,27 +4,32 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Card } from '@/components/ui/Card';
+import { Badge, StatusBadge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/Table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { SkeletonTable } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ideasApi } from '@/lib/api';
 import { Idea } from '@/lib/types';
-import { formatDate, getClassificationColor, truncate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { Lightbulb, Plus, TrendingUp } from 'lucide-react';
 
 export default function IdeasPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ status: '', classification: '' });
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     loadIdeas();
-  }, [projectId, filter]);
+  }, [projectId]);
 
   const loadIdeas = async () => {
     try {
-      const params: Record<string, string> = {};
-      if (filter.status) params.status = filter.status;
-      if (filter.classification) params.classification = filter.classification;
-      const data = await ideasApi.list(projectId, params);
+      const data = await ideasApi.list(projectId);
       setIdeas(data);
     } catch (error) {
       console.error('Failed to load ideas:', error);
@@ -33,95 +38,104 @@ export default function IdeasPage() {
     }
   };
 
+  const filteredIdeas = ideas.filter((idea) => {
+    if (filter === 'all') return true;
+    return idea.status === filter;
+  });
+
   return (
-    <Layout>
-      <Header title="Ideas" />
+    <Layout projectId={projectId}>
+      <Header
+        title="Ideas"
+        subtitle={`${ideas.length} research ideas tracked`}
+        actions={
+          <Button>
+            <Plus size={18} className="mr-2" />
+            New Idea
+          </Button>
+        }
+      />
 
-      <div className="p-6">
+      <div className="p-6 space-y-6">
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex gap-4">
-            <select
-              value={filter.status}
-              onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="rejected">Rejected</option>
-              <option value="promoted">Promoted</option>
-              <option value="archived">Archived</option>
-            </select>
-            <select
-              value={filter.classification}
-              onChange={(e) =>
-                setFilter({ ...filter, classification: e.target.value })
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All Classifications</option>
-              <option value="high_value">High Value</option>
-              <option value="promising">Promising</option>
-              <option value="incremental">Incremental</option>
-              <option value="weak">Weak</option>
-              <option value="reject">Reject</option>
-            </select>
-          </div>
-        </div>
+        <Tabs defaultValue="all" onValueChange={(v) => setFilter(v)}>
+          <TabsList>
+            <TabsTrigger value="all">All ({ideas.length})</TabsTrigger>
+            <TabsTrigger value="active">Active ({ideas.filter(i => i.status === 'active').length})</TabsTrigger>
+            <TabsTrigger value="under_validation">Validating ({ideas.filter(i => i.status === 'under_validation').length})</TabsTrigger>
+            <TabsTrigger value="promoted">Promoted ({ideas.filter(i => i.status === 'promoted').length})</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected ({ideas.filter(i => i.status === 'rejected').length})</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Ideas List */}
+        {/* Ideas Table */}
         {loading ? (
-          <div className="text-center py-12">Loading...</div>
-        ) : ideas.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No ideas found</div>
+          <SkeletonTable />
+        ) : filteredIdeas.length === 0 ? (
+          <EmptyState
+            icon={<Lightbulb className="w-8 h-8 text-gray-400" />}
+            title="No ideas yet"
+            description="Ideas will be generated through research runs or manually added."
+          />
         ) : (
-          <div className="space-y-4">
-            {ideas.map((idea) => (
-              <div
-                key={idea.id}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${getClassificationColor(
-                          idea.classification || ''
-                        )}`}
-                      >
-                        {idea.classification || 'Unclassified'}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        Score: {idea.overall_score?.toFixed(2) || 'N/A'}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        Origin: {idea.origin}
-                      </span>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Idea</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Classification</TableHead>
+                <TableHead>Score</TableHead>
+                <TableHead>Origin</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredIdeas.map((idea) => (
+                <TableRow key={idea.id}>
+                  <TableCell>
+                    <div className="max-w-md">
+                      <p className="font-medium text-gray-900 truncate">{idea.current_text}</p>
+                      {idea.classification_reason && (
+                        <p className="text-xs text-gray-500 truncate mt-1">{idea.classification_reason}</p>
+                      )}
                     </div>
-                    <p className="text-gray-800 mb-2">
-                      {truncate(idea.current_text, 200)}
-                    </p>
-                    <div className="text-sm text-gray-500">
-                      Created: {formatDate(idea.created_at)}
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        idea.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : idea.status === 'rejected'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {idea.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={idea.status} />
+                  </TableCell>
+                  <TableCell>
+                    {idea.classification ? (
+                      <Badge variant={
+                        idea.classification === 'high_value' ? 'success' :
+                        idea.classification === 'promising' ? 'info' :
+                        idea.classification === 'weak' ? 'danger' : 'default'
+                      }>
+                        {idea.classification}
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {idea.overall_score ? (
+                      <div className="flex items-center gap-2">
+                        <TrendingUp size={14} className="text-green-500" />
+                        <span className="font-medium">{idea.overall_score.toFixed(1)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="default">{idea.origin.replace('_', ' ')}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-500">{formatDate(idea.created_at)}</span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
     </Layout>

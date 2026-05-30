@@ -5,15 +5,28 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { StatsGrid } from '@/components/ui/StatCard';
+import { SkeletonStats } from '@/components/ui/Skeleton';
 import { projectsApi } from '@/lib/api';
-import { Project, ProjectStats } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import { Project } from '@/lib/types';
+import {
+  Lightbulb,
+  FileSearch,
+  Activity,
+  MessageSquareQuestion,
+  FlaskConical,
+  GraduationCap,
+  Settings,
+  ArrowRight,
+} from 'lucide-react';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
-  const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,12 +35,8 @@ export default function ProjectDetailPage() {
 
   const loadProject = async () => {
     try {
-      const [projectData, statsData] = await Promise.all([
-        projectsApi.get(projectId),
-        projectsApi.stats(projectId),
-      ]);
-      setProject(projectData);
-      setStats(statsData);
+      const data = await projectsApi.get(projectId);
+      setProject(data);
     } catch (error) {
       console.error('Failed to load project:', error);
     } finally {
@@ -37,120 +46,94 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="p-6 text-center">Loading...</div>
+      <Layout projectId={projectId}>
+        <Header title="Loading..." />
+        <div className="p-6">
+          <SkeletonStats />
+        </div>
       </Layout>
     );
   }
 
   if (!project) {
     return (
-      <Layout>
-        <div className="p-6 text-center">Project not found</div>
+      <Layout projectId={projectId}>
+        <Header title="Project Not Found" />
       </Layout>
     );
   }
 
   const navItems = [
-    { name: 'Ideas', href: `/projects/${projectId}/ideas`, icon: '💡' },
-    { name: 'Runs', href: `/projects/${projectId}/runs`, icon: '🔄' },
-    { name: 'Papers', href: `/projects/${projectId}/papers`, icon: '📄' },
-    { name: 'Questions', href: `/projects/${projectId}/questions`, icon: '❓' },
-    { name: 'Hypotheses', href: `/projects/${projectId}/hypotheses`, icon: '🔬' },
-    { name: 'Skills', href: `/projects/${projectId}/skills`, icon: '🛠️' },
-    { name: 'Reports', href: `/projects/${projectId}/reports`, icon: '📊' },
-    { name: 'Wiki', href: `/projects/${projectId}/wiki`, icon: '📚' },
-    { name: 'Settings', href: `/projects/${projectId}/settings`, icon: '⚙️' },
+    { href: `/projects/${projectId}/ideas`, label: 'Ideas', icon: Lightbulb, color: 'bg-yellow-100 text-yellow-600' },
+    { href: `/projects/${projectId}/runs`, label: 'Research Runs', icon: Activity, color: 'bg-green-100 text-green-600' },
+    { href: `/projects/${projectId}/papers`, label: 'Papers', icon: FileSearch, color: 'bg-blue-100 text-blue-600' },
+    { href: `/projects/${projectId}/questions`, label: 'Questions', icon: MessageSquareQuestion, color: 'bg-purple-100 text-purple-600' },
+    { href: `/projects/${projectId}/hypotheses`, label: 'Hypotheses', icon: FlaskConical, color: 'bg-indigo-100 text-indigo-600' },
+    { href: `/projects/${projectId}/skills`, label: 'Skills', icon: GraduationCap, color: 'bg-orange-100 text-orange-600' },
+    { href: `/projects/${projectId}/reports`, label: 'Reports', icon: FileSearch, color: 'bg-red-100 text-red-600' },
+    { href: `/projects/${projectId}/wiki`, label: 'Wiki', icon: FileSearch, color: 'bg-teal-100 text-teal-600' },
+    { href: `/projects/${projectId}/settings`, label: 'Settings', icon: Settings, color: 'bg-gray-100 text-gray-600' },
   ];
 
   return (
-    <Layout>
-      <Header title={project.name} />
-
-      <div className="p-6">
-        {/* Project Info */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Project Details</h2>
-              <dl className="space-y-2">
-                <div>
-                  <dt className="text-sm text-gray-500">Domain</dt>
-                  <dd className="text-sm font-medium">{project.domain}</dd>
-                </div>
-                {project.description && (
-                  <div>
-                    <dt className="text-sm text-gray-500">Description</dt>
-                    <dd className="text-sm">{project.description}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-sm text-gray-500">Created</dt>
-                  <dd className="text-sm">{formatDate(project.created_at)}</dd>
-                </div>
-              </dl>
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Settings</h2>
-              <dl className="space-y-2">
-                <div>
-                  <dt className="text-sm text-gray-500">Default Flexibility</dt>
-                  <dd className="text-sm">{project.default_flexibility}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-gray-500">Idle Research</dt>
-                  <dd className="text-sm">
-                    {project.idle_research_enabled ? 'Enabled' : 'Disabled'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-gray-500">Idle Trigger</dt>
-                  <dd className="text-sm">{project.idle_trigger_minutes} minutes</dd>
-                </div>
-              </dl>
-            </div>
+    <Layout projectId={projectId}>
+      <Header
+        title={project.name}
+        subtitle={project.domain}
+        actions={
+          <div className="flex gap-3">
+            <Badge variant={project.idle_research_enabled ? 'success' : 'default'}>
+              {project.idle_research_enabled ? 'Idle Research Active' : 'Idle Research Off'}
+            </Badge>
           </div>
-        </div>
+        }
+      />
 
+      <div className="p-6 space-y-6">
         {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4 text-center">
-              <div className="text-3xl font-bold text-blue-600">{stats.total_ideas}</div>
-              <div className="text-sm text-gray-500">Ideas</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 text-center">
-              <div className="text-3xl font-bold text-green-600">{stats.total_papers}</div>
-              <div className="text-sm text-gray-500">Papers</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 text-center">
-              <div className="text-3xl font-bold text-purple-600">{stats.total_runs}</div>
-              <div className="text-sm text-gray-500">Runs</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 text-center">
-              <div className="text-3xl font-bold text-orange-600">{stats.total_questions}</div>
-              <div className="text-sm text-gray-500">Questions</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 text-center">
-              <div className="text-3xl font-bold text-red-600">{stats.total_hypotheses}</div>
-              <div className="text-sm text-gray-500">Hypotheses</div>
-            </div>
-          </div>
-        )}
+        <StatsGrid
+          stats={[
+            { label: 'Ideas', value: 0, icon: <Lightbulb size={24} /> },
+            { label: 'Papers', value: 0, icon: <FileSearch size={24} /> },
+            { label: 'Research Runs', value: 0, icon: <Activity size={24} /> },
+            { label: 'Hypotheses', value: 0, icon: <FlaskConical size={24} /> },
+          ]}
+        />
 
-        {/* Navigation */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {navItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition flex items-center gap-3"
-            >
-              <span className="text-2xl">{item.icon}</span>
-              <span className="font-medium">{item.name}</span>
-            </Link>
-          ))}
+        {/* Navigation Grid */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Navigate to</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Card hover className="h-full">
+                    <div className="p-4 flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${item.color}`}>
+                        <Icon size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">{item.label}</h3>
+                      </div>
+                      <ArrowRight size={16} className="text-gray-400" />
+                    </div>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Project Info */}
+        {project.description && (
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">About</h3>
+              <p className="text-gray-600">{project.description}</p>
+            </div>
+          </Card>
+        )}
       </div>
     </Layout>
   );

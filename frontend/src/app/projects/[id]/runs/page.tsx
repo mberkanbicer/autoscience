@@ -4,9 +4,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Badge, StatusBadge } from '@/components/ui/Badge';
+import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/Table';
+import { SkeletonTable } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { runsApi } from '@/lib/api';
 import { ResearchRun } from '@/lib/types';
-import { formatDateTime, getStatusColor } from '@/lib/utils';
+import { formatDate, formatDuration } from '@/lib/utils';
+import { Activity, Clock, DollarSign } from 'lucide-react';
 
 export default function RunsPage() {
   const params = useParams();
@@ -30,73 +35,74 @@ export default function RunsPage() {
   };
 
   return (
-    <Layout>
-      <Header title="Research Runs" />
+    <Layout projectId={projectId}>
+      <Header
+        title="Research Runs"
+        subtitle={`${runs.length} runs completed`}
+      />
 
       <div className="p-6">
         {loading ? (
-          <div className="text-center py-12">Loading...</div>
+          <SkeletonTable />
         ) : runs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No runs found</div>
+          <EmptyState
+            icon={<Activity className="w-8 h-8 text-gray-400" />}
+            title="No research runs yet"
+            description="Start a research run to begin autonomous literature analysis."
+          />
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Run Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Started
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Completed
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Budget
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {runs.map((run) => (
-                  <tr key={run.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {run.run_type}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>Started</TableHead>
+                <TableHead>Completed</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Budget Used</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {runs.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell>
+                    <Badge variant="info">{run.run_type}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={run.state} />
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-600">
+                      {run.started_at ? formatDate(run.started_at) : '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-600">
+                      {run.completed_at ? formatDate(run.completed_at) : '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {run.started_at && run.completed_at ? (
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <Clock size={14} />
+                        <span className="text-sm">{formatDuration(run.started_at, run.completed_at)}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${getStatusColor(
-                          run.state
-                        )}`}
-                      >
-                        {run.state}
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <DollarSign size={14} />
+                      <span className="text-sm">
+                        {run.budget_usd ? `$${run.budget_usd.toFixed(2)}` : '—'}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {run.started_at ? formatDateTime(run.started_at) : 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {run.completed_at ? formatDateTime(run.completed_at) : 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        ${run.max_cost_usd} / {run.max_minutes}min
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
     </Layout>

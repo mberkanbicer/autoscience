@@ -4,14 +4,23 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Input, Textarea } from '@/components/ui/Input';
+import { SkeletonCard } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { projectsApi } from '@/lib/api';
 import { Project } from '@/lib/types';
-import { formatDate, getStatusColor } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { Plus, FolderKanban, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [newProject, setNewProject] = useState({
     name: '',
     domain: '',
@@ -34,6 +43,8 @@ export default function ProjectsPage() {
   };
 
   const handleCreate = async () => {
+    if (!newProject.name || !newProject.domain) return;
+    setCreating(true);
     try {
       await projectsApi.create(newProject);
       setShowCreateModal(false);
@@ -41,6 +52,8 @@ export default function ProjectsPage() {
       loadProjects();
     } catch (error) {
       console.error('Failed to create project:', error);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -48,61 +61,59 @@ export default function ProjectsPage() {
     <Layout>
       <Header
         title="Projects"
+        subtitle="Manage your research projects"
         actions={
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Create Project
-          </button>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus size={18} className="mr-2" />
+            New Project
+          </Button>
         }
       />
 
       <div className="p-6">
         {loading ? (
-          <div className="text-center py-12">Loading...</div>
-        ) : projects.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">No projects yet</p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Create Your First Project
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
+        ) : projects.length === 0 ? (
+          <EmptyState
+            icon={<FolderKanban className="w-8 h-8 text-gray-400" />}
+            title="No projects yet"
+            description="Create your first research project to get started with autonomous research."
+            action={
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus size={18} className="mr-2" />
+                Create Project
+              </Button>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/projects/${project.id}`}
-                className="block p-6 bg-white rounded-lg shadow hover:shadow-lg transition"
-              >
-                <h2 className="text-xl font-semibold mb-2">{project.name}</h2>
-                <p className="text-gray-600 mb-4">{project.domain}</p>
-                {project.description && (
-                  <p className="text-sm text-gray-500 mb-4 line-clamp-2">
-                    {project.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <span>Created: {formatDate(project.created_at)}</span>
-                </div>
-                <div className="mt-4 flex items-center gap-2">
-                  <span
-                    className={`px-2 py-1 rounded text-xs ${
-                      project.idle_research_enabled
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {project.idle_research_enabled ? 'Idle Enabled' : 'Idle Disabled'}
-                  </span>
-                  <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
-                    Flexibility: {project.default_flexibility}
-                  </span>
-                </div>
+              <Link key={project.id} href={`/projects/${project.id}`}>
+                <Card hover className="h-full">
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <FolderKanban className="text-white" size={24} />
+                      </div>
+                      <Badge variant={project.idle_research_enabled ? 'success' : 'default'}>
+                        {project.idle_research_enabled ? 'Idle Active' : 'Idle Off'}
+                      </Badge>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{project.name}</h3>
+                    <p className="text-sm text-gray-500 mb-4">{project.domain}</p>
+                    {project.description && (
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-4">{project.description}</p>
+                    )}
+                    <div className="flex items-center justify-between text-xs text-gray-400">
+                      <span>Created {formatDate(project.created_at)}</span>
+                      <ArrowRight size={16} className="text-blue-500" />
+                    </div>
+                  </div>
+                </Card>
               </Link>
             ))}
           </div>
@@ -110,72 +121,41 @@ export default function ProjectsPage() {
       </div>
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Create Project</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={newProject.name}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, name: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="My Research Project"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Domain
-                </label>
-                <input
-                  type="text"
-                  value={newProject.domain}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, domain: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="Machine Learning"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={newProject.description}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, description: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  rows={3}
-                  placeholder="Optional description"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-4 mt-6">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={!newProject.name || !newProject.domain}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                Create
-              </button>
-            </div>
-          </div>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create New Project"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Project Name"
+            placeholder="e.g., AI Research Initiative"
+            value={newProject.name}
+            onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+          />
+          <Input
+            label="Domain"
+            placeholder="e.g., machine learning, computational biology"
+            value={newProject.domain}
+            onChange={(e) => setNewProject({ ...newProject, domain: e.target.value })}
+          />
+          <Textarea
+            label="Description"
+            placeholder="Brief description of your research focus..."
+            rows={3}
+            value={newProject.description}
+            onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+          />
         </div>
-      )}
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} loading={creating}>
+            Create Project
+          </Button>
+        </ModalFooter>
+      </Modal>
     </Layout>
   );
 }

@@ -4,8 +4,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input, Textarea } from '@/components/ui/Input';
+import { SkeletonCard } from '@/components/ui/Skeleton';
 import { projectsApi } from '@/lib/api';
 import { Project } from '@/lib/types';
+import { Save, Settings, Bell, Shield, Clock } from 'lucide-react';
 
 export default function SettingsPage() {
   const params = useParams();
@@ -13,6 +18,7 @@ export default function SettingsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -34,6 +40,8 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       await projectsApi.update(projectId, project);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (error) {
       console.error('Failed to save project:', error);
     } finally {
@@ -43,79 +51,73 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="p-6 text-center">Loading...</div>
+      <Layout projectId={projectId}>
+        <Header title="Settings" />
+        <div className="p-6 space-y-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
       </Layout>
     );
   }
 
   if (!project) {
     return (
-      <Layout>
-        <div className="p-6 text-center">Project not found</div>
+      <Layout projectId={projectId}>
+        <Header title="Settings" />
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout projectId={projectId}>
       <Header
         title="Project Settings"
+        subtitle="Configure your research project"
         actions={
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+          <Button onClick={handleSave} loading={saving}>
+            <Save size={18} className="mr-2" />
+            {saved ? 'Saved!' : 'Save Changes'}
+          </Button>
         }
       />
 
-      <div className="p-6">
-        <div className="bg-white rounded-lg shadow p-6 max-w-2xl">
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Project Name
-              </label>
-              <input
-                type="text"
-                value={project.name}
-                onChange={(e) => setProject({ ...project, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
+      <div className="p-6 space-y-6 max-w-3xl">
+        {/* General Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Settings className="text-blue-600" size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">General</h3>
+                <p className="text-sm text-gray-500">Basic project information</p>
+              </div>
             </div>
-
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              label="Project Name"
+              value={project.name}
+              onChange={(e) => setProject({ ...project, name: e.target.value })}
+            />
+            <Input
+              label="Domain"
+              value={project.domain}
+              onChange={(e) => setProject({ ...project, domain: e.target.value })}
+              helperText="The research domain for this project (e.g., machine learning, biology)"
+            />
+            <Textarea
+              label="Description"
+              value={project.description || ''}
+              onChange={(e) => setProject({ ...project, description: e.target.value })}
+              rows={3}
+            />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Domain
-              </label>
-              <input
-                type="text"
-                value={project.domain}
-                onChange={(e) => setProject({ ...project, domain: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                value={project.description || ''}
-                onChange={(e) =>
-                  setProject({ ...project, description: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Default Flexibility ({project.default_flexibility})
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Default Flexibility ({project.default_flexibility.toFixed(1)})
               </label>
               <input
                 type="range"
@@ -124,107 +126,107 @@ export default function SettingsPage() {
                 step="0.1"
                 value={project.default_flexibility}
                 onChange={(e) =>
-                  setProject({
-                    ...project,
-                    default_flexibility: parseFloat(e.target.value),
-                  })
+                  setProject({ ...project, default_flexibility: parseFloat(e.target.value) })
                 }
-                className="w-full"
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               />
-              <div className="flex justify-between text-xs text-gray-500">
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>Strict (0)</span>
                 <span>Flexible (1)</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="pt-4 border-t">
-              <h3 className="text-lg font-medium mb-4">Idle Research Settings</h3>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">
-                    Enable Idle Research
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={project.idle_research_enabled}
-                    onChange={(e) =>
-                      setProject({
-                        ...project,
-                        idle_research_enabled: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 text-blue-600 rounded"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Idle Trigger (minutes): {project.idle_trigger_minutes}
-                  </label>
-                  <input
-                    type="range"
-                    min="30"
-                    max="480"
-                    step="30"
-                    value={project.idle_trigger_minutes}
-                    onChange={(e) =>
-                      setProject({
-                        ...project,
-                        idle_trigger_minutes: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Max Idle Cycles Per Day
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={project.max_idle_cycles_per_day}
-                    onChange={(e) =>
-                      setProject({
-                        ...project,
-                        max_idle_cycles_per_day: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Max Sources Per Cycle
-                  </label>
-                  <input
-                    type="number"
-                    min="10"
-                    max="200"
-                    value={project.max_sources_per_cycle}
-                    onChange={(e) =>
-                      setProject({
-                        ...project,
-                        max_sources_per_cycle: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
+        {/* Idle Research Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                <Clock className="text-green-600" size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Idle Research</h3>
+                <p className="text-sm text-gray-500">Configure background research behavior</p>
               </div>
             </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <label className="font-medium text-gray-900">Enable Idle Research</label>
+                <p className="text-sm text-gray-500">Automatically research during idle periods</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={project.idle_research_enabled}
+                  onChange={(e) =>
+                    setProject({ ...project, idle_research_enabled: e.target.checked })
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
 
-            <div className="pt-4 border-t">
-              <h3 className="text-lg font-medium mb-4">Safety Settings</h3>
+            <Input
+              label="Idle Trigger (minutes)"
+              type="number"
+              min="30"
+              max="480"
+              step="30"
+              value={project.idle_trigger_minutes}
+              onChange={(e) =>
+                setProject({ ...project, idle_trigger_minutes: parseInt(e.target.value) })
+              }
+              helperText="How long to wait before starting idle research"
+            />
 
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">
-                  Require Approval for External Actions
-                </label>
+            <Input
+              label="Max Cycles Per Day"
+              type="number"
+              min="1"
+              max="10"
+              value={project.max_idle_cycles_per_day}
+              onChange={(e) =>
+                setProject({ ...project, max_idle_cycles_per_day: parseInt(e.target.value) })
+              }
+            />
+
+            <Input
+              label="Max Sources Per Cycle"
+              type="number"
+              min="10"
+              max="200"
+              value={project.max_sources_per_cycle}
+              onChange={(e) =>
+                setProject({ ...project, max_sources_per_cycle: parseInt(e.target.value) })
+              }
+            />
+          </CardContent>
+        </Card>
+
+        {/* Safety Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <Shield className="text-red-600" size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Safety</h3>
+                <p className="text-sm text-gray-500">Control what the system can do</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <label className="font-medium text-gray-900">Require Approval for External Actions</label>
+                <p className="text-sm text-gray-500">Ask before making API calls or running code</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={project.approval_required_for_external_actions}
@@ -234,12 +236,13 @@ export default function SettingsPage() {
                       approval_required_for_external_actions: e.target.checked,
                     })
                   }
-                  className="h-4 w-4 text-blue-600 rounded"
+                  className="sr-only peer"
                 />
-              </div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
