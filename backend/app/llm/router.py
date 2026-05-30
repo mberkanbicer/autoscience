@@ -212,7 +212,7 @@ def create_default_router(
             "llamacpp",
             LlamaCppProvider(
                 base_url=llamacpp_base_url,
-                model=llamacpp_model or "local-model",
+                default_model=llamacpp_model or "local-model",
             ),
         )
 
