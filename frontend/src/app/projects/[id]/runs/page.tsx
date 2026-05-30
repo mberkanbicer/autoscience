@@ -95,7 +95,7 @@ export default function RunsPage() {
                     <div className="flex items-center gap-1 text-gray-600">
                       <DollarSign size={14} />
                       <span className="text-sm">
-                        {run.budget_usd ? `$${run.budget_usd.toFixed(2)}` : '—'}
+                        ${run.max_cost_usd.toFixed(2)}
                       </span>
                     </div>
                   </TableCell>
