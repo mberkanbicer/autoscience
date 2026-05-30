@@ -36,6 +36,7 @@ export function Sidebar({ projectId }: SidebarProps) {
         { href: `/projects/${projectId}`, label: 'Overview', icon: LayoutDashboard },
         { href: `/projects/${projectId}/ideas`, label: 'Ideas', icon: Lightbulb },
         { href: `/projects/${projectId}/runs`, label: 'Research Runs', icon: Activity },
+        { href: `/projects/${projectId}/pipeline`, label: 'Pipeline', icon: Activity },
         { href: `/projects/${projectId}/papers`, label: 'Papers', icon: FileSearch },
         { href: `/projects/${projectId}/questions`, label: 'Questions', icon: MessageSquare },
         { href: `/projects/${projectId}/hypotheses`, label: 'Hypotheses', icon: FlaskConical },

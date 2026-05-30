@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { StatsGrid } from '@/components/ui/StatCard';
 import { SkeletonStats } from '@/components/ui/Skeleton';
 import { projectsApi } from '@/lib/api';
-import { Project } from '@/lib/types';
+import { Project, ProjectStats } from '@/lib/types';
 import {
   Lightbulb,
   FileSearch,
@@ -21,12 +21,16 @@ import {
   GraduationCap,
   Settings,
   ArrowRight,
+  GitBranch,
+  MessageSquareText,
+  BookOpen,
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
+  const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,8 +39,12 @@ export default function ProjectDetailPage() {
 
   const loadProject = async () => {
     try {
-      const data = await projectsApi.get(projectId);
-      setProject(data);
+      const [projectData, statsData] = await Promise.all([
+        projectsApi.get(projectId),
+        projectsApi.stats(projectId),
+      ]);
+      setProject(projectData);
+      setStats(statsData);
     } catch (error) {
       console.error('Failed to load project:', error);
     } finally {
@@ -72,6 +80,7 @@ export default function ProjectDetailPage() {
     { href: `/projects/${projectId}/skills`, label: 'Skills', icon: GraduationCap, color: 'bg-orange-100 text-orange-600' },
     { href: `/projects/${projectId}/reports`, label: 'Reports', icon: FileSearch, color: 'bg-red-100 text-red-600' },
     { href: `/projects/${projectId}/wiki`, label: 'Wiki', icon: FileSearch, color: 'bg-teal-100 text-teal-600' },
+    { href: `/projects/${projectId}/pipeline`, label: 'Pipeline', icon: GitBranch, color: 'bg-cyan-100 text-cyan-600' },
     { href: `/projects/${projectId}/settings`, label: 'Settings', icon: Settings, color: 'bg-gray-100 text-gray-600' },
   ];
 
@@ -91,14 +100,23 @@ export default function ProjectDetailPage() {
 
       <div className="p-6 space-y-6">
         {/* Stats */}
-        <StatsGrid
-          stats={[
-            { label: 'Ideas', value: 0, icon: <Lightbulb size={24} /> },
-            { label: 'Papers', value: 0, icon: <FileSearch size={24} /> },
-            { label: 'Research Runs', value: 0, icon: <Activity size={24} /> },
-            { label: 'Hypotheses', value: 0, icon: <FlaskConical size={24} /> },
-          ]}
-        />
+        {stats && (
+          <StatsGrid
+            className="lg:grid-cols-5"
+            stats={[
+              { label: 'Ideas', value: stats.total_ideas, icon: <Lightbulb size={24} /> },
+              { label: 'Active Ideas', value: stats.active_ideas, icon: <Lightbulb size={24} /> },
+              { label: 'Papers', value: stats.total_papers, icon: <FileSearch size={24} /> },
+              { label: 'Runs', value: stats.total_runs, icon: <Activity size={24} /> },
+              { label: 'Questions', value: stats.total_questions, icon: <MessageSquareText size={24} /> },
+              { label: 'Hypotheses', value: stats.total_hypotheses, icon: <FlaskConical size={24} /> },
+              { label: 'Conflicts', value: stats.total_conflicts, icon: <MessageSquare size={24} /> },
+              { label: 'Skills', value: stats.total_skills, icon: <GraduationCap size={24} /> },
+              { label: 'Reports', value: 0, icon: <BookOpen size={24} /> },
+              { label: 'Wiki Notes', value: 0, icon: <BookOpen size={24} /> },
+            ]}
+          />
+        )}
 
         {/* Navigation Grid */}
         <div>
