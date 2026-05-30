@@ -106,6 +106,7 @@ class IdeaService:
             setattr(idea, field, value)
 
         await self.db.flush()
+        await self.db.refresh(idea)
         return idea
 
     async def delete_idea(self, idea_id: str) -> bool:
@@ -115,6 +116,7 @@ class IdeaService:
             return False
 
         await self.db.delete(idea)
+        await self.db.flush()
         return True
 
     async def get_idea_versions(self, idea_id: str) -> list[IdeaVersion]:

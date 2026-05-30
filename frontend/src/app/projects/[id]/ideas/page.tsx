@@ -91,9 +91,10 @@ export default function IdeasPage() {
     try {
       await ideasApi.delete(deletingIdea.id);
       setDeletingIdea(null);
-      loadIdeas();
-    } catch (error) {
+      await loadIdeas();
+    } catch (error: any) {
       console.error('Failed to delete idea:', error);
+      alert('Failed to delete idea: ' + (error.message || 'Unknown error'));
     } finally {
       setDeleting(false);
     }
