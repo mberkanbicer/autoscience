@@ -117,7 +117,7 @@ async def pause_idea(
     result = await db.execute(
         sql_select(ResearchRun).where(
             ResearchRun.idea_id == idea_id,
-            ResearchRun.state.in_("running", "created"),
+            ResearchRun.state.in_(["running", "created"]),
         )
     )
     running_runs = list(result.scalars().all())
