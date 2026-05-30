@@ -215,11 +215,13 @@ class LiteratureEngine:
         # Sort by overall score
         ranked.sort(key=lambda p: p.overall_score, reverse=True)
 
-        # Use LLM to refine top 20 rankings
-        if len(ranked) > 20:
+        # Use LLM to refine top 20 rankings (only if LLM provider available)
+        if len(ranked) > 20 and self.llm.has_provider():
             top_20 = ranked[:20]
             refined = await self._llm_rank_top_papers(idea, top_20)
             ranked = refined + ranked[20:]
+        elif len(ranked) > 20:
+            logger.info("skipping_llm_ranking_no_provider")
 
         return ranked
 

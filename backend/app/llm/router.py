@@ -45,6 +45,10 @@ class LLMRouter:
             raise ValueError(f"Provider {provider_name} not registered")
         return self.providers[provider_name]
 
+    def has_provider(self) -> bool:
+        """Check if any provider is available."""
+        return len(self.providers) > 0
+
     async def complete(
         self,
         messages: list[Message],
