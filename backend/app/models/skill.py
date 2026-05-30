@@ -1,6 +1,6 @@
 """Skill models."""
 
-from sqlalchemy import Boolean, Float, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,7 +12,7 @@ class Skill(BaseModel):
 
     __tablename__ = "skills"
 
-    project_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     skill_type: Mapped[str] = mapped_column(
         String(50), nullable=False
@@ -49,7 +49,7 @@ class SkillVersion(BaseModel):
 
     __tablename__ = "skill_versions"
 
-    skill_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills.id"), nullable=False, index=True)
     version: Mapped[str] = mapped_column(String(20), nullable=False)
     changes: Mapped[str | None] = mapped_column(Text, nullable=True)
     procedure: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -63,8 +63,8 @@ class SkillUsage(BaseModel):
 
     __tablename__ = "skill_usages"
 
-    skill_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    run_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills.id"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True, index=True)
     success: Mapped[bool] = mapped_column(Boolean, default=True)
     score_before: Mapped[float | None] = mapped_column(Float, nullable=True)
     score_after: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -79,7 +79,7 @@ class SkillEvaluation(BaseModel):
 
     __tablename__ = "skill_evaluations"
 
-    skill_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills.id"), nullable=False, index=True)
     evaluator: Mapped[str] = mapped_column(String(100), nullable=False)  # system | user
     rating: Mapped[float] = mapped_column(Float, nullable=False)  # 0-10
     feedback: Mapped[str | None] = mapped_column(Text, nullable=True)

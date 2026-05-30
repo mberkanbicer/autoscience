@@ -1,6 +1,6 @@
 """Report and knowledge note models."""
 
-from sqlalchemy import String, Text
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,9 +12,9 @@ class ResearchReport(BaseModel):
 
     __tablename__ = "research_reports"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    run_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
-    idea_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True, index=True)
+    idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -28,7 +28,7 @@ class KnowledgeNote(BaseModel):
 
     __tablename__ = "knowledge_notes"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     note_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # paper | cluster | conflict | hypothesis | skill | project
@@ -44,9 +44,9 @@ class LiteratureSearch(BaseModel):
 
     __tablename__ = "literature_searches"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    run_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
-    idea_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True, index=True)
+    idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
     total_results: Mapped[int | None] = mapped_column(nullable=True)
     papers_selected: Mapped[int | None] = mapped_column(nullable=True)
     queries_used: Mapped[list] = mapped_column(JSON, default=list)
@@ -58,7 +58,7 @@ class SearchQuery(BaseModel):
 
     __tablename__ = "search_queries"
 
-    search_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    search_id: Mapped[str] = mapped_column(ForeignKey("literature_searches.id"), nullable=False, index=True)
     query_text: Mapped[str] = mapped_column(Text, nullable=False)
     query_type: Mapped[str | None] = mapped_column(
         String(50), nullable=True
@@ -73,7 +73,7 @@ class Dataset(BaseModel):
 
     __tablename__ = "datasets"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -89,8 +89,8 @@ class AnalysisRun(BaseModel):
 
     __tablename__ = "analysis_runs"
 
-    hypothesis_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
-    dataset_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    hypothesis_id: Mapped[str | None] = mapped_column(ForeignKey("hypotheses.id"), nullable=True, index=True)
+    dataset_id: Mapped[str | None] = mapped_column(ForeignKey("datasets.id"), nullable=True, index=True)
     script: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -101,7 +101,7 @@ class AnalysisArtifact(BaseModel):
 
     __tablename__ = "analysis_artifacts"
 
-    analysis_run_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analysis_runs.id"), nullable=False, index=True)
     artifact_type: Mapped[str | None] = mapped_column(
         String(50), nullable=True
     )  # figure | table | json | csv | script

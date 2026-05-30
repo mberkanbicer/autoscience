@@ -85,6 +85,7 @@ async def update_project(
         setattr(project, field, value)
 
     await db.flush()
+    await db.refresh(project)
     return project
 
 

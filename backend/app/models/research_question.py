@@ -1,6 +1,6 @@
 """Research question and hypothesis models."""
 
-from sqlalchemy import Float, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,9 +12,9 @@ class ResearchQuestion(BaseModel):
 
     __tablename__ = "research_questions"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    idea_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
-    run_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True, index=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     source_conflicts: Mapped[list] = mapped_column(JSON, default=list)
     source_gaps: Mapped[list] = mapped_column(JSON, default=list)
@@ -30,9 +30,9 @@ class Hypothesis(BaseModel):
 
     __tablename__ = "hypotheses"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    idea_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
-    question_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
+    question_id: Mapped[str | None] = mapped_column(ForeignKey("research_questions.id"), nullable=True, index=True)
     statement: Mapped[str] = mapped_column(Text, nullable=False)
     independent_variable: Mapped[str | None] = mapped_column(Text, nullable=True)
     dependent_variable: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -54,7 +54,7 @@ class ValidationPlan(BaseModel):
 
     __tablename__ = "validation_plans"
 
-    hypothesis_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    hypothesis_id: Mapped[str] = mapped_column(ForeignKey("hypotheses.id"), nullable=False, index=True)
     dataset_candidates: Mapped[list] = mapped_column(JSON, default=list)
     benchmark_candidates: Mapped[list] = mapped_column(JSON, default=list)
     baselines: Mapped[list] = mapped_column(JSON, default=list)

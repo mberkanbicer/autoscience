@@ -1,6 +1,6 @@
 """Research run models."""
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,8 +12,8 @@ class ResearchRun(BaseModel):
 
     __tablename__ = "research_runs"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    idea_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
     run_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # user_directed | flexible_user | idle_autonomous | validation | skill_refinement
@@ -44,7 +44,7 @@ class ResearchRunEvent(BaseModel):
 
     __tablename__ = "research_run_events"
 
-    run_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("research_runs.id"), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     actor: Mapped[str | None] = mapped_column(String(100), nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -58,7 +58,7 @@ class ToolCall(BaseModel):
 
     __tablename__ = "tool_calls"
 
-    run_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("research_runs.id"), nullable=False, index=True)
     agent_role: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tool_name: Mapped[str] = mapped_column(String(255), nullable=False)
     input_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -76,8 +76,8 @@ class IdleCycle(BaseModel):
 
     __tablename__ = "idle_cycles"
 
-    project_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    run_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True, index=True)
     idle_mode: Mapped[str | None] = mapped_column(
         String(50), nullable=True
     )  # frontier_scan | citation_conflict | revisit_rejected | cross_domain | skill_improvement | dataset_discovery
