@@ -46,6 +46,9 @@ export default function PipelinePage() {
 
   useEffect(() => {
     loadPipelineData();
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(loadPipelineData, 10000);
+    return () => clearInterval(interval);
   }, [projectId]);
 
   const loadPipelineData = async () => {
