@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { questionsApi } from '@/lib/api';
 import { ResearchQuestion } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { MessageSquareQuestion, Hash, TrendingUp } from 'lucide-react';
+import { MessageSquare, Hash, TrendingUp } from 'lucide-react';
 
 export default function QuestionsPage() {
   const params = useParams();
@@ -50,7 +50,7 @@ export default function QuestionsPage() {
           </div>
         ) : questions.length === 0 ? (
           <EmptyState
-            icon={<MessageSquareQuestion className="w-8 h-8 text-gray-400" />}
+            icon={<MessageSquare className="w-8 h-8 text-gray-400" />}
             title="No questions yet"
             description="Research questions are generated from literature conflicts and gaps."
           />
@@ -63,16 +63,16 @@ export default function QuestionsPage() {
                     <span className="text-purple-600 font-bold">{index + 1}</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-gray-900 font-medium mb-2">{question.question_text}</p>
+                    <p className="text-gray-900 font-medium mb-2">{question.question}</p>
                     {question.rationale && (
                       <p className="text-sm text-gray-600 mb-3">{question.rationale}</p>
                     )}
                     <div className="flex items-center gap-3 flex-wrap">
                       <StatusBadge status={question.status} />
-                      {question.priority_rank && (
+                      {question.rank && (
                         <Badge variant="purple">
                           <TrendingUp size={12} className="mr-1" />
-                          Rank #{question.priority_rank}
+                          Rank #{question.rank}
                         </Badge>
                       )}
                       <span className="text-xs text-gray-400">

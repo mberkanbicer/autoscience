@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { hypothesesApi } from '@/lib/api';
 import { Hypothesis } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { FlaskConical, Target, AlertTriangle, CheckCircle } from 'lucide-react';
+import { FlaskConical, Target, AlertTriangle, CheckCircle, TrendingUp } from 'lucide-react';
 
 export default function HypothesesPage() {
   const params = useParams();
@@ -61,71 +61,87 @@ export default function HypothesesPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <p className="text-gray-900 font-medium mb-2">{hypothesis.statement}</p>
-                    {hypothesis.rationale && (
-                      <p className="text-sm text-gray-600 mb-3">{hypothesis.rationale}</p>
+                    {hypothesis.context && (
+                      <p className="text-sm text-gray-600 mb-3">{hypothesis.context}</p>
                     )}
                   </div>
-                  <div className="ml-4 flex-shrink-0">
+                  <div className="ml-4 flex-shrink-0 flex items-center gap-2">
+                    {hypothesis.confidence !== null && hypothesis.confidence !== undefined && (
+                      <Badge variant="info">
+                        <TrendingUp size={12} className="mr-1" />
+                        {(hypothesis.confidence * 100).toFixed(0)}%
+                      </Badge>
+                    )}
                     <StatusBadge status={hypothesis.status} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Independent Variables */}
-                  {hypothesis.independent_variables && hypothesis.independent_variables.length > 0 && (
+                  {/* Independent Variable */}
+                  {hypothesis.independent_variable && (
                     <div className="bg-blue-50 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <Target size={14} className="text-blue-600" />
-                        <span className="text-xs font-medium text-blue-600 uppercase">Independent Variables</span>
+                        <span className="text-xs font-medium text-blue-600 uppercase">Independent Variable</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {hypothesis.independent_variables.map((v, i) => (
-                          <Badge key={i} variant="info" size="sm">{v}</Badge>
-                        ))}
-                      </div>
+                      <p className="text-sm text-blue-800">{hypothesis.independent_variable}</p>
                     </div>
                   )}
 
-                  {/* Dependent Variables */}
-                  {hypothesis.dependent_variables && hypothesis.dependent_variables.length > 0 && (
+                  {/* Dependent Variable */}
+                  {hypothesis.dependent_variable && (
                     <div className="bg-green-50 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <CheckCircle size={14} className="text-green-600" />
-                        <span className="text-xs font-medium text-green-600 uppercase">Dependent Variables</span>
+                        <span className="text-xs font-medium text-green-600 uppercase">Dependent Variable</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {hypothesis.dependent_variables.map((v, i) => (
-                          <Badge key={i} variant="success" size="sm">{v}</Badge>
-                        ))}
-                      </div>
+                      <p className="text-sm text-green-800">{hypothesis.dependent_variable}</p>
                     </div>
                   )}
                 </div>
 
-                {/* Baseline Comparison */}
-                {hypothesis.baseline_comparison && (
-                  <div className="text-sm text-gray-600 mb-3">
-                    <span className="font-medium">Baseline:</span> {hypothesis.baseline_comparison}
-                  </div>
-                )}
+                {/* Additional Details */}
+                <div className="space-y-2 text-sm">
+                  {hypothesis.expected_direction && (
+                    <div>
+                      <span className="font-medium text-gray-700">Expected Direction:</span>{' '}
+                      <span className="text-gray-600">{hypothesis.expected_direction}</span>
+                    </div>
+                  )}
+                  {hypothesis.baseline && (
+                    <div>
+                      <span className="font-medium text-gray-700">Baseline:</span>{' '}
+                      <span className="text-gray-600">{hypothesis.baseline}</span>
+                    </div>
+                  )}
+                  {hypothesis.metric && (
+                    <div>
+                      <span className="font-medium text-gray-700">Metric:</span>{' '}
+                      <span className="text-gray-600">{hypothesis.metric}</span>
+                    </div>
+                  )}
+                  {hypothesis.dataset_requirement && (
+                    <div>
+                      <span className="font-medium text-gray-700">Dataset:</span>{' '}
+                      <span className="text-gray-600">{hypothesis.dataset_requirement}</span>
+                    </div>
+                  )}
+                </div>
 
-                {/* Failure Conditions */}
-                {hypothesis.failure_conditions && hypothesis.failure_conditions.length > 0 && (
-                  <div className="bg-red-50 rounded-lg p-3">
+                {/* Failure Condition */}
+                {hypothesis.failure_condition && (
+                  <div className="mt-4 bg-red-50 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertTriangle size={14} className="text-red-600" />
-                      <span className="text-xs font-medium text-red-600 uppercase">Failure Conditions</span>
+                      <span className="text-xs font-medium text-red-600 uppercase">Failure Condition</span>
                     </div>
-                    <ul className="text-sm text-red-700 space-y-1">
-                      {hypothesis.failure_conditions.map((condition, i) => (
-                        <li key={i}>• {condition}</li>
-                      ))}
-                    </ul>
+                    <p className="text-sm text-red-700">{hypothesis.failure_condition}</p>
                   </div>
                 )}
 
-                <div className="mt-4 text-xs text-gray-400">
-                  Created {formatDate(hypothesis.created_at)}
+                <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
+                  <span>Version {hypothesis.version}</span>
+                  <span>Created {formatDate(hypothesis.created_at)}</span>
                 </div>
               </Card>
             ))}

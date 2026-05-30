@@ -66,7 +66,9 @@ export default function SkillsPage() {
                 </div>
 
                 <h3 className="font-semibold text-gray-900 mb-2">{skill.name}</h3>
-                <p className="text-sm text-gray-600 line-clamp-2 mb-4">{skill.description}</p>
+                {skill.purpose && (
+                  <p className="text-sm text-gray-600 line-clamp-2 mb-4">{skill.purpose}</p>
+                )}
 
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between text-sm">
@@ -81,40 +83,53 @@ export default function SkillsPage() {
                     <span className="text-gray-500">Times Used</span>
                     <div className="flex items-center gap-1 text-gray-900">
                       <Zap size={14} className="text-yellow-500" />
-                      {skill.usage_count}
+                      {skill.times_used}
                     </div>
                   </div>
-                  {skill.success_rate !== null && skill.success_rate !== undefined && (
+                  {skill.times_used > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Success Rate</span>
                       <div className="flex items-center gap-1 text-gray-900">
                         <BarChart size={14} className="text-green-500" />
-                        {(skill.success_rate * 100).toFixed(0)}%
+                        {Math.round((skill.successful_uses / skill.times_used) * 100)}%
+                      </div>
+                    </div>
+                  )}
+                  {skill.average_score_improvement !== null && skill.average_score_improvement !== undefined && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Avg Improvement</span>
+                      <div className="flex items-center gap-1 text-green-600">
+                        <TrendingUp size={14} />
+                        +{skill.average_score_improvement.toFixed(1)}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {skill.procedure_steps && skill.procedure_steps.length > 0 && (
+                {skill.procedure.length > 0 && (
                   <div className="border-t border-gray-100 pt-4">
                     <span className="text-xs font-medium text-gray-500 uppercase">Procedure</span>
                     <ol className="mt-2 text-sm text-gray-600 space-y-1">
-                      {skill.procedure_steps.slice(0, 3).map((step, i) => (
+                      {skill.procedure.slice(0, 3).map((step, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="text-blue-500 font-medium">{i + 1}.</span>
                           <span className="line-clamp-1">{step}</span>
                         </li>
                       ))}
-                      {skill.procedure_steps.length > 3 && (
-                        <li className="text-gray-400">+{skill.procedure_steps.length - 3} more steps</li>
+                      {skill.procedure.length > 3 && (
+                        <li className="text-gray-400">+{skill.procedure.length - 3} more steps</li>
                       )}
                     </ol>
                   </div>
                 )}
 
-                <div className="mt-4 text-xs text-gray-400">
-                  Last used {skill.last_used_at ? formatDate(skill.last_used_at) : 'never'}
-                </div>
+                {skill.trigger_conditions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {skill.trigger_conditions.slice(0, 2).map((condition, i) => (
+                      <Badge key={i} variant="default" size="sm">{condition}</Badge>
+                    ))}
+                  </div>
+                )}
               </Card>
             ))}
           </div>

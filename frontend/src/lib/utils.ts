@@ -68,3 +68,16 @@ export function getClassificationColor(classification: string): string {
       return 'text-gray-700 bg-gray-100';
   }
 }
+
+export function formatDuration(start: string, end: string): string {
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d ${diffHours % 24}h`;
+  if (diffHours > 0) return `${diffHours}h ${diffMins % 60}m`;
+  return `${diffMins}m`;
+}
