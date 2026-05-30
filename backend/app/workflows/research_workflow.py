@@ -78,6 +78,15 @@ class ResearchWorkflow:
         config: WorkflowConfig | None = None,
         run_id: str | None = None,
         run_service=None,
+        keyword_engine=None,
+        literature_engine=None,
+        analysis_engine=None,
+        clustering_engine=None,
+        conflict_engine=None,
+        question_engine=None,
+        hypothesis_engine=None,
+        validation_engine=None,
+        scoring_engine=None,
     ):
         self.agents = agents
         self.config = config or WorkflowConfig(run_type="user_directed")
@@ -85,6 +94,15 @@ class ResearchWorkflow:
         self.status = WorkflowStatus.PENDING
         self.run_id = run_id
         self.run_service = run_service
+        self.keyword_engine = keyword_engine
+        self.literature_engine = literature_engine
+        self.analysis_engine = analysis_engine
+        self.clustering_engine = clustering_engine
+        self.conflict_engine = conflict_engine
+        self.question_engine = question_engine
+        self.hypothesis_engine = hypothesis_engine
+        self.validation_engine = validation_engine
+        self.scoring_engine = scoring_engine
 
     async def run(self, state: ResearchState) -> ResearchState:
         """Run the complete research workflow."""
@@ -319,33 +337,85 @@ class ResearchWorkflow:
         return state
 
     async def _retrieve_literature(self, state: ResearchState) -> ResearchState:
-        """Retrieve literature."""
-        agent = self.agents.get(AgentRole.LITERATURE)
-        if not agent:
+        """Retrieve literature by searching academic databases."""
+        from ..schemas.research_state import PaperSummary
+
+        if not self.literature_engine:
+            logger.warning("no_literature_engine")
+            state.current_phase = "literature_retrieved"
             return state
 
-        input = AgentInput(
-            task=f"Search for papers related to: {state.current_idea}",
-            context={"max_sources": state.budget.max_sources},
-        )
+        # Expand keywords if keyword engine available
+        keywords = None
+        if self.keyword_engine:
+            try:
+                kw_result = await self.keyword_engine.expand_keywords(state.current_idea)
+                keywords = kw_result.get("keywords", []) if isinstance(kw_result, dict) else None
+            except Exception as e:
+                logger.warning("keyword_expansion_failed", error=str(e))
 
-        output = await agent.run(input)
-        state.sources_searched += 10  # Simulated
+        # Search academic databases
+        try:
+            result = await self.literature_engine.retrieve_literature(
+                idea=state.current_idea,
+                keywords=keywords,
+                limit=min(state.budget.max_sources, 30),
+            )
+
+            # Convert found papers to PaperSummary and add to state
+            for rp in result.papers:
+                paper = rp.paper
+                state.papers.append(
+                    PaperSummary(
+                        id=paper.id or paper.doi or paper.title[:50],
+                        title=paper.title,
+                        authors=paper.authors if isinstance(paper.authors, list) else [str(paper.authors)],
+                        year=paper.year,
+                        doi=paper.doi,
+                        citation_count=paper.citation_count,
+                        paper_type=paper.paper_type,
+                        relevance_score=rp.overall_score,
+                    )
+                )
+
+            state.sources_searched += result.total_found
+            logger.info(
+                "literature_retrieved",
+                papers_found=len(result.papers),
+                total_sources=result.total_found,
+            )
+
+        except Exception as e:
+            logger.error("literature_retrieval_failed", error=str(e))
+            state.add_error("literature_retrieval", str(e))
+
         state.current_phase = "literature_retrieved"
         return state
 
     async def _analyze_papers(self, state: ResearchState) -> ResearchState:
-        """Analyze papers."""
-        agent = self.agents.get(AgentRole.PAPER_ANALYST)
-        if not agent:
+        """Analyze papers using the analysis engine."""
+        if not self.analysis_engine or not state.papers:
+            state.current_phase = "papers_analyzed"
             return state
 
-        input = AgentInput(
-            task="Analyze retrieved papers",
-            context={"papers": [p.model_dump() for p in state.papers[:5]]},
-        )
+        try:
+            # Analyze up to 10 papers
+            for paper_summary in state.papers[:10]:
+                try:
+                    analysis = await self.analysis_engine.analyze_paper(
+                        title=paper_summary.title,
+                        abstract="",  # Would need full paper data
+                        idea=state.current_idea,
+                    )
+                    if analysis:
+                        state.add_event("paper_analyzed", details={"paper": paper_summary.title[:80]})
+                except Exception as e:
+                    logger.warning("paper_analysis_failed", paper=paper_summary.title[:50], error=str(e))
 
-        output = await agent.run(input)
+            state.add_event("papers_analyzed", details={"count": min(len(state.papers), 10)})
+        except Exception as e:
+            logger.error("analysis_failed", error=str(e))
+
         state.current_phase = "papers_analyzed"
         return state
 
@@ -365,53 +435,103 @@ class ResearchWorkflow:
         return state
 
     async def _detect_conflicts(self, state: ResearchState) -> ResearchState:
-        """Detect conflicts."""
-        agent = self.agents.get(AgentRole.CONFLICT)
-        if not agent:
+        """Detect conflicts using the conflict engine."""
+        from ..schemas.research_state import ConflictSummary
+
+        if not self.conflict_engine or not state.papers:
+            state.current_phase = "conflicts_detected"
             return state
 
-        input = AgentInput(
-            task="Detect conflicts in the literature",
-            context={"papers": [p.model_dump() for p in state.papers[:10]]},
-        )
+        try:
+            # Convert state papers back to RawPaper-like dicts for the engine
+            paper_dicts = [
+                {"title": p.title, "authors": p.authors, "year": p.year, "id": p.id}
+                for p in state.papers[:15]
+            ]
+            result = await self.conflict_engine.detect_conflicts(
+                idea=state.current_idea,
+                papers=paper_dicts,
+            )
+            if result and hasattr(result, 'conflicts'):
+                for c in result.conflicts[:10]:
+                    state.conflicts.append(
+                        ConflictSummary(
+                            id=c.get('id', ''),
+                            conflict_type=c.get('type', 'unknown'),
+                            description=c.get('description', ''),
+                            severity=c.get('severity'),
+                        )
+                    )
+        except Exception as e:
+            logger.error("conflict_detection_failed", error=str(e))
 
-        output = await agent.run(input)
         state.current_phase = "conflicts_detected"
         return state
 
     async def _generate_questions(self, state: ResearchState) -> ResearchState:
-        """Generate research questions."""
-        agent = self.agents.get(AgentRole.RESEARCH_QUESTION)
-        if not agent:
+        """Generate research questions using the question engine."""
+        from ..schemas.research_state import QuestionSummary
+
+        if not self.question_engine:
+            state.current_phase = "questions_generated"
             return state
 
-        input = AgentInput(
-            task="Generate research questions from conflicts",
-            context={
-                "idea": state.current_idea,
-                "conflicts": [c.model_dump() for c in state.conflicts],
-            },
-        )
+        try:
+            conflict_dicts = [
+                {"type": c.conflict_type, "description": c.description}
+                for c in state.conflicts
+            ]
+            result = await self.question_engine.generate_questions(
+                idea=state.current_idea,
+                papers=[{"title": p.title} for p in state.papers[:10]],
+                conflicts=conflict_dicts,
+            )
+            if result and hasattr(result, 'questions'):
+                for q in result.questions[:10]:
+                    state.questions.append(
+                        QuestionSummary(
+                            id=q.get('id', ''),
+                            question=q.get('text', q.get('question', '')),
+                            rank=q.get('rank'),
+                            status="active",
+                        )
+                    )
+        except Exception as e:
+            logger.error("question_generation_failed", error=str(e))
 
-        output = await agent.run(input)
         state.current_phase = "questions_generated"
         return state
 
     async def _form_hypotheses(self, state: ResearchState) -> ResearchState:
-        """Form hypotheses."""
-        agent = self.agents.get(AgentRole.HYPOTHESIS)
-        if not agent:
+        """Form hypotheses using the hypothesis engine."""
+        from ..schemas.research_state import HypothesisSummary
+
+        if not self.hypothesis_engine:
+            state.current_phase = "hypotheses_formed"
             return state
 
-        input = AgentInput(
-            task="Form testable hypotheses from questions",
-            context={
-                "idea": state.current_idea,
-                "questions": [q.model_dump() for q in state.questions],
-            },
-        )
+        try:
+            question_dicts = [
+                {"text": q.question, "rank": q.rank}
+                for q in state.questions
+            ]
+            result = await self.hypothesis_engine.generate_hypotheses(
+                idea=state.current_idea,
+                questions=question_dicts,
+            )
+            if result and hasattr(result, 'hypotheses'):
+                for h in result.hypotheses[:10]:
+                    state.hypotheses.append(
+                        HypothesisSummary(
+                            id=h.get('id', ''),
+                            statement=h.get('statement', ''),
+                            confidence=h.get('confidence'),
+                            status="draft",
+                        )
+                    )
+        except Exception as e:
+            logger.error("hypothesis_generation_failed", error=str(e))
 
-        output = await agent.run(input)
         state.current_phase = "hypotheses_formed"
         return state
 

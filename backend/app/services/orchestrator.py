@@ -144,6 +144,15 @@ class ResearchOrchestrator:
             config=WorkflowConfig(run_type=run_type, flexibility=flexibility),
             run_id=run.id,
             run_service=self.run_service,
+            keyword_engine=self.keyword_engine,
+            literature_engine=self.literature_engine,
+            analysis_engine=self.paper_analysis_engine,
+            clustering_engine=self.clustering_engine,
+            conflict_engine=self.conflict_engine,
+            question_engine=self.question_engine,
+            hypothesis_engine=self.hypothesis_engine,
+            validation_engine=self.validation_engine,
+            scoring_engine=self.scoring_engine,
         )
 
         state = await workflow.run(state)
