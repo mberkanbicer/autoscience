@@ -24,6 +24,7 @@ from ..services.project_service import ProjectService
 from ..services.idea_service import IdeaService
 from ..services.idea_ledger_service import IdeaLedgerService
 from ..services.research_run_service import ResearchRunService
+from ..schemas.research_run import ResearchRunCreate
 from ..services.paper_service import PaperService
 from ..services.literature_service import LiteratureService
 from ..services.paper_analysis_service import PaperAnalysisService
@@ -116,10 +117,10 @@ class ResearchOrchestrator:
         # Create research run
         run = await self.run_service.create_run(
             project_id=project_id,
-            data={
-                "idea_id": idea.id,
-                "run_type": run_type,
-            },
+            data=ResearchRunCreate(
+                idea_id=idea.id,
+                run_type=run_type,
+            ),
         )
 
         # Initialize state
