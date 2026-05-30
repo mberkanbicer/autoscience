@@ -200,19 +200,22 @@ class ResearchOrchestrator:
         """Store research results in the database."""
         # Store papers
         for paper in state.papers:
-            await self.paper_service.create_paper(
-                project_id=state.project_id,
-                data={
-                    "title": paper.title,
-                    "authors": paper.authors,
-                    "year": paper.year,
-                    "doi": paper.doi,
-                    "abstract": paper.abstract,
-                    "venue": paper.venue,
-                    "citation_count": paper.citation_count,
-                    "paper_type": paper.paper_type,
-                },
-            )
+            try:
+                await self.paper_service.create_paper(
+                    project_id=state.project_id,
+                    data={
+                        "title": paper.title,
+                        "authors": paper.authors if isinstance(paper.authors, list) else [str(paper.authors)],
+                        "year": paper.year,
+                        "doi": paper.doi,
+                        "abstract": getattr(paper, 'abstract', None),
+                        "venue": getattr(paper, 'venue', None),
+                        "citation_count": paper.citation_count,
+                        "paper_type": paper.paper_type,
+                    },
+                )
+            except Exception as e:
+                logger.warning("store_paper_failed", title=paper.title[:50], error=str(e))
 
         # Store clusters
         for cluster in state.clusters:
@@ -230,20 +233,26 @@ class ResearchOrchestrator:
 
         # Store questions
         for question in state.questions:
-            await self.question_service.store_questions(
-                project_id=state.project_id,
-                result={"questions": [question]},
-                run_id=state.run_id,
-                idea_id=state.idea_id,
-            )
+            try:
+                await self.question_service.store_questions(
+                    project_id=state.project_id,
+                    result={"questions": [{"text": question.question, "rank": question.rank}]},
+                    run_id=state.run_id,
+                    idea_id=state.idea_id,
+                )
+            except Exception as e:
+                logger.warning("store_question_failed", error=str(e))
 
         # Store hypotheses
         for hypothesis in state.hypotheses:
-            await self.hypothesis_service.store_hypotheses(
-                project_id=state.project_id,
-                result={"hypotheses": [hypothesis]},
-                idea_id=state.idea_id,
-            )
+            try:
+                await self.hypothesis_service.store_hypotheses(
+                    project_id=state.project_id,
+                    result={"hypotheses": [{"statement": hypothesis.statement, "confidence": hypothesis.confidence}]},
+                    idea_id=state.idea_id,
+                )
+            except Exception as e:
+                logger.warning("store_hypothesis_failed", error=str(e))
 
         # Store score
         if state.scores:

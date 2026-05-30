@@ -365,9 +365,10 @@ class ResearchWorkflow:
             # Convert found papers to PaperSummary and add to state
             for rp in result.papers:
                 paper = rp.paper
+                paper_id = paper.source_id or paper.doi or paper.title[:50]
                 state.papers.append(
                     PaperSummary(
-                        id=paper.id or paper.doi or paper.title[:50],
+                        id=paper_id,
                         title=paper.title,
                         authors=paper.authors if isinstance(paper.authors, list) else [str(paper.authors)],
                         year=paper.year,
@@ -420,17 +421,35 @@ class ResearchWorkflow:
         return state
 
     async def _cluster_papers(self, state: ResearchState) -> ResearchState:
-        """Cluster papers."""
-        agent = self.agents.get(AgentRole.CLUSTER)
-        if not agent:
+        """Cluster papers using the clustering engine."""
+        from ..schemas.research_state import ClusterSummary
+
+        if not self.clustering_engine or not state.papers:
+            state.current_phase = "papers_clustered"
             return state
 
-        input = AgentInput(
-            task="Cluster papers by theme",
-            context={"papers": [p.model_dump() for p in state.papers[:10]]},
-        )
+        try:
+            paper_dicts = [
+                {"title": p.title, "id": p.id, "authors": p.authors, "year": p.year}
+                for p in state.papers
+            ]
+            result = await self.clustering_engine.cluster_papers(
+                papers=paper_dicts,
+            )
+            if result and hasattr(result, 'clusters'):
+                for c in result.clusters[:10]:
+                    state.clusters.append(
+                        ClusterSummary(
+                            id=c.id,
+                            name=c.name,
+                            description=c.description,
+                            paper_count=len(c.paper_ids),
+                        )
+                    )
+            state.add_event("papers_clustered", details={"clusters": len(state.clusters)})
+        except Exception as e:
+            logger.error("clustering_failed", error=str(e))
 
-        output = await agent.run(input)
         state.current_phase = "papers_clustered"
         return state
 
@@ -438,28 +457,24 @@ class ResearchWorkflow:
         """Detect conflicts using the conflict engine."""
         from ..schemas.research_state import ConflictSummary
 
-        if not self.conflict_engine or not state.papers:
+        if not self.conflict_engine or len(state.papers) < 2:
             state.current_phase = "conflicts_detected"
             return state
 
         try:
-            # Convert state papers back to RawPaper-like dicts for the engine
             paper_dicts = [
                 {"title": p.title, "authors": p.authors, "year": p.year, "id": p.id}
                 for p in state.papers[:15]
             ]
-            result = await self.conflict_engine.detect_conflicts(
-                idea=state.current_idea,
-                papers=paper_dicts,
-            )
+            result = await self.conflict_engine.detect_conflicts(papers=paper_dicts)
             if result and hasattr(result, 'conflicts'):
                 for c in result.conflicts[:10]:
                     state.conflicts.append(
                         ConflictSummary(
-                            id=c.get('id', ''),
-                            conflict_type=c.get('type', 'unknown'),
-                            description=c.get('description', ''),
-                            severity=c.get('severity'),
+                            id=c.id,
+                            conflict_type=c.conflict_type,
+                            description=c.description,
+                            severity=c.severity,
                         )
                     )
         except Exception as e:
@@ -471,28 +486,37 @@ class ResearchWorkflow:
     async def _generate_questions(self, state: ResearchState) -> ResearchState:
         """Generate research questions using the question engine."""
         from ..schemas.research_state import QuestionSummary
+        from ..engine.conflict_detection import Conflict, Gap
 
         if not self.question_engine:
             state.current_phase = "questions_generated"
             return state
 
         try:
-            conflict_dicts = [
-                {"type": c.conflict_type, "description": c.description}
-                for c in state.conflicts
+            # Convert state conflicts to engine Conflict objects
+            conflict_objs = [
+                Conflict(
+                    id=c.id or f"conflict-{i}",
+                    conflict_type=c.conflict_type,
+                    description=c.description,
+                    severity=c.severity or 0.5,
+                )
+                for i, c in enumerate(state.conflicts)
             ]
+            gap_objs = []  # No gaps from our pipeline yet
+
             result = await self.question_engine.generate_questions(
-                idea=state.current_idea,
-                papers=[{"title": p.title} for p in state.papers[:10]],
-                conflicts=conflict_dicts,
+                conflicts=conflict_objs,
+                gaps=gap_objs,
+                idea_context=state.current_idea,
             )
             if result and hasattr(result, 'questions'):
                 for q in result.questions[:10]:
                     state.questions.append(
                         QuestionSummary(
-                            id=q.get('id', ''),
-                            question=q.get('text', q.get('question', '')),
-                            rank=q.get('rank'),
+                            id=q.id,
+                            question=q.question,
+                            rank=q.overall_score,
                             status="active",
                         )
                     )
@@ -536,25 +560,61 @@ class ResearchWorkflow:
         return state
 
     async def _plan_validation(self, state: ResearchState) -> ResearchState:
-        """Plan validation."""
-        agent = self.agents.get(AgentRole.VALIDATION_PLANNER)
-        if not agent:
+        """Plan validation using the validation engine."""
+        if not self.validation_engine or not state.hypotheses:
+            state.current_phase = "validation_planned"
             return state
 
-        input = AgentInput(
-            task="Design validation plan for hypotheses",
-            context={
-                "hypotheses": [h.model_dump() for h in state.hypotheses],
-            },
-        )
+        try:
+            hyp_dicts = [
+                {"statement": h.statement, "confidence": h.confidence}
+                for h in state.hypotheses
+            ]
+            for h in state.hypotheses[:5]:
+                try:
+                    await self.validation_engine.create_validation_plan(
+                        hypothesis={"statement": h.statement},
+                        idea=state.current_idea,
+                    )
+                    state.add_event("validation_planned", details={"hypothesis": h.statement[:80]})
+                except Exception as e:
+                    logger.warning("validation_plan_failed", error=str(e))
+        except Exception as e:
+            logger.error("validation_planning_failed", error=str(e))
 
-        output = await agent.run(input)
         state.current_phase = "validation_planned"
         return state
 
     async def _score_idea(self, state: ResearchState) -> ResearchState:
-        """Score the idea."""
-        # Use scoring engine directly
+        """Score the idea using the scoring engine."""
+        from ..schemas.research_state import ScoreSummary
+
+        if not self.scoring_engine:
+            state.current_phase = "idea_scored"
+            return state
+
+        try:
+            # Build paper and conflict dicts for scoring
+            paper_dicts = [{"title": p.title, "year": p.year} for p in state.papers]
+            conflict_dicts = [{"type": c.conflict_type, "description": c.description} for c in state.conflicts]
+
+            score_result = await self.scoring_engine.score_idea(
+                idea={"id": state.idea_id or "", "current_text": state.current_idea},
+                papers=paper_dicts if paper_dicts else None,
+                conflicts=conflict_dicts if conflict_dicts else None,
+            )
+            if score_result:
+                state.scores.append(
+                    ScoreSummary(
+                        id=getattr(score_result, 'id', ''),
+                        overall_value=getattr(score_result, 'overall_value', None),
+                        classification=getattr(score_result, 'classification', None),
+                    )
+                )
+                state.current_classification = getattr(score_result, 'classification', None)
+        except Exception as e:
+            logger.error("scoring_failed", error=str(e))
+
         state.current_phase = "idea_scored"
         return state
 
