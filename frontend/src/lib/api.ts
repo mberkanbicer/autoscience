@@ -14,7 +14,8 @@ async function request<T>(
   const { method = 'GET', body, headers = {} } = options;
 
   // Use relative URL - Next.js proxy will forward to backend
-  const response = await fetch(`/api${endpoint}`, {
+  // Endpoint already includes /api/v1/..., proxy maps /api/* to backend
+  const response = await fetch(endpoint, {
     method,
     headers: {
       'Content-Type': 'application/json',
