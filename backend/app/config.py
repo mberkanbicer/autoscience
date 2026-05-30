@@ -30,10 +30,20 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_default_model: str = "claude-sonnet-4-20250514"
 
+    # OpenRouter
+    openrouter_api_key: str = ""
+    openrouter_default_model: str = "openai/gpt-4o"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    # Local LLM (Ollama or compatible)
     local_llm_base_url: str = "http://localhost:11434"
     local_llm_model: str = "llama3"
 
-    default_llm_provider: Literal["openai", "anthropic", "local"] = "openai"
+    # Llama.cpp (llama-server)
+    llamacpp_base_url: str = "http://localhost:8080"
+    llamacpp_model: str = "local-model"
+
+    default_llm_provider: Literal["openai", "anthropic", "openrouter", "local", "llamacpp"] = "openai"
 
     # Embeddings
     embedding_provider: Literal["openai", "local"] = "openai"

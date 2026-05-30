@@ -7,6 +7,8 @@ from .base import LLMProvider, Message, CompletionResult, StructuredOutput
 from .openai_provider import OpenAIProvider
 from .anthropic_provider import AnthropicProvider
 from .local_provider import LocalProvider
+from .openrouter_provider import OpenRouterProvider
+from .llamacpp_provider import LlamaCppProvider
 
 logger = structlog.get_logger()
 
@@ -165,8 +167,13 @@ class LLMRouter:
 def create_default_router(
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
+    openrouter_api_key: str | None = None,
+    openrouter_default_model: str | None = None,
+    openrouter_base_url: str | None = None,
     local_base_url: str | None = None,
     local_model: str | None = None,
+    llamacpp_base_url: str | None = None,
+    llamacpp_model: str | None = None,
     default_provider: str = "openai",
 ) -> LLMRouter:
     """Create a router with configured providers."""
@@ -184,10 +191,29 @@ def create_default_router(
             AnthropicProvider(api_key=anthropic_api_key),
         )
 
+    if openrouter_api_key:
+        router.register_provider(
+            "openrouter",
+            OpenRouterProvider(
+                api_key=openrouter_api_key,
+                default_model=openrouter_default_model or "openai/gpt-4o",
+                base_url=openrouter_base_url or "https://openrouter.ai/api/v1",
+            ),
+        )
+
     if local_base_url:
         router.register_provider(
             "local",
             LocalProvider(base_url=local_base_url, model=local_model or "llama3"),
+        )
+
+    if llamacpp_base_url:
+        router.register_provider(
+            "llamacpp",
+            LlamaCppProvider(
+                base_url=llamacpp_base_url,
+                model=llamacpp_model or "local-model",
+            ),
         )
 
     # Set default and fallback chain

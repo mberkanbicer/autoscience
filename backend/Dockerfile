@@ -9,10 +9,8 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies first (better caching)
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
-    pip install --no-cache-dir \
+# Install Python dependencies
+RUN pip install --no-cache-dir \
     fastapi>=0.110.0 \
     uvicorn[standard]>=0.27.0 \
     python-multipart>=0.0.9 \
@@ -33,7 +31,8 @@ RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
     sentence-transformers>=2.3.0 \
     scikit-learn>=1.4.0 \
     pandas>=2.2.0 \
-    matplotlib>=3.8.0
+    matplotlib>=3.8.0 \
+    aiosqlite>=0.20.0
 
 # Copy application
 COPY . .

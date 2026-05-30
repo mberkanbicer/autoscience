@@ -20,8 +20,13 @@ def get_llm_router() -> LLMRouter:
     return create_default_router(
         openai_api_key=settings.openai_api_key,
         anthropic_api_key=settings.anthropic_api_key,
+        openrouter_api_key=settings.openrouter_api_key,
+        openrouter_default_model=settings.openrouter_default_model,
+        openrouter_base_url=settings.openrouter_base_url,
         local_base_url=settings.local_llm_base_url,
         local_model=settings.local_llm_model,
+        llamacpp_base_url=settings.llamacpp_base_url,
+        llamacpp_model=settings.llamacpp_model,
         default_provider=settings.default_llm_provider,
     )
 
