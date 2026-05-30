@@ -133,80 +133,32 @@ start_docker() {
 
 start_dev() {
     print_header
-    echo -e "${BLUE}Starting in development mode...${NC}"
+    echo -e "${BLUE}Starting in development mode with hot-reload...${NC}"
     echo ""
     
-    # Check for PostgreSQL
-    if ! command -v psql &> /dev/null && ! docker ps | grep -q postgres; then
-        echo -e "${YELLOW}Starting PostgreSQL in Docker...${NC}"
-        docker run -d --name autoscience-postgres-dev \
-            -p ${POSTGRES_PORT}:5432 \
-            -e POSTGRES_DB=autoscience \
-            -e POSTGRES_USER=autoscience \
-            -e POSTGRES_PASSWORD=autoscience \
-            postgres:15-alpine 2>/dev/null || true
-        
-        echo -e "${YELLOW}Waiting for PostgreSQL...${NC}"
-        sleep 3
-    fi
+    check_prerequisites
+    setup_env
     
-    # Backend setup
-    echo -e "${YELLOW}Setting up backend...${NC}"
-    cd backend
-    
-    if [ ! -d ".venv" ]; then
-        python3 -m venv .venv
-    fi
-    
-    source .venv/bin/activate
-    
-    if [ ! -f ".env" ]; then
-        cat > .env << 'EOF'
-DATABASE_URL=postgresql+asyncpg://autoscience:autoscience@localhost:5432/autoscience
-DATABASE_URL_SYNC=postgresql://autoscience:autoscience@localhost:5432/autoscience
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-EOF
-        echo -e "${YELLOW}Created backend/.env. Please add your API keys.${NC}"
-    fi
-    
-    pip install -e ".[dev]" -q 2>/dev/null
-    
-    # Start backend in background
-    echo -e "${YELLOW}Starting backend on port ${BACKEND_PORT}...${NC}"
-    uvicorn app.main:app --reload --port ${BACKEND_PORT} &
-    BACKEND_PID=$!
-    
-    cd ..
-    
-    # Frontend setup
-    echo -e "${YELLOW}Setting up frontend...${NC}"
-    cd frontend
-    
-    if [ ! -d "node_modules" ]; then
-        npm install --silent
-    fi
-    
-    # Start frontend in background
-    echo -e "${YELLOW}Starting frontend on port ${FRONTEND_PORT}...${NC}"
-    PORT=${FRONTEND_PORT} npm run dev &
-    FRONTEND_PID=$!
-    
-    cd ..
+    # Start services with hot-reload
+    echo -e "${YELLOW}Starting development services...${NC}"
+    docker compose -f docker/docker-compose.dev.yml up -d --build
     
     echo ""
-    echo -e "${GREEN}Development servers started!${NC}"
+    echo -e "${GREEN}Development services started with hot-reload!${NC}"
     echo ""
-    echo -e "Frontend: ${BLUE}http://localhost:${FRONTEND_PORT}${NC}"
-    echo -e "Backend:  ${BLUE}http://localhost:${BACKEND_PORT}${NC}"
-    echo -e "API Docs: ${BLUE}http://localhost:${BACKEND_PORT}/docs${NC}"
+    echo -e "Frontend:   ${BLUE}http://localhost:${FRONTEND_PORT}${NC}"
+    echo -e "Backend:    ${BLUE}http://localhost:${BACKEND_PORT}${NC}"
+    echo -e "API Docs:   ${BLUE}http://localhost:${BACKEND_PORT}/docs${NC}"
+    echo -e "PostgreSQL: ${BLUE}localhost:5433${NC}"
+    echo -e "Redis:      ${BLUE}localhost:6380${NC}"
     echo ""
-    echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
+    echo -e "${YELLOW}Hot-reload is enabled:${NC}"
+    echo -e "  - Backend: Edit files in backend/app/ → auto-restarts"
+    echo -e "  - Frontend: Edit files in frontend/src/ → auto-refreshes"
     echo ""
-    
-    # Wait for Ctrl+C
-    trap "stop_dev $BACKEND_PID $FRONTEND_PID" EXIT INT TERM
-    wait
+    echo -e "${YELLOW}Tip: Use './start.sh logs' to view logs${NC}"
+    echo -e "${YELLOW}Tip: Use './start.sh stop' to stop all services${NC}"
+    echo ""
 }
 
 stop_dev() {
@@ -225,7 +177,9 @@ stop_dev() {
 stop_docker() {
     print_header
     echo -e "${YELLOW}Stopping Docker services...${NC}"
-    docker compose -f docker/docker-compose.yml down
+    # Stop both production and dev compose files
+    docker compose -f docker/docker-compose.yml down 2>/dev/null || true
+    docker compose -f docker/docker-compose.dev.yml down 2>/dev/null || true
     echo -e "${GREEN}Services stopped.${NC}"
 }
 
@@ -233,12 +187,21 @@ show_status() {
     print_header
     echo -e "${BLUE}Docker Services Status:${NC}"
     echo ""
-    docker compose -f docker/docker-compose.yml ps
+    echo -e "${YELLOW}Production services:${NC}"
+    docker compose -f docker/docker-compose.yml ps 2>/dev/null || echo "  Not running"
+    echo ""
+    echo -e "${YELLOW}Development services:${NC}"
+    docker compose -f docker/docker-compose.dev.yml ps 2>/dev/null || echo "  Not running"
     echo ""
 }
 
 show_logs() {
-    docker compose -f docker/docker-compose.yml logs -f
+    # Try dev first, then production
+    if docker compose -f docker/docker-compose.dev.yml ps 2>/dev/null | grep -q running; then
+        docker compose -f docker/docker-compose.dev.yml logs -f
+    else
+        docker compose -f docker/docker-compose.yml logs -f
+    fi
 }
 
 show_help() {
@@ -246,8 +209,8 @@ show_help() {
     echo "Usage: ./start.sh [command]"
     echo ""
     echo "Commands:"
-    echo "  docker    Start all services with Docker (recommended)"
-    echo "  dev       Start in development mode (local)"
+    echo "  docker    Start all services with Docker (production-like)"
+    echo "  dev       Start in development mode with hot-reload"
     echo "  stop      Stop all services"
     echo "  status    Show service status"
     echo "  logs      View logs (Docker mode)"
@@ -255,8 +218,8 @@ show_help() {
     echo "  help      Show this help message"
     echo ""
     echo "Examples:"
-    echo "  ./start.sh docker    # Start with Docker"
-    echo "  ./start.sh dev       # Start in dev mode"
+    echo "  ./start.sh docker    # Production-like mode"
+    echo "  ./start.sh dev       # Development with hot-reload"
     echo "  ./start.sh stop      # Stop everything"
     echo ""
 }

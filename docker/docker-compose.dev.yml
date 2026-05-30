@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: autoscience-postgres-dev
+    environment:
+      POSTGRES_DB: autoscience
+      POSTGRES_USER: autoscience
+      POSTGRES_PASSWORD: autoscience
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoscience"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: autoscience-redis-dev
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Backend dev server with hot-reload
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: autoscience-backend-dev
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://autoscience:autoscience@postgres:5432/autoscience
+      - DATABASE_URL_SYNC=postgresql://autoscience:autoscience@postgres:5432/autoscience
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434
+      - LLAMACPP_BASE_URL=http://host.docker.internal:8080
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
+      - APP_DEBUG=true
+      - CORS_ORIGINS=["http://localhost:3000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code for hot-reload
+      - ../backend/app:/app/app
+      - ../backend/alembic:/app/alembic
+      - ../backend/alembic.ini:/app/alembic.ini
+      - ../backend/pyproject.toml:/app/pyproject.toml
+      - backend_artifacts:/app/artifacts
+    command: >
+      sh -c "pip install -e . --quiet 2>/dev/null || true &&
+             alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Frontend dev server with hot-reload
+  frontend:
+    image: node:18-alpine
+    container_name: autoscience-frontend-dev
+    working_dir: /app
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      # Mount source code for hot-reload
+      - ../frontend/src:/app/src
+      - ../frontend/public:/app/public
+      - ../frontend/package.json:/app/package.json
+      - ../frontend/next.config.js:/app/next.config.js
+      - ../frontend/tailwind.config.js:/app/tailwind.config.js
+      - ../frontend/tsconfig.json:/app/tsconfig.json
+      - ../frontend/postcss.config.js:/app/postcss.config.js
+    command: >
+      sh -c "npm install --silent 2>/dev/null &&
+             npm run dev"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_dev_data:
+  backend_artifacts:
