@@ -110,10 +110,17 @@ class IdeaService:
         return idea
 
     async def delete_idea(self, idea_id: str) -> bool:
-        """Delete an idea."""
+        """Delete an idea and all related records."""
         idea = await self.get_idea(idea_id)
         if not idea:
             return False
+
+        # Delete related records first
+        from sqlalchemy import delete as sql_delete
+        await self.db.execute(sql_delete(IdeaVersion).where(IdeaVersion.idea_id == idea_id))
+        await self.db.execute(sql_delete(IdeaScore).where(IdeaScore.idea_id == idea_id))
+        await self.db.execute(sql_delete(IdeaClassification).where(IdeaClassification.idea_id == idea_id))
+        await self.db.execute(sql_delete(IdeaDecision).where(IdeaDecision.idea_id == idea_id))
 
         await self.db.delete(idea)
         await self.db.flush()
