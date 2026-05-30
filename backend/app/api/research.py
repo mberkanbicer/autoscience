@@ -75,7 +75,7 @@ def get_orchestrator(db: AsyncSession) -> ResearchOrchestrator:
     )
 
 
-@router.post("/research/run")
+@router.post("/run")
 async def start_research_run(
     project_id: str,
     idea: str,
@@ -130,7 +130,7 @@ async def start_research_run(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/research/idle")
+@router.post("/idle")
 async def start_idle_cycle(
     project_id: str,
     db: AsyncSession = Depends(get_db),
