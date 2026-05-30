@@ -159,6 +159,7 @@ export const wikiApi = {
     request<any>(`/api/v1/wiki?project_id=${projectId}`, { method: 'POST', body: data }),
   update: (id: string, data: any) => 
     request<any>(`/api/v1/wiki/${id}`, { method: 'PUT', body: data }),
+  delete: (id: string) => request<void>(`/api/v1/wiki/${id}`, { method: 'DELETE' }),
 };
 
 // Approvals

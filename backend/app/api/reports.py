@@ -104,3 +104,83 @@ async def update_wiki_note(
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     return note
+
+
+@router.delete("/wiki/{note_id}", status_code=204)
+async def delete_wiki_note(
+    note_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a knowledge note."""
+    service = KnowledgeService(db)
+    deleted = await service.delete_note(note_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+
+# Approvals
+
+@router.get("/approvals", response_model=list[dict])
+async def list_approvals(
+    project_id: str = Query(...),
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """List approval requests for a project."""
+    from sqlalchemy import select
+    from ..models.audit import ApprovalRequest
+
+    query = select(ApprovalRequest).where(ApprovalRequest.project_id == project_id)
+    if status:
+        query = query.where(ApprovalRequest.status == status)
+    query = query.order_by(ApprovalRequest.created_at.desc())
+
+    result = await db.execute(query)
+    approvals = list(result.scalars().all())
+    return approvals
+
+
+@router.post("/approvals/{approval_id}/approve", response_model=dict)
+async def approve_request(
+    approval_id: str,
+    body: dict = {},
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve a pending request."""
+    from sqlalchemy import select
+    from ..models.audit import ApprovalRequest
+
+    result = await db.execute(
+        select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
+    )
+    approval = result.scalar_one_or_none()
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    approval.status = "approved"
+    await db.flush()
+    await db.refresh(approval)
+    return {"id": approval.id, "status": approval.status}
+
+
+@router.post("/approvals/{approval_id}/deny", response_model=dict)
+async def deny_request(
+    approval_id: str,
+    body: dict = {},
+    db: AsyncSession = Depends(get_db),
+):
+    """Deny a pending request."""
+    from sqlalchemy import select
+    from ..models.audit import ApprovalRequest
+
+    result = await db.execute(
+        select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
+    )
+    approval = result.scalar_one_or_none()
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    approval.status = "denied"
+    await db.flush()
+    await db.refresh(approval)
+    return {"id": approval.id, "status": approval.status}
