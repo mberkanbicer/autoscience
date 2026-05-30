@@ -1,5 +1,6 @@
 """Main API endpoint for research operations."""
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -9,6 +10,8 @@ from ..services.orchestrator import ResearchOrchestrator
 from ..llm.router import LLMRouter, create_default_router
 from ..connectors.manager import ConnectorManager, create_default_manager
 from ..config import get_settings
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -26,21 +29,23 @@ def get_llm_router(
     default_provider: str | None = None,
 ) -> LLMRouter:
     """Get LLM router instance with API keys from headers or env."""
-    # Use header values if provided, otherwise fall back to env
-    or_key = openrouter_api_key or settings.openrouter_api_key
-    oa_key = openai_api_key or settings.openai_api_key
-    an_key = anthropic_api_key or settings.anthropic_api_key
+    # Use header values if provided (treat empty strings as None), fall back to env
+    or_key = (openrouter_api_key or None) or settings.openrouter_api_key
+    oa_key = (openai_api_key or None) or settings.openai_api_key
+    an_key = (anthropic_api_key or None) or settings.anthropic_api_key
     
     # Determine default provider
     provider = default_provider or settings.default_llm_provider
     
-    # If we have an API key from headers, use that provider as default
+    # Auto-select provider based on available keys
     if or_key and not oa_key and not an_key:
         provider = 'openrouter'
     elif oa_key and not or_key and not an_key:
         provider = 'openai'
     elif an_key and not or_key and not oa_key:
         provider = 'anthropic'
+    
+    logger.info("llm_router_created", provider=provider, has_openrouter=bool(or_key), has_openai=bool(oa_key), has_anthropic=bool(an_key))
     
     return create_default_router(
         openai_api_key=oa_key,
