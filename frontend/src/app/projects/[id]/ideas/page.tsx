@@ -51,9 +51,7 @@ export default function IdeasPage() {
     setCreating(true);
     try {
       await ideasApi.create(projectId, {
-        initial_text: newIdea.text,
-        current_text: newIdea.text,
-        origin: newIdea.origin,
+        text: newIdea.text,
       });
       setShowCreateModal(false);
       setNewIdea({ text: '', origin: 'user_prompt' });
