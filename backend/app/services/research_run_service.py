@@ -109,6 +109,7 @@ class ResearchRunService:
             self.db.add(event)
 
         await self.db.flush()
+        await self.db.refresh(run)
         return run
 
     async def start_run(self, run_id: str) -> ResearchRun | None:
