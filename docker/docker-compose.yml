@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: autoscience-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: autoscience
       POSTGRES_USER: autoscience
@@ -21,6 +22,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: autoscience-redis
+    restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -36,6 +38,7 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     container_name: autoscience-backend
+    restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql+asyncpg://autoscience:${POSTGRES_PASSWORD:-autoscience}@postgres:5432/autoscience
       - DATABASE_URL_SYNC=postgresql://autoscience:${POSTGRES_PASSWORD:-autoscience}@postgres:5432/autoscience
@@ -45,7 +48,7 @@ services:
       - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-http://host.docker.internal:11434}
       - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
       - APP_DEBUG=${APP_DEBUG:-false}
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - CORS_ORIGINS=["http://localhost:${FRONTEND_PORT:-3000}"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -55,15 +58,20 @@ services:
         condition: service_healthy
     volumes:
       - ../backend:/app
-      - artifacts_data:/app/artifacts
+      - backend_artifacts:/app/artifacts
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
       context: ../frontend
       dockerfile: Dockerfile
     container_name: autoscience-frontend
+    restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - PORT=3000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -72,4 +80,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  artifacts_data:
+  backend_artifacts:

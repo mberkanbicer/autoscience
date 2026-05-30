@@ -1,0 +1,287 @@
+#!/bin/bash
+
+# Autoscience - One-Command Start Script
+# Usage: ./start.sh [dev|docker|stop|status|logs|setup]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Configuration
+BACKEND_PORT=${BACKEND_PORT:-8000}
+FRONTEND_PORT=${FRONTEND_PORT:-3000}
+POSTGRES_PORT=${POSTGRES_PORT:-5432}
+REDIS_PORT=${REDIS_PORT:-6379}
+
+print_header() {
+    echo ""
+    echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║           Background Scientific Cognition System         ║${NC}"
+    echo -e "${BLUE}║                    Autoscience v0.1.0                    ║${NC}"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+check_prerequisites() {
+    echo -e "${YELLOW}Checking prerequisites...${NC}"
+    
+    local missing=0
+    
+    # Docker
+    if command -v docker &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Docker $(docker --version | cut -d' ' -f3 | tr -d ',')"
+    else
+        echo -e "${RED}✗${NC} Docker is required for Docker mode"
+        missing=1
+    fi
+    
+    # Docker Compose
+    if docker compose version &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Docker Compose $(docker compose version | cut -d' ' -f4)"
+    elif command -v docker-compose &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Docker Compose (legacy)"
+    else
+        echo -e "${RED}✗${NC} Docker Compose is required"
+        missing=1
+    fi
+    
+    # Python (for dev mode)
+    if command -v python3 &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Python $(python3 --version | cut -d' ' -f2)"
+    fi
+    
+    # Node.js (for dev mode)
+    if command -v node &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Node.js $(node --version)"
+    fi
+    
+    if [ $missing -eq 1 ]; then
+        echo ""
+        echo -e "${RED}Missing prerequisites. Please install them first.${NC}"
+        exit 1
+    fi
+    echo ""
+}
+
+setup_env() {
+    if [ ! -f .env ]; then
+        echo -e "${YELLOW}Creating .env from template...${NC}"
+        cat > .env << 'EOF'
+# Autoscience Environment Configuration
+
+# Database
+POSTGRES_PASSWORD=autoscience
+POSTGRES_PORT=5432
+
+# Redis
+REDIS_PORT=6379
+
+# Backend
+BACKEND_PORT=8000
+APP_DEBUG=false
+
+# Frontend
+FRONTEND_PORT=3000
+
+# LLM Providers (at least one required)
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+LOCAL_LLM_BASE_URL=http://host.docker.internal:11434
+DEFAULT_LLM_PROVIDER=openai
+
+# Academic Sources (optional, improves rate limits)
+SEMANTIC_SCHOLAR_API_KEY=
+UNPAYWALL_EMAIL=
+EOF
+        echo -e "${GREEN}Created .env file. Please add your API keys.${NC}"
+    fi
+}
+
+start_docker() {
+    print_header
+    echo -e "${BLUE}Starting with Docker Compose...${NC}"
+    echo ""
+    
+    check_prerequisites
+    setup_env
+    
+    # Build and start services
+    echo -e "${YELLOW}Building and starting services...${NC}"
+    docker compose -f docker/docker-compose.yml up -d --build
+    
+    echo ""
+    echo -e "${GREEN}Services started!${NC}"
+    echo ""
+    echo -e "Frontend:   ${BLUE}http://localhost:${FRONTEND_PORT}${NC}"
+    echo -e "Backend:    ${BLUE}http://localhost:${BACKEND_PORT}${NC}"
+    echo -e "API Docs:   ${BLUE}http://localhost:${BACKEND_PORT}/docs${NC}"
+    echo -e "PostgreSQL: ${BLUE}localhost:${POSTGRES_PORT}${NC}"
+    echo -e "Redis:      ${BLUE}localhost:${REDIS_PORT}${NC}"
+    echo ""
+    echo -e "${YELLOW}Tip: Use './start.sh logs' to view logs${NC}"
+    echo -e "${YELLOW}Tip: Use './start.sh stop' to stop all services${NC}"
+    echo ""
+}
+
+start_dev() {
+    print_header
+    echo -e "${BLUE}Starting in development mode...${NC}"
+    echo ""
+    
+    # Check for PostgreSQL
+    if ! command -v psql &> /dev/null && ! docker ps | grep -q postgres; then
+        echo -e "${YELLOW}Starting PostgreSQL in Docker...${NC}"
+        docker run -d --name autoscience-postgres-dev \
+            -p ${POSTGRES_PORT}:5432 \
+            -e POSTGRES_DB=autoscience \
+            -e POSTGRES_USER=autoscience \
+            -e POSTGRES_PASSWORD=autoscience \
+            postgres:15-alpine 2>/dev/null || true
+        
+        echo -e "${YELLOW}Waiting for PostgreSQL...${NC}"
+        sleep 3
+    fi
+    
+    # Backend setup
+    echo -e "${YELLOW}Setting up backend...${NC}"
+    cd backend
+    
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+    
+    source .venv/bin/activate
+    
+    if [ ! -f ".env" ]; then
+        cat > .env << 'EOF'
+DATABASE_URL=postgresql+asyncpg://autoscience:autoscience@localhost:5432/autoscience
+DATABASE_URL_SYNC=postgresql://autoscience:autoscience@localhost:5432/autoscience
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+EOF
+        echo -e "${YELLOW}Created backend/.env. Please add your API keys.${NC}"
+    fi
+    
+    pip install -e ".[dev]" -q 2>/dev/null
+    
+    # Start backend in background
+    echo -e "${YELLOW}Starting backend on port ${BACKEND_PORT}...${NC}"
+    uvicorn app.main:app --reload --port ${BACKEND_PORT} &
+    BACKEND_PID=$!
+    
+    cd ..
+    
+    # Frontend setup
+    echo -e "${YELLOW}Setting up frontend...${NC}"
+    cd frontend
+    
+    if [ ! -d "node_modules" ]; then
+        npm install --silent
+    fi
+    
+    # Start frontend in background
+    echo -e "${YELLOW}Starting frontend on port ${FRONTEND_PORT}...${NC}"
+    PORT=${FRONTEND_PORT} npm run dev &
+    FRONTEND_PID=$!
+    
+    cd ..
+    
+    echo ""
+    echo -e "${GREEN}Development servers started!${NC}"
+    echo ""
+    echo -e "Frontend: ${BLUE}http://localhost:${FRONTEND_PORT}${NC}"
+    echo -e "Backend:  ${BLUE}http://localhost:${BACKEND_PORT}${NC}"
+    echo -e "API Docs: ${BLUE}http://localhost:${BACKEND_PORT}/docs${NC}"
+    echo ""
+    echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
+    echo ""
+    
+    # Wait for Ctrl+C
+    trap "stop_dev $BACKEND_PID $FRONTEND_PID" EXIT INT TERM
+    wait
+}
+
+stop_dev() {
+    local backend_pid=$1
+    local frontend_pid=$2
+    
+    echo ""
+    echo -e "${YELLOW}Stopping services...${NC}"
+    
+    [ -n "$backend_pid" ] && kill $backend_pid 2>/dev/null
+    [ -n "$frontend_pid" ] && kill $frontend_pid 2>/dev/null
+    
+    echo -e "${GREEN}Services stopped.${NC}"
+}
+
+stop_docker() {
+    print_header
+    echo -e "${YELLOW}Stopping Docker services...${NC}"
+    docker compose -f docker/docker-compose.yml down
+    echo -e "${GREEN}Services stopped.${NC}"
+}
+
+show_status() {
+    print_header
+    echo -e "${BLUE}Docker Services Status:${NC}"
+    echo ""
+    docker compose -f docker/docker-compose.yml ps
+    echo ""
+}
+
+show_logs() {
+    docker compose -f docker/docker-compose.yml logs -f
+}
+
+show_help() {
+    print_header
+    echo "Usage: ./start.sh [command]"
+    echo ""
+    echo "Commands:"
+    echo "  docker    Start all services with Docker (recommended)"
+    echo "  dev       Start in development mode (local)"
+    echo "  stop      Stop all services"
+    echo "  status    Show service status"
+    echo "  logs      View logs (Docker mode)"
+    echo "  setup     Initial setup (create .env files)"
+    echo "  help      Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  ./start.sh docker    # Start with Docker"
+    echo "  ./start.sh dev       # Start in dev mode"
+    echo "  ./start.sh stop      # Stop everything"
+    echo ""
+}
+
+# Main
+case "${1:-help}" in
+    docker)
+        start_docker
+        ;;
+    dev)
+        start_dev
+        ;;
+    stop)
+        stop_docker
+        ;;
+    status)
+        show_status
+        ;;
+    logs)
+        show_logs
+        ;;
+    setup)
+        setup_env
+        ;;
+    help|*)
+        show_help
+        ;;
+esac
