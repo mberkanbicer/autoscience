@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { Input, Textarea } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { SkeletonCards } from '@/components/ui/Skeleton';
+import { SkeletonCard } from '@/components/ui/Skeleton';
 import { ideasApi } from '@/lib/api';
 import { Idea } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
@@ -127,7 +127,9 @@ export default function IdeasPage() {
 
       <div className="p-6">
         {loading ? (
-          <SkeletonCards count={6} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+          </div>
         ) : ideas.length === 0 ? (
           <EmptyState
             icon={<Lightbulb className="w-8 h-8 text-gray-400" />}

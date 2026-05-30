@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Autoscience - Background Scientific Cognition System',
   description: 'A persistent, autonomous research platform that functions like a researcher\'s brain.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

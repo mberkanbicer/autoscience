@@ -6,7 +6,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { SkeletonCards } from '@/components/ui/Skeleton';
+import { SkeletonCard } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { projectsApi, runsApi, ideasApi, papersApi, questionsApi, hypothesesApi } from '@/lib/api';
 import {
@@ -211,7 +211,9 @@ export default function PipelinePage() {
 
       <div className="p-6">
         {loading ? (
-          <SkeletonCards count={8} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+          </div>
         ) : stages.length === 0 ? (
           <EmptyState
             icon={<Activity className="w-8 h-8 text-gray-400" />}
