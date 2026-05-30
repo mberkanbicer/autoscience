@@ -14,7 +14,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { runsApi, ideasApi } from '@/lib/api';
 import { ResearchRun, Idea } from '@/lib/types';
 import { formatDate, formatDuration } from '@/lib/utils';
-import { Activity, Clock, DollarSign, Play, Loader2, CheckCircle2, XCircle, Lightbulb, AlertTriangle } from 'lucide-react';
+import {
+  Activity, Clock, DollarSign, Play, Loader2, CheckCircle2, XCircle,
+  AlertTriangle, ChevronDown, ChevronRight, RotateCw, X,
+} from 'lucide-react';
 
 export default function RunsPage() {
   const params = useParams();
@@ -22,24 +25,20 @@ export default function RunsPage() {
   const searchParams = useSearchParams();
   const projectId = params.id as string;
   const prefillIdea = searchParams.get('idea') || '';
-  
+
   const [runs, setRuns] = useState<ResearchRun[]>([]);
-  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [starting, setStarting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
-  const [startResult, setStartResult] = useState<{ success: boolean; message: string; runId?: string } | null>(null);
-  const [newRun, setNewRun] = useState({
-    idea: '',
-    run_type: 'user_directed',
-    create_idea: false,
-  });
+  const [startResult, setStartResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [newRun, setNewRun] = useState({ idea: '', run_type: 'user_directed' });
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [runEvents, setRunEvents] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     loadRuns();
-    loadIdeas();
     if (prefillIdea) {
       setNewRun(prev => ({ ...prev, idea: prefillIdea }));
       setShowCreateModal(true);
@@ -59,67 +58,59 @@ export default function RunsPage() {
     }
   };
 
-  const loadIdeas = async () => {
+  const loadRunEvents = async (runId: string) => {
     try {
-      const data = await ideasApi.list(projectId);
-      setIdeas(data);
+      const events = await runsApi.events(runId);
+      setRunEvents(prev => ({ ...prev, [runId]: events }));
     } catch (error) {
-      console.error('Failed to load ideas:', error);
+      console.error('Failed to load run events:', error);
     }
   };
 
-  // Check if idea already exists
-  const findMatchingIdea = (text: string): Idea | null => {
-    const normalized = text.trim().toLowerCase();
-    return ideas.find(idea => 
-      (idea.current_text || idea.initial_text).trim().toLowerCase() === normalized
-    ) || null;
+  const toggleExpand = (runId: string) => {
+    if (expandedRunId === runId) {
+      setExpandedRunId(null);
+    } else {
+      setExpandedRunId(runId);
+      loadRunEvents(runId);
+    }
   };
 
-  const matchingIdea = findMatchingIdea(newRun.idea);
+  const handleCancelRun = async (runId: string) => {
+    try {
+      await runsApi.cancel(runId);
+      loadRuns();
+    } catch (error) {
+      console.error('Failed to cancel run:', error);
+    }
+  };
 
   const startPolling = (runId: string) => {
     setPolling(true);
     setPollingRunId(runId);
     let attempts = 0;
-    const maxAttempts = 150; // 5 minutes max
-    
     const poll = setInterval(async () => {
       attempts++;
       const updatedRuns = await loadRuns();
-      
       const run = updatedRuns.find((r: ResearchRun) => r.id === runId);
-      if (run && (run.state === 'completed' || run.state === 'failed' || run.state === 'error')) {
-        clearInterval(poll);
-        setPolling(false);
-        setPollingRunId(null);
-        setStarting(false);
-        
-        if (run.state === 'completed') {
-          setStartResult({
-            success: true,
-            message: `Research completed successfully! Check the Ideas, Papers, Questions, and Hypotheses pages for results.`,
-            runId: run.id,
-          });
-        } else {
-          setStartResult({
-            success: false,
-            message: `Research run ${run.state}. Check the backend logs for details.`,
-            runId: run.id,
-          });
-        }
-      }
-      
-      if (attempts >= maxAttempts) {
+      if (run && (run.state === 'completed' || run.state === 'failed' || run.state === 'cancelled')) {
         clearInterval(poll);
         setPolling(false);
         setPollingRunId(null);
         setStarting(false);
         setStartResult({
-          success: false,
-          message: 'Research is still running. Check back in a few minutes.',
-          runId,
+          success: run.state === 'completed',
+          message: run.state === 'completed'
+            ? 'Research completed! Check the results below.'
+            : `Research ${run.state}.`,
         });
+      }
+      if (attempts >= 150) {
+        clearInterval(poll);
+        setPolling(false);
+        setPollingRunId(null);
+        setStarting(false);
+        setStartResult({ success: false, message: 'Research still running. Check back later.' });
       }
     }, 2000);
   };
@@ -128,72 +119,45 @@ export default function RunsPage() {
     if (!newRun.idea.trim()) return;
     setStarting(true);
     setStartResult(null);
-    
     try {
       const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
-      
-      // Fire the request with a short timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       try {
-        const response = await fetch(`/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(newRun.idea)}&run_type=${newRun.run_type}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
-            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
-            'X-OpenAI-API-Key': apiSettings.openai_api_key || '',
-            'X-OpenAI-Model': apiSettings.openai_model || 'gpt-4o',
-            'X-Anthropic-API-Key': apiSettings.anthropic_api_key || '',
-            'X-Anthropic-Model': apiSettings.anthropic_model || 'claude-sonnet-4-20250514',
-            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
-          },
-          signal: controller.signal,
-        });
-        
+        const response = await fetch(
+          `/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(newRun.idea)}&run_type=${newRun.run_type}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
+              'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+              'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+            },
+            signal: controller.signal,
+          }
+        );
         clearTimeout(timeoutId);
-        
         if (response.ok) {
           const result = await response.json();
           setStarting(false);
-          setStartResult({
-            success: true,
-            message: `Research completed! Found ${result.papers_found} papers, ${result.questions_generated} questions, ${result.hypotheses_formed} hypotheses.`,
-            runId: result.run_id,
-          });
+          setStartResult({ success: true, message: `Done! ${result.papers_found} papers, ${result.questions_generated} questions, ${result.hypotheses_formed} hypotheses.` });
           loadRuns();
           return;
         }
-      } catch (fetchError: any) {
-        if (fetchError.name === 'AbortError') {
-          console.log('Request still running, starting poll...');
-        } else {
-          throw fetchError;
-        }
+      } catch (e: any) {
+        if (e.name !== 'AbortError') throw e;
       }
-      
-      // Poll for completion
-      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      await new Promise(r => setTimeout(r, 2000));
       const updatedRuns = await loadRuns();
       const latestRun = updatedRuns[0];
-      if (latestRun && latestRun.state === 'running') {
-        startPolling(latestRun.id);
-      } else {
-        setStarting(false);
-        setStartResult({
-          success: true,
-          message: 'Research submitted. Check the runs list for results.',
-        });
-      }
-      
+      if (latestRun?.state === 'running') startPolling(latestRun.id);
+      else { setStarting(false); setStartResult({ success: true, message: 'Research submitted.' }); }
     } catch (error: any) {
-      console.error('Failed to start research run:', error);
       setStarting(false);
-      setStartResult({
-        success: false,
-        message: error.message || 'Failed to start research run. Make sure the backend is running.',
-      });
+      setStartResult({ success: false, message: error.message || 'Failed to start.' });
     }
   };
 
@@ -201,10 +165,17 @@ export default function RunsPage() {
     if (!starting) {
       setShowCreateModal(false);
       setStartResult(null);
-      setNewRun({ idea: '', run_type: 'user_directed', create_idea: false });
-      // Clear URL params
+      setNewRun({ idea: '', run_type: 'user_directed' });
       router.replace(`/projects/${projectId}/runs`);
     }
+  };
+
+  const getEventIcon = (type: string) => {
+    if (type.includes('start') || type.includes('created')) return <Play size={14} className="text-green-500" />;
+    if (type.includes('complete') || type.includes('success')) return <CheckCircle2 size={14} className="text-green-600" />;
+    if (type.includes('fail') || type.includes('error')) return <XCircle size={14} className="text-red-500" />;
+    if (type.includes('cancel')) return <X size={14} className="text-gray-500" />;
+    return <ChevronRight size={14} className="text-blue-500" />;
   };
 
   return (
@@ -213,10 +184,16 @@ export default function RunsPage() {
         title="Research Runs"
         subtitle={`${runs.length} runs`}
         actions={
-          <Button onClick={() => setShowCreateModal(true)} disabled={starting}>
-            <Play size={18} className="mr-2" />
-            Start Research Run
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={loadRuns} disabled={starting}>
+              <RotateCw size={16} className="mr-2" />
+              Refresh
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)} disabled={starting}>
+              <Play size={18} className="mr-2" />
+              Start Research
+            </Button>
+          </div>
         }
       />
 
@@ -227,7 +204,7 @@ export default function RunsPage() {
           <EmptyState
             icon={<Activity className="w-8 h-8 text-gray-400" />}
             title="No research runs yet"
-            description="Start a research run to begin autonomous literature analysis, conflict detection, and hypothesis generation."
+            description="Start a research run to begin autonomous literature analysis."
             action={
               <Button onClick={() => setShowCreateModal(true)}>
                 <Play size={18} className="mr-2" />
@@ -236,113 +213,125 @@ export default function RunsPage() {
             }
           />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Started</TableHead>
-                <TableHead>Completed</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Budget</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {runs.map((run) => (
-                <TableRow key={run.id}>
-                  <TableCell>
-                    <Badge variant="info">{run.run_type}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={run.state} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">
-                      {run.started_at ? formatDate(run.started_at) : '—'}
+          <div className="space-y-2">
+            {runs.map((run) => (
+              <div key={run.id}>
+                {/* Run Row */}
+                <div
+                  className={`flex items-center gap-4 p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${expandedRunId === run.id ? 'border-blue-300 bg-blue-50' : ''}`}
+                  onClick={() => toggleExpand(run.id)}
+                >
+                  <div className="text-gray-400">
+                    {expandedRunId === run.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  </div>
+                  <Badge variant="info">{run.run_type}</Badge>
+                  <StatusBadge status={run.state} />
+                  <div className="flex-1" />
+                  <span className="text-sm text-gray-500">
+                    {run.started_at ? formatDate(run.started_at) : '—'}
+                  </span>
+                  {run.started_at && run.completed_at && (
+                    <span className="text-sm text-gray-500 flex items-center gap-1">
+                      <Clock size={14} />
+                      {formatDuration(run.started_at, run.completed_at)}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">
-                      {run.completed_at ? formatDate(run.completed_at) : '—'}
+                  )}
+                  {run.state === 'running' && (
+                    <span className="flex items-center gap-1 text-blue-600">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span className="text-sm">Running</span>
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    {run.started_at && run.completed_at ? (
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <Clock size={14} />
-                        <span className="text-sm">{formatDuration(run.started_at, run.completed_at)}</span>
-                      </div>
-                    ) : run.state === 'running' ? (
-                      <div className="flex items-center gap-1 text-blue-600">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span className="text-sm">Running...</span>
-                      </div>
+                  )}
+                  <span className="text-sm text-gray-500 flex items-center gap-1">
+                    <DollarSign size={14} />
+                    ${run.max_cost_usd.toFixed(2)}
+                  </span>
+                  {run.state === 'running' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleCancelRun(run.id); }}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                      title="Cancel run"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Expanded Details */}
+                {expandedRunId === run.id && (
+                  <div className="ml-8 mt-2 mb-4 p-4 bg-gray-50 border rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Run Events</h4>
+                    {runEvents[run.id] ? (
+                      runEvents[run.id].length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No events recorded yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {runEvents[run.id].map((event: any, idx: number) => (
+                            <div key={event.id || idx} className="flex items-start gap-3 p-2 bg-white rounded border">
+                              {getEventIcon(event.event_type)}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-800">{event.event_type}</span>
+                                  {event.actor && (
+                                    <Badge variant="default" size="sm">{event.actor}</Badge>
+                                  )}
+                                </div>
+                                {event.details && (
+                                  <p className="text-xs text-gray-500 mt-1 truncate">
+                                    {typeof event.details === 'string' ? event.details : JSON.stringify(event.details).slice(0, 200)}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-400 whitespace-nowrap">
+                                {event.created_at ? formatDate(event.created_at) : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )
                     ) : (
-                      '—'
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Loader2 size={14} className="animate-spin" />
+                        Loading events...
+                      </div>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <DollarSign size={14} />
-                      <span className="text-sm">${run.max_cost_usd.toFixed(2)}</span>
+
+                    <div className="mt-3 pt-3 border-t text-xs text-gray-400 flex items-center gap-4">
+                      <span>ID: {run.id.slice(0, 8)}...</span>
+                      <span>Max duration: {run.max_minutes}min</span>
+                      <span>Max sources: {run.max_sources}</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
       {/* Start Research Run Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={handleCloseModal}
-        title="Start Research Run"
-        size="lg"
-      >
+      <Modal isOpen={showCreateModal} onClose={handleCloseModal} title="Start Research Run" size="lg">
         {startResult ? (
           <div className="space-y-4">
             <div className={`rounded-lg p-4 text-sm ${startResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
               <div className="flex items-center gap-2 mb-2">
-                {startResult.success ? (
-                  <CheckCircle2 size={20} className="text-green-600" />
-                ) : (
-                  <XCircle size={20} className="text-red-600" />
-                )}
-                <strong>{startResult.success ? 'Research Completed!' : 'Research Failed'}</strong>
+                {startResult.success ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                <strong>{startResult.success ? 'Done!' : 'Failed'}</strong>
               </div>
               <p>{startResult.message}</p>
             </div>
           </div>
         ) : starting ? (
-          <div className="space-y-4">
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {polling ? 'Research in Progress' : 'Starting Research...'}
-              </h3>
-              <p className="text-sm text-gray-600 text-center max-w-md">
-                {polling 
-                  ? "Searching literature, analyzing papers, generating hypotheses..."
-                  : "Initializing research pipeline..."}
-              </p>
-              {polling && pollingRunId && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Run ID: {pollingRunId.slice(0, 8)}...
-                </p>
-              )}
-            </div>
+          <div className="flex flex-col items-center py-8">
+            <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
+            <h3 className="text-lg font-medium">Research in Progress</h3>
+            <p className="text-sm text-gray-600 mt-1">This may take 1-3 minutes...</p>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
-              <strong>What happens:</strong> The system will search academic literature, analyze papers,
-              detect conflicts, generate research questions, and form hypotheses.
-              <br /><br />
-              <strong>Note:</strong> This may take 1-3 minutes.
+              Searches literature, analyzes papers, detects conflicts, generates questions & hypotheses.
             </div>
-            
             <Textarea
               label="Research Idea"
               placeholder="Describe what you want to research..."
@@ -350,50 +339,28 @@ export default function RunsPage() {
               value={newRun.idea}
               onChange={(e) => setNewRun({ ...newRun, idea: e.target.value })}
             />
-
-            {/* Show if idea already exists */}
-            {matchingIdea && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle size={16} />
-                  <strong>This idea already exists</strong>
-                </div>
-                <p>
-                  Found in Ideas with status <Badge variant="info">{matchingIdea.status}</Badge>
-                  {matchingIdea.overall_score != null && (
-                    <> and score {(matchingIdea.overall_score * 100).toFixed(0)}%</>
-                  )}.
-                  The research will use the existing idea entry.
-                </p>
-              </div>
-            )}
-            
             <Select
               label="Run Type"
               value={newRun.run_type}
               onChange={(e) => setNewRun({ ...newRun, run_type: e.target.value })}
               options={[
-                { value: 'user_directed', label: 'User Directed - Focus on specific idea' },
-                { value: 'idle_exploration', label: 'Idle Exploration - Broader exploration' },
-                { value: 'literature_review', label: 'Literature Review - Deep paper analysis' },
+                { value: 'user_directed', label: 'User Directed' },
+                { value: 'idle_exploration', label: 'Idle Exploration' },
+                { value: 'literature_review', label: 'Literature Review' },
               ]}
             />
           </div>
         )}
-
         <ModalFooter>
           {starting ? (
-            <Button variant="secondary" onClick={handleCloseModal}>
-              Close (Research Continues)
-            </Button>
+            <Button variant="secondary" onClick={handleCloseModal}>Close (Continues in Background)</Button>
           ) : startResult ? (
             <Button onClick={handleCloseModal}>Done</Button>
           ) : (
             <>
               <Button variant="secondary" onClick={handleCloseModal}>Cancel</Button>
               <Button onClick={handleStartRun} disabled={!newRun.idea.trim()}>
-                <Play size={16} className="mr-2" />
-                Start Research
+                <Play size={16} className="mr-2" /> Start Research
               </Button>
             </>
           )}

@@ -98,6 +98,44 @@ async def update_idea(
     return idea
 
 
+@router.post("/{idea_id}/pause", response_model=IdeaResponse)
+async def pause_idea(
+    idea_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Pause an active idea."""
+    service = IdeaService(db)
+    idea = await service.get_idea(idea_id)
+    if not idea:
+        raise HTTPException(status_code=404, detail="Idea not found")
+    if idea.status != "active":
+        raise HTTPException(status_code=400, detail=f"Cannot pause idea in '{idea.status}' status")
+    idea.status = "paused"
+    await service.add_idea_decision(idea_id, "pause", "Paused by user")
+    await db.flush()
+    await db.refresh(idea)
+    return idea
+
+
+@router.post("/{idea_id}/resume", response_model=IdeaResponse)
+async def resume_idea(
+    idea_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Resume a paused idea."""
+    service = IdeaService(db)
+    idea = await service.get_idea(idea_id)
+    if not idea:
+        raise HTTPException(status_code=404, detail="Idea not found")
+    if idea.status != "paused":
+        raise HTTPException(status_code=400, detail=f"Cannot resume idea in '{idea.status}' status")
+    idea.status = "active"
+    await service.add_idea_decision(idea_id, "resume", "Resumed by user")
+    await db.flush()
+    await db.refresh(idea)
+    return idea
+
+
 @router.delete("/{idea_id}", status_code=204)
 async def delete_idea(
     idea_id: str,

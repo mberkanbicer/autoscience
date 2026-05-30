@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { Input, Textarea } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { ideasApi } from '@/lib/api';
@@ -18,11 +18,14 @@ import {
   Lightbulb,
   Plus,
   Play,
+  Pause,
   Trash2,
   Edit2,
   Loader2,
   Clock,
   Sparkles,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 
 export default function IdeasPage() {
@@ -37,7 +40,8 @@ export default function IdeasPage() {
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [newIdea, setNewIdea] = useState({ text: '', flexibility: 0.6 });
+  const [newIdea, setNewIdea] = useState({ text: '' });
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     loadIdeas();
@@ -58,10 +62,10 @@ export default function IdeasPage() {
     if (!newIdea.text.trim()) return;
     setCreating(true);
     try {
-      await ideasApi.create(projectId, { text: newIdea.text });
+      const created = await ideasApi.create(projectId, { text: newIdea.text });
       setShowCreateModal(false);
-      setNewIdea({ text: '', flexibility: 0.6 });
-      loadIdeas();
+      setNewIdea({ text: '' });
+      await loadIdeas();
     } catch (error) {
       console.error('Failed to create idea:', error);
     } finally {
@@ -73,11 +77,9 @@ export default function IdeasPage() {
     if (!editingIdea || !editingIdea.current_text.trim()) return;
     setUpdating(true);
     try {
-      await ideasApi.update(editingIdea.id, {
-        current_text: editingIdea.current_text,
-      });
+      await ideasApi.update(editingIdea.id, { current_text: editingIdea.current_text });
       setEditingIdea(null);
-      loadIdeas();
+      await loadIdeas();
     } catch (error) {
       console.error('Failed to update idea:', error);
     } finally {
@@ -93,31 +95,65 @@ export default function IdeasPage() {
       setDeletingIdea(null);
       await loadIdeas();
     } catch (error: any) {
-      console.error('Failed to delete idea:', error);
-      alert('Failed to delete idea: ' + (error.message || 'Unknown error'));
+      alert('Failed to delete: ' + (error.message || 'Unknown error'));
     } finally {
       setDeleting(false);
     }
   };
 
-  const handleStartResearch = (idea: Idea) => {
-    router.push(`/projects/${projectId}/runs?idea=${encodeURIComponent(idea.current_text || idea.initial_text)}`);
+  const handlePause = async (idea: Idea) => {
+    setActionLoading(idea.id);
+    try {
+      await ideasApi.pause(idea.id);
+      await loadIdeas();
+    } catch (error: any) {
+      alert('Failed to pause: ' + (error.message || 'Unknown error'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResume = async (idea: Idea) => {
+    setActionLoading(idea.id);
+    try {
+      await ideasApi.resume(idea.id);
+      // Start autonomous research when resumed
+      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
+      fetch(`/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(idea.current_text || idea.initial_text)}&run_type=user_directed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
+          'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+          'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+        },
+      }).catch(() => {}); // Fire and forget
+      await loadIdeas();
+    } catch (error: any) {
+      alert('Failed to resume: ' + (error.message || 'Unknown error'));
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'success';
+      case 'paused': return 'warning';
       case 'rejected': return 'error';
-      case 'archived': return 'default';
-      default: return 'info';
+      case 'promoted': return 'info';
+      default: return 'default';
     }
   };
+
+  const isActive = (idea: Idea) => idea.status === 'active';
+  const isPaused = (idea: Idea) => idea.status === 'paused';
 
   return (
     <Layout projectId={projectId}>
       <Header
         title="Ideas"
-        subtitle={`${ideas.length} ideas tracked`}
+        subtitle={`${ideas.length} ideas · ${ideas.filter(i => i.status === 'active').length} active`}
         actions={
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus size={18} className="mr-2" />
@@ -150,33 +186,71 @@ export default function IdeasPage() {
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Lightbulb size={18} className="text-yellow-500" />
+                      <Lightbulb size={18} className={isActive(idea) ? 'text-yellow-500' : 'text-gray-400'} />
                       <Badge variant={getStatusColor(idea.status)}>
                         {idea.status}
                       </Badge>
                     </div>
                     <div className="flex gap-1">
-                      <button
-                        onClick={() => handleStartResearch(idea)}
-                        className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
-                        title="Start Research"
-                      >
-                        <Play size={16} />
-                      </button>
-                      <button
-                        onClick={() => setEditingIdea(idea)}
-                        className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => setDeletingIdea(idea)}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* Pause/Resume */}
+                      {isActive(idea) && (
+                        <button
+                          onClick={() => handlePause(idea)}
+                          disabled={actionLoading === idea.id}
+                          className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors"
+                          title="Pause (stops research, allows editing)"
+                        >
+                          {actionLoading === idea.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Pause size={16} />
+                          )}
+                        </button>
+                      )}
+                      {isPaused(idea) && (
+                        <button
+                          onClick={() => handleResume(idea)}
+                          disabled={actionLoading === idea.id}
+                          className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
+                          title="Resume (restarting research)"
+                        >
+                          {actionLoading === idea.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Play size={16} />
+                          )}
+                        </button>
+                      )}
+                      {/* Edit — only when paused */}
+                      {isPaused(idea) && (
+                        <button
+                          onClick={() => setEditingIdea(idea)}
+                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      )}
+                      {isActive(idea) && (
+                        <span className="p-1.5 text-gray-300" title="Pause the idea to edit">
+                          <Lock size={16} />
+                        </span>
+                      )}
+                      {/* Delete — only when paused */}
+                      {isPaused(idea) && (
+                        <button
+                          onClick={() => setDeletingIdea(idea)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                      {isActive(idea) && (
+                        <span className="p-1.5 text-gray-300" title="Pause the idea to delete">
+                          <Lock size={16} />
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -220,10 +294,10 @@ export default function IdeasPage() {
         <div className="space-y-4">
           <Textarea
             label="Research Idea"
-            placeholder="Describe your research idea... (e.g., 'Using attention mechanisms for time series forecasting')"
+            placeholder="Describe your research idea..."
             rows={4}
             value={newIdea.text}
-            onChange={(e) => setNewIdea({ ...newIdea, text: e.target.value })}
+            onChange={(e) => setNewIdea({ text: e.target.value })}
           />
         </div>
         <ModalFooter>

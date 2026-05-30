@@ -60,6 +60,8 @@ export const ideasApi = {
   delete: (id: string) => request<void>(`/api/v1/ideas/${id}`, { method: 'DELETE' }),
   versions: (id: string) => request<any[]>(`/api/v1/ideas/${id}/versions`),
   decisions: (id: string) => request<any[]>(`/api/v1/ideas/${id}/decisions`),
+  pause: (id: string) => request<any>(`/api/v1/ideas/${id}/pause`, { method: 'POST' }),
+  resume: (id: string) => request<any>(`/api/v1/ideas/${id}/resume`, { method: 'POST' }),
 };
 
 // Research Runs
