@@ -7,8 +7,10 @@ import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Textarea, Select } from '@/components/ui/Input';
 import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/Table';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { SkeletonTable } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ideasApi } from '@/lib/api';
@@ -22,6 +24,12 @@ export default function IdeasPage() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newIdea, setNewIdea] = useState({
+    text: '',
+    origin: 'user_prompt',
+  });
 
   useEffect(() => {
     loadIdeas();
@@ -38,6 +46,25 @@ export default function IdeasPage() {
     }
   };
 
+  const handleCreate = async () => {
+    if (!newIdea.text.trim()) return;
+    setCreating(true);
+    try {
+      await ideasApi.create(projectId, {
+        initial_text: newIdea.text,
+        current_text: newIdea.text,
+        origin: newIdea.origin,
+      });
+      setShowCreateModal(false);
+      setNewIdea({ text: '', origin: 'user_prompt' });
+      loadIdeas();
+    } catch (error) {
+      console.error('Failed to create idea:', error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const filteredIdeas = ideas.filter((idea) => {
     if (filter === 'all') return true;
     return idea.status === filter;
@@ -49,7 +76,7 @@ export default function IdeasPage() {
         title="Ideas"
         subtitle={`${ideas.length} research ideas tracked`}
         actions={
-          <Button>
+          <Button onClick={() => setShowCreateModal(true)}>
             <Plus size={18} className="mr-2" />
             New Idea
           </Button>
@@ -75,7 +102,13 @@ export default function IdeasPage() {
           <EmptyState
             icon={<Lightbulb className="w-8 h-8 text-gray-400" />}
             title="No ideas yet"
-            description="Ideas will be generated through research runs or manually added."
+            description="Click 'New Idea' to add your first research idea."
+            action={
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus size={18} className="mr-2" />
+                Create Idea
+              </Button>
+            }
           />
         ) : (
           <Table>
@@ -138,6 +171,43 @@ export default function IdeasPage() {
           </Table>
         )}
       </div>
+
+      {/* Create Idea Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="New Research Idea"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Textarea
+            label="Research Idea"
+            placeholder="Describe your research idea in detail..."
+            rows={6}
+            value={newIdea.text}
+            onChange={(e) => setNewIdea({ ...newIdea, text: e.target.value })}
+          />
+          <Select
+            label="Origin"
+            value={newIdea.origin}
+            onChange={(e) => setNewIdea({ ...newIdea, origin: e.target.value })}
+            options={[
+              { value: 'user_prompt', label: 'User Prompt' },
+              { value: 'idle_generated', label: 'Idle Generated' },
+              { value: 'literature_gap', label: 'Literature Gap' },
+              { value: 'skill_generated', label: 'Skill Generated' },
+            ]}
+          />
+        </div>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} loading={creating} disabled={!newIdea.text.trim()}>
+            Create Idea
+          </Button>
+        </ModalFooter>
+      </Modal>
     </Layout>
   );
 }

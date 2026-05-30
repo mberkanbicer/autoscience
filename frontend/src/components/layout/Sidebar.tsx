@@ -21,6 +21,7 @@ import {
 const mainNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/settings', label: 'API Settings', icon: Settings },
 ];
 
 interface SidebarProps {
