@@ -64,9 +64,6 @@ export default function QuestionsPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-gray-900 font-medium mb-2">{question.question}</p>
-                    {question.rationale && (
-                      <p className="text-sm text-gray-600 mb-3">{question.rationale}</p>
-                    )}
                     <div className="flex items-center gap-3 flex-wrap">
                       <StatusBadge status={question.status} />
                       {question.rank && (
