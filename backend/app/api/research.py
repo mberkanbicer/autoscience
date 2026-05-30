@@ -44,9 +44,7 @@ def get_llm_router(
     
     return create_default_router(
         openai_api_key=oa_key,
-        openai_default_model=openai_model or settings.openai_default_model,
         anthropic_api_key=an_key,
-        anthropic_default_model=anthropic_model or settings.anthropic_default_model,
         openrouter_api_key=or_key,
         openrouter_default_model=openrouter_model or settings.openrouter_default_model,
         openrouter_base_url=settings.openrouter_base_url,
