@@ -76,11 +76,15 @@ class ResearchWorkflow:
         self,
         agents: dict[AgentRole, BaseAgent],
         config: WorkflowConfig | None = None,
+        run_id: str | None = None,
+        run_service=None,
     ):
         self.agents = agents
         self.config = config or WorkflowConfig(run_type="user_directed")
         self.step_history: list[WorkflowStepResult] = []
         self.status = WorkflowStatus.PENDING
+        self.run_id = run_id
+        self.run_service = run_service
 
     async def run(self, state: ResearchState) -> ResearchState:
         """Run the complete research workflow."""
@@ -226,6 +230,13 @@ class ResearchWorkflow:
         state.current_phase = step.value
         state.add_event("step_started", details={"step": step.value})
 
+        # Persist event to DB
+        if self.run_service and self.run_id:
+            await self.run_service.add_run_event(
+                self.run_id, "step_started", actor="workflow",
+                details={"step": step.value, "phase_label": self._phase_label(step)},
+            )
+
         try:
             # Check budget
             if state.is_budget_exceeded():
@@ -235,6 +246,18 @@ class ResearchWorkflow:
 
             # Execute handler
             state = await handler(state)
+
+            # Log tool call for the agent run
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            if self.run_service and self.run_id:
+                agent_role = self._step_to_agent(step)
+                await self.run_service.add_tool_call(
+                    run_id=self.run_id,
+                    tool_name=f"agent_{step.value}",
+                    agent_role=agent_role,
+                    duration_ms=duration_ms,
+                    success=True,
+                )
 
             # Record success
             duration = (datetime.now() - start_time).total_seconds()
@@ -249,6 +272,14 @@ class ResearchWorkflow:
                 "step_completed",
                 details={"step": step.value, "duration": duration},
             )
+
+            # Persist event to DB
+            if self.run_service and self.run_id:
+                await self.run_service.add_run_event(
+                    self.run_id, "step_completed", actor="workflow",
+                    details={"step": step.value, "duration": round(duration, 2),
+                             "phase_label": self._phase_label(step)},
+                )
 
         except Exception as e:
             duration = (datetime.now() - start_time).total_seconds()
@@ -483,3 +514,41 @@ class ResearchWorkflow:
     def get_total_duration(self) -> float:
         """Get total workflow duration."""
         return sum(s.duration_seconds for s in self.step_history)
+
+    def _phase_label(self, step: WorkflowStep) -> str:
+        """Human-readable phase label."""
+        labels = {
+            WorkflowStep.INTERPRET_INTENT: "Interpreting research intent",
+            WorkflowStep.PLAN_SEARCH: "Planning literature search",
+            WorkflowStep.RETRIEVE_LITERATURE: "Searching academic databases",
+            WorkflowStep.ANALYZE_PAPERS: "Analyzing papers",
+            WorkflowStep.CLUSTER_PAPERS: "Clustering papers by theme",
+            WorkflowStep.DETECT_CONFLICTS: "Detecting conflicts in literature",
+            WorkflowStep.GENERATE_QUESTIONS: "Generating research questions",
+            WorkflowStep.FORM_HYPOTHESES: "Forming testable hypotheses",
+            WorkflowStep.PLAN_VALIDATION: "Planning validation approach",
+            WorkflowStep.SCORE_IDEA: "Scoring idea quality",
+            WorkflowStep.MAKE_DECISION: "Making research decisions",
+            WorkflowStep.CREATE_SKILLS: "Creating reusable research skills",
+            WorkflowStep.GENERATE_REPORT: "Generating research report",
+        }
+        return labels.get(step, step.value)
+
+    def _step_to_agent(self, step: WorkflowStep) -> str:
+        """Map workflow step to agent role name."""
+        mapping = {
+            WorkflowStep.INTERPRET_INTENT: "user_intent",
+            WorkflowStep.PLAN_SEARCH: "literature",
+            WorkflowStep.RETRIEVE_LITERATURE: "literature",
+            WorkflowStep.ANALYZE_PAPERS: "paper_analyst",
+            WorkflowStep.CLUSTER_PAPERS: "cluster",
+            WorkflowStep.DETECT_CONFLICTS: "conflict",
+            WorkflowStep.GENERATE_QUESTIONS: "research_question",
+            WorkflowStep.FORM_HYPOTHESES: "hypothesis",
+            WorkflowStep.PLAN_VALIDATION: "validation_planner",
+            WorkflowStep.SCORE_IDEA: "scoring",
+            WorkflowStep.MAKE_DECISION: "decision",
+            WorkflowStep.CREATE_SKILLS: "skill_curator",
+            WorkflowStep.GENERATE_REPORT: "archivist",
+        }
+        return mapping.get(step, "workflow")

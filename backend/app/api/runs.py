@@ -208,6 +208,78 @@ async def get_tool_calls(
     return tool_calls
 
 
+@router.get("/{run_id}/status")
+async def get_run_status(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get live status of a research run with current phase, recent events, and tool calls."""
+    service = ResearchRunService(db)
+    run = await service.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    events = await service.get_run_events(run_id)
+    tool_calls = await service.get_tool_calls(run_id)
+
+    # Determine current phase from latest event
+    current_phase = "unknown"
+    if events:
+        for event in reversed(events):
+            if event.event_type == "step_started" and event.details:
+                current_phase = event.details.get("step", "unknown")
+                break
+            elif event.event_type == "step_completed" and event.details:
+                current_phase = event.details.get("step", "unknown") + " (done)"
+                break
+
+    return {
+        "run_id": run.id,
+        "state": run.state,
+        "current_phase": current_phase,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "event_count": len(events),
+        "tool_call_count": len(tool_calls),
+        "recent_events": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "actor": e.actor,
+                "details": e.details,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in events[-20:]  # Last 20 events
+        ],
+        "recent_tool_calls": [
+            {
+                "id": tc.id,
+                "tool_name": tc.tool_name,
+                "agent_role": tc.agent_role,
+                "success": tc.success,
+                "duration_ms": tc.duration_ms,
+                "error_message": tc.error_message,
+                "created_at": tc.created_at.isoformat() if tc.created_at else None,
+            }
+            for tc in tool_calls[-20:]  # Last 20 tool calls
+        ],
+    }
+
+
+@router.get("/by-idea/{idea_id}")
+async def get_runs_by_idea(
+    idea_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get runs for a specific idea."""
+    from sqlalchemy import select
+    from ..models.research_run import ResearchRun
+    result = await db.execute(
+        select(ResearchRun).where(ResearchRun.idea_id == idea_id).order_by(ResearchRun.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 @router.get("/{run_id}/snapshot", response_model=ResearchState)
 async def get_run_snapshot(
     run_id: str,

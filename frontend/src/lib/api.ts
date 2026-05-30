@@ -80,6 +80,8 @@ export const runsApi = {
   cancel: (id: string) => request<any>(`/api/v1/runs/${id}/cancel`, { method: 'POST' }),
   events: (id: string) => request<any[]>(`/api/v1/runs/${id}/events`),
   tools: (id: string) => request<any[]>(`/api/v1/runs/${id}/tools`),
+  status: (id: string) => request<any>(`/api/v1/runs/${id}/status`),
+  byIdea: (ideaId: string) => request<any[]>(`/api/v1/runs/by-idea/${ideaId}`),
   snapshot: (id: string) => request<any>(`/api/v1/runs/${id}/snapshot`),
 };
 

@@ -103,15 +103,30 @@ async def pause_idea(
     idea_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Pause an active idea."""
+    """Pause an active idea and cancel any running research."""
     service = IdeaService(db)
     idea = await service.get_idea(idea_id)
     if not idea:
         raise HTTPException(status_code=404, detail="Idea not found")
     if idea.status != "active":
         raise HTTPException(status_code=400, detail=f"Cannot pause idea in '{idea.status}' status")
+    
+    # Cancel any running research for this idea
+    from sqlalchemy import select as sql_select
+    from ..models.research_run import ResearchRun
+    result = await db.execute(
+        sql_select(ResearchRun).where(
+            ResearchRun.idea_id == idea_id,
+            ResearchRun.state.in_("running", "created"),
+        )
+    )
+    running_runs = list(result.scalars().all())
+    run_service = ResearchRunService(db)
+    for run in running_runs:
+        await run_service.cancel_run(run.id)
+    
     idea.status = "paused"
-    await service.add_idea_decision(idea_id, "pause", "Paused by user")
+    await service.add_idea_decision(idea_id, "pause", f"Paused by user. Cancelled {len(running_runs)} running research.")
     await db.flush()
     await db.refresh(idea)
     return idea

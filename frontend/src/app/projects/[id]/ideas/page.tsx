@@ -117,20 +117,38 @@ export default function IdeasPage() {
     setActionLoading(idea.id);
     try {
       await ideasApi.resume(idea.id);
-      // Start autonomous research when resumed
-      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
-      fetch(`/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(idea.current_text || idea.initial_text)}&run_type=user_directed`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
-          'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
-          'X-Default-Provider': apiSettings.default_provider || 'openrouter',
-        },
-      }).catch(() => {}); // Fire and forget
       await loadIdeas();
     } catch (error: any) {
       alert('Failed to resume: ' + (error.message || 'Unknown error'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleStartResearch = async (idea: Idea) => {
+    setActionLoading(idea.id);
+    try {
+      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
+      const response = await fetch(
+        `/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(idea.current_text || idea.initial_text)}&run_type=user_directed`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
+            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+          },
+        }
+      );
+      if (response.ok) {
+        router.push(`/projects/${projectId}/runs`);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed: ' + (err.detail || 'Unknown error'));
+      }
+    } catch (error: any) {
+      alert('Failed to start research: ' + (error.message || 'Unknown error'));
     } finally {
       setActionLoading(null);
     }
@@ -192,6 +210,21 @@ export default function IdeasPage() {
                       </Badge>
                     </div>
                     <div className="flex gap-1">
+                      {/* Start Research — only for active ideas */}
+                      {isActive(idea) && (
+                        <button
+                          onClick={() => handleStartResearch(idea)}
+                          disabled={actionLoading === idea.id}
+                          className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
+                          title="Start Research Run"
+                        >
+                          {actionLoading === idea.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Play size={16} />
+                          )}
+                        </button>
+                      )}
                       {/* Pause/Resume */}
                       {isActive(idea) && (
                         <button

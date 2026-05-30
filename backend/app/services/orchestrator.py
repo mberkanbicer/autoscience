@@ -142,6 +142,8 @@ class ResearchOrchestrator:
         workflow = ResearchWorkflow(
             agents=self.agents,
             config=WorkflowConfig(run_type=run_type, flexibility=flexibility),
+            run_id=run.id,
+            run_service=self.run_service,
         )
 
         state = await workflow.run(state)
