@@ -49,7 +49,7 @@ export default function WikiPage() {
   const filteredNotes = notes.filter(
     (note) =>
       (note.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+      (note.content || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const noteTypes = Object.keys(groupedNotes);
