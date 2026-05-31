@@ -154,6 +154,8 @@ class ResearchOrchestrator:
             hypothesis_engine=self.hypothesis_engine,
             validation_engine=self.validation_engine,
             scoring_engine=self.scoring_engine,
+            idea_ledger=self.idea_ledger,
+            db=self.db,
         )
 
         state = await workflow.run(state)

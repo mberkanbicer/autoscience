@@ -11,13 +11,14 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { questionsApi } from '@/lib/api';
 import { ResearchQuestion } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { MessageSquare, Hash, TrendingUp } from 'lucide-react';
+import { MessageSquare, Hash, TrendingUp, Trash2, XCircle } from 'lucide-react';
 
 export default function QuestionsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [questions, setQuestions] = useState<ResearchQuestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuestions();
@@ -31,6 +32,19 @@ export default function QuestionsPage() {
       console.error('Failed to load questions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this question?')) return;
+    setDeletingId(id);
+    try {
+      await questionsApi.reject(id, 'Deleted by user');
+      setQuestions(questions.filter(q => q.id !== id));
+    } catch (error) {
+      console.error('Failed to delete question:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -75,6 +89,14 @@ export default function QuestionsPage() {
                       <span className="text-xs text-gray-400">
                         {formatDate(question.created_at)}
                       </span>
+                      <button
+                        onClick={() => handleDelete(question.id)}
+                        disabled={deletingId === question.id}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50 ml-auto"
+                        title="Delete question"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                     {question.rejection_reason && (
                       <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">

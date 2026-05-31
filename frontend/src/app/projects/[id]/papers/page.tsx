@@ -10,13 +10,14 @@ import { SkeletonTable } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { papersApi } from '@/lib/api';
 import { Paper } from '@/lib/types';
-import { FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink, Trash2 } from 'lucide-react';
 
 export default function PapersPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPapers();
@@ -30,6 +31,19 @@ export default function PapersPage() {
       console.error('Failed to load papers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this paper?')) return;
+    setDeletingId(id);
+    try {
+      await papersApi.delete(id);
+      setPapers(papers.filter(p => p.id !== id));
+    } catch (error) {
+      console.error('Failed to delete paper:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -88,16 +102,25 @@ export default function PapersPage() {
                     <Badge variant="info">{paper.paper_type || 'unknown'}</Badge>
                   </TableCell>
                   <TableCell>
-                    {paper.doi && (
-                      <a
-                        href={`https://doi.org/${paper.doi}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700"
+                    <div className="flex items-center gap-2">
+                      {paper.doi && (
+                        <a
+                          href={`https://doi.org/${paper.doi}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <ExternalLink size={16} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDelete(paper.id)}
+                        disabled={deletingId === paper.id}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
                       >
-                        <ExternalLink size={16} />
-                      </a>
-                    )}
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

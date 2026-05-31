@@ -87,6 +87,8 @@ class ResearchWorkflow:
         hypothesis_engine=None,
         validation_engine=None,
         scoring_engine=None,
+        idea_ledger=None,
+        db=None,
     ):
         self.agents = agents
         self.config = config or WorkflowConfig(run_type="user_directed")
@@ -102,6 +104,9 @@ class ResearchWorkflow:
         self.question_engine = question_engine
         self.hypothesis_engine = hypothesis_engine
         self.validation_engine = validation_engine
+        self.scoring_engine = scoring_engine
+        self.idea_ledger = idea_ledger
+        self.db = db
         self.scoring_engine = scoring_engine
 
     async def run(self, state: ResearchState) -> ResearchState:
@@ -395,11 +400,29 @@ class ResearchWorkflow:
             for paper_summary in state.papers[:10]:
                 try:
                     analysis = await self.analysis_engine.analyze_paper(
+                        paper_id=paper_summary.id,
                         title=paper_summary.title,
                         abstract="",  # Would need full paper data
-                        idea=state.current_idea,
+                        idea_context=state.current_idea,
                     )
                     if analysis:
+                        # Store analysis in DB
+                        try:
+                            from ..models.paper import PaperAnalysis as PaperAnalysisModel
+                            from uuid import uuid4
+                            db_analysis = PaperAnalysisModel(
+                                id=str(uuid4()),
+                                paper_id=paper_summary.id,
+                                problem=analysis.problem,
+                                method=analysis.method,
+                                metrics=analysis.metrics,
+                                findings=analysis.findings,
+                                limitations=analysis.limitations,
+                                confidence=analysis.confidence,
+                            )
+                            self.db.add(db_analysis)
+                        except Exception:
+                            pass
                         state.add_event("paper_analyzed", details={"paper": paper_summary.title[:80]})
                 except Exception as e:
                     logger.warning("paper_analysis_failed", paper=paper_summary.title[:50], error=str(e))
@@ -610,38 +633,46 @@ class ResearchWorkflow:
         return state
 
     async def _make_decision(self, state: ResearchState) -> ResearchState:
-        """Make decision on next action."""
-        agent = self.agents.get(AgentRole.DECISION)
-        if not agent:
-            return state
+        """Make decision on next action and store it."""
+        try:
+            classification = state.current_classification or "pending"
+            if self.idea_ledger:
+                await self.idea_ledger.add_decision(
+                    idea_id=state.idea_id,
+                    decision=f"Research completed: {len(state.papers)} papers, {len(state.questions)} questions, {len(state.hypotheses)} hypotheses. Classification: {classification}",
+                    reason=f"Based on {len(state.papers)} papers from 5 academic databases.",
+                    run_id=state.run_id,
+                )
+            state.add_event("decision_recorded", details={"classification": classification})
+        except Exception as e:
+            logger.warning("decision_recording_failed", error=str(e))
 
-        input = AgentInput(
-            task="Decide next action based on research progress",
-            context={
-                "idea": state.current_idea,
-                "phase": state.current_phase,
-                "papers_found": len(state.papers),
-                "conflicts_found": len(state.conflicts),
-                "questions_found": len(state.questions),
-            },
-        )
-
-        output = await agent.run(input)
         state.current_phase = "decision_made"
         return state
 
     async def _create_skills(self, state: ResearchState) -> ResearchState:
         """Create skills from successful patterns."""
-        agent = self.agents.get(AgentRole.SKILL_CURATOR)
-        if not agent:
-            return state
+        try:
+            from ..models.skill import Skill as SkillModel
+            from uuid import uuid4
+            
+            # Create a skill based on the research context
+            steps_completed = [s.step.value for s in self.step_history if s.status == 'completed']
+            if steps_completed:
+                skill = SkillModel(
+                    id=str(uuid4()),
+                    project_id=state.project_id,
+                    skill_name=f"Research: {state.current_idea[:60]}",
+                    skill_type="research_method",
+                    description=f"Completed research workflow: {', '.join(steps_completed[:5])}",
+                    trigger_conditions=["user_directed"],
+                    effectiveness_score=len(state.papers) / max(len(steps_completed), 1),
+                )
+                self.db.add(skill)
+                state.add_event("skill_created", details={"skill_name": skill.skill_name})
+        except Exception as e:
+            logger.warning("skill_creation_failed", error=str(e))
 
-        input = AgentInput(
-            task="Identify and create reusable research skills",
-            context={"workflow_steps": [s.step.value for s in self.step_history]},
-        )
-
-        output = await agent.run(input)
         state.current_phase = "skills_created"
         return state
 

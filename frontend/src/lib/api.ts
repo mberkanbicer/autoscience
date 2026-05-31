@@ -84,6 +84,7 @@ export const runsApi = {
   byIdea: (ideaId: string) => request<any[]>(`/api/v1/runs/by-idea/${ideaId}`),
   snapshot: (id: string) => request<any>(`/api/v1/runs/${id}/snapshot`),
   delete: (id: string) => request<void>(`/api/v1/runs/${id}`, { method: 'DELETE' }),
+  audit: (id: string) => request<any[]>(`/api/v1/runs/${id}/audit`),
 };
 
 // Papers

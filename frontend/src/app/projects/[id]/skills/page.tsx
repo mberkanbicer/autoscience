@@ -11,13 +11,14 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { skillsApi } from '@/lib/api';
 import { Skill } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { GraduationCap, Zap, TrendingUp, BarChart } from 'lucide-react';
+import { GraduationCap, Zap, TrendingUp, BarChart, Trash2, Pause } from 'lucide-react';
 
 export default function SkillsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSkills();
@@ -31,6 +32,29 @@ export default function SkillsPage() {
       console.error('Failed to load skills:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this skill?')) return;
+    setDeletingId(id);
+    try {
+      await skillsApi.delete(id);
+      setSkills(skills.filter(s => s.id !== id));
+    } catch (error) {
+      console.error('Failed to delete skill:', error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleRetire = async (id: string) => {
+    if (!window.confirm('Retire this skill?')) return;
+    try {
+      await skillsApi.retire(id);
+      loadSkills();
+    } catch (error) {
+      console.error('Failed to retire skill:', error);
     }
   };
 
@@ -62,7 +86,24 @@ export default function SkillsPage() {
                   <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
                     <GraduationCap className="text-orange-600" size={24} />
                   </div>
-                  <StatusBadge status={skill.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={skill.status} />
+                    <button
+                      onClick={() => handleRetire(skill.id)}
+                      className="text-yellow-500 hover:text-yellow-700"
+                      title="Retire skill"
+                    >
+                      <Pause size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(skill.id)}
+                      disabled={deletingId === skill.id}
+                      className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                      title="Delete skill"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 <h3 className="font-semibold text-gray-900 mb-2">{skill.name}</h3>
