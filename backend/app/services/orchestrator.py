@@ -53,10 +53,12 @@ class ResearchOrchestrator:
         db: AsyncSession,
         llm_router: LLMRouter,
         connector_manager: ConnectorManager,
+        event_broadcaster=None,
     ):
         self.db = db
         self.llm = llm_router
         self.connectors = connector_manager
+        self.event_broadcaster = event_broadcaster
 
         # Initialize engines
         self.keyword_engine = KeywordExpansionEngine(llm_router)
@@ -99,6 +101,7 @@ class ResearchOrchestrator:
         idea_text: str,
         run_type: str = "user_directed",
         flexibility: float = 0.6,
+        existing_run_id: str | None = None,
     ) -> ResearchState:
         """Run a complete research cycle."""
         logger.info(
@@ -115,14 +118,19 @@ class ResearchOrchestrator:
             flexibility=flexibility,
         )
 
-        # Create research run
-        run = await self.run_service.create_run(
-            project_id=project_id,
-            data=ResearchRunCreate(
-                idea_id=idea.id,
-                run_type=run_type,
-            ),
-        )
+        # Use existing run or create new one
+        if existing_run_id:
+            run = await self.run_service.get_run(existing_run_id)
+            if not run:
+                raise ValueError(f"Run {existing_run_id} not found")
+        else:
+            run = await self.run_service.create_run(
+                project_id=project_id,
+                data=ResearchRunCreate(
+                    idea_id=idea.id,
+                    run_type=run_type,
+                ),
+            )
 
         # Initialize state
         state = ResearchState(
@@ -156,6 +164,7 @@ class ResearchOrchestrator:
             scoring_engine=self.scoring_engine,
             idea_ledger=self.idea_ledger,
             db=self.db,
+            event_broadcaster=self.event_broadcaster,
         )
 
         state = await workflow.run(state)

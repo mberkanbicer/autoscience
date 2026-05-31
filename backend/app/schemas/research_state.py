@@ -165,6 +165,7 @@ class ResearchState(BaseSchema):
     papers: list[PaperSummary] = Field(default_factory=list)
     clusters: list[ClusterSummary] = Field(default_factory=list)
     conflicts: list[ConflictSummary] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)  # Expanded keywords from plan_search
 
     # Research questions and hypotheses
     questions: list[QuestionSummary] = Field(default_factory=list)

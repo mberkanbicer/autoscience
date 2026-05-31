@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     core_api_key: str = ""
     unpaywall_email: str = "your-email@example.com"
 
+    # SearXNG
+    searxng_url: str = "https://search.bicers.me"
+    searxng_categories: str = "science,general"
+    searxng_engines: str = ""  # comma-separated, empty = all
+    cache_ttl_seconds: int = 3600
+
     # Sandbox
     sandbox_docker_image: str = "autoscience-sandbox:latest"
     sandbox_timeout_seconds: int = 300

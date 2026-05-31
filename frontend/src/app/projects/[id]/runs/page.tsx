@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { runsApi, ideasApi } from '@/lib/api';
 import { ResearchRun, Idea } from '@/lib/types';
 import { formatDate, formatDuration } from '@/lib/utils';
+import { LivePreview } from '@/components/LivePreview';
 import {
   Activity, Clock, DollarSign, Play, Loader2, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronRight, RotateCw, X, Search,
@@ -192,43 +193,33 @@ export default function RunsPage() {
     setStartResult(null);
     try {
       const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      try {
-        const response = await fetch(
-          `/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(newRun.idea)}&run_type=${newRun.run_type}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
-              'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
-              'X-Default-Provider': apiSettings.default_provider || 'openrouter',
-            },
-            signal: controller.signal,
-          }
-        );
-        clearTimeout(timeoutId);
-        if (response.ok) {
-          const result = await response.json();
-          setStarting(false);
-          setStartResult({ success: true, message: `Done! ${result.papers_found} papers, ${result.questions_generated} questions, ${result.hypotheses_formed} hypotheses.` });
-          loadRuns();
-          return;
+      const response = await fetch(
+        `/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(newRun.idea)}&run_type=${newRun.run_type}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
+            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+          },
         }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') throw e;
+      );
+      if (response.ok) {
+        const result = await response.json();
+        setStarting(false);
+        setStartResult({ success: true, message: `Research started! Run ID: ${result.run_id}` });
+        setShowCreateModal(false);
+        setStartResult(null);
+        // Reload runs and expand the new one
+        const updatedRuns = await loadRuns();
+        if (result.run_id) {
+          setExpandedRunId(result.run_id);
+        }
+        return;
       }
-      // Request still running, poll for it
-      await new Promise(r => setTimeout(r, 2000));
-      const updatedRuns = await loadRuns();
-      const latestRun = updatedRuns[0];
-      if (latestRun?.state === 'running') {
-        setExpandedRunId(latestRun.id);
-        pollLiveStatus(latestRun.id);
-      }
-      setStarting(false);
-      setStartResult({ success: true, message: 'Research started! Watch the live progress below.' });
+      const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(err.detail || `HTTP ${response.status}`);
     } catch (error: any) {
       setStarting(false);
       setStartResult({ success: false, message: error.message || 'Failed to start.' });
@@ -474,7 +465,11 @@ export default function RunsPage() {
                   {isExpanded && (
                     <div className="p-4 bg-gray-50 border-t">
                       {isRunning ? (
-                        renderProgressTrack(run.id)
+                        <div className="space-y-4">
+                          {/* Live Search Preview */}
+                          <LivePreview runId={run.id} isActive={isRunning} onComplete={loadRuns} />
+                          {renderProgressTrack(run.id)}
+                        </div>
                       ) : (
                         <div className="text-sm text-gray-600">
                           {status?.recent_events && status.recent_events.length > 0 ? (

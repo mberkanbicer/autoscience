@@ -9,6 +9,8 @@ from .semantic_scholar import SemanticScholarConnector
 from .crossref import CrossrefConnector
 from .arxiv import ArxivConnector
 from .pubmed import PubMedConnector
+from .searxng import SearXNGConnector
+from ..services.cache_service import CacheService
 
 logger = structlog.get_logger()
 
@@ -127,6 +129,8 @@ def create_default_manager(
     openalex_email: str | None = None,
     semantic_scholar_api_key: str | None = None,
     pubmed_api_key: str | None = None,
+    searxng_url: str | None = None,
+    cache_service: CacheService | None = None,
 ) -> ConnectorManager:
     """Create a connector manager with default connectors."""
     manager = ConnectorManager()
@@ -137,5 +141,12 @@ def create_default_manager(
     manager.register_connector("crossref", CrossrefConnector(email=openalex_email))
     manager.register_connector("arxiv", ArxivConnector())
     manager.register_connector("pubmed", PubMedConnector(api_key=pubmed_api_key))
+
+    # Register SearXNG if URL provided
+    if searxng_url:
+        manager.register_connector(
+            "searxng",
+            SearXNGConnector(base_url=searxng_url, cache_service=cache_service),
+        )
 
     return manager

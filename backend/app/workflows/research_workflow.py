@@ -89,6 +89,7 @@ class ResearchWorkflow:
         scoring_engine=None,
         idea_ledger=None,
         db=None,
+        event_broadcaster=None,
     ):
         self.agents = agents
         self.config = config or WorkflowConfig(run_type="user_directed")
@@ -107,6 +108,7 @@ class ResearchWorkflow:
         self.scoring_engine = scoring_engine
         self.idea_ledger = idea_ledger
         self.db = db
+        self.event_broadcaster = event_broadcaster
         self.scoring_engine = scoring_engine
 
     async def run(self, state: ResearchState) -> ResearchState:
@@ -138,11 +140,36 @@ class ResearchWorkflow:
             state.completed_at = datetime.utcnow()
             state.current_phase = "completed"
 
+            # Broadcast completion
+            if self.event_broadcaster and self.run_id:
+                try:
+                    await self.event_broadcaster.publish(
+                        self.run_id, "run_completed", {
+                            "papers": len(state.papers),
+                            "conflicts": len(state.conflicts),
+                            "questions": len(state.questions),
+                            "hypotheses": len(state.hypotheses),
+                        }
+                    )
+                except Exception:
+                    pass
+
         except Exception as e:
             logger.error("workflow_failed", error=str(e))
             self.status = WorkflowStatus.FAILED
             state.state = RunState.FAILED
             state.add_error("workflow_failed", str(e))
+
+            # Broadcast failure
+            if self.event_broadcaster and self.run_id:
+                try:
+                    await self.event_broadcaster.publish(
+                        self.run_id, "run_failed", {
+                            "error": str(e),
+                        }
+                    )
+                except Exception:
+                    pass
 
         return state
 
@@ -253,6 +280,18 @@ class ResearchWorkflow:
         state.current_phase = step.value
         state.add_event("step_started", details={"step": step.value})
 
+        # Broadcast step progress
+        if self.event_broadcaster and self.run_id:
+            try:
+                await self.event_broadcaster.publish(
+                    self.run_id, "step_started", {
+                        "step": step.value,
+                        "label": self._phase_label(step),
+                    }
+                )
+            except Exception:
+                pass
+
         try:
             # Execute handler
             state = await handler(state)
@@ -322,7 +361,34 @@ class ResearchWorkflow:
         return state
 
     async def _plan_search(self, state: ResearchState) -> ResearchState:
-        """Plan literature search."""
+        """Plan literature search — expand keywords and broadcast them."""
+        keywords = None
+        if self.keyword_engine:
+            try:
+                kw_result = await self.keyword_engine.expand_keywords(state.current_idea)
+                all_terms = []
+                all_terms.extend(kw_result.core_concepts)
+                all_terms.extend(kw_result.synonyms)
+                all_terms.extend(kw_result.method_terms)
+                keywords = all_terms if all_terms else None
+            except Exception as e:
+                logger.warning("keyword_expansion_failed", error=str(e))
+
+        # Store keywords in state for use by _retrieve_literature
+        state.keywords = keywords or []
+
+        # Broadcast keywords event
+        if self.event_broadcaster and self.run_id:
+            try:
+                await self.event_broadcaster.publish(
+                    self.run_id, "keywords", {
+                        "idea": state.current_idea,
+                        "keywords": state.keywords,
+                    }
+                )
+            except Exception:
+                pass
+
         state.current_phase = "search_planned"
         return state
 
@@ -335,20 +401,22 @@ class ResearchWorkflow:
             state.current_phase = "literature_retrieved"
             return state
 
-        # Expand keywords if keyword engine available
-        keywords = None
-        if self.keyword_engine:
+        # Use keywords from state (expanded in _plan_search)
+        keywords = state.keywords if state.keywords else None
+
+        # Broadcast search start
+        if self.event_broadcaster and self.run_id:
             try:
-                kw_result = await self.keyword_engine.expand_keywords(state.current_idea)
-                # KeywordExpansion is a dataclass with core_concepts, synonyms, etc.
-                # Flatten into a list of strings for the literature engine
-                all_terms = []
-                all_terms.extend(kw_result.core_concepts)
-                all_terms.extend(kw_result.synonyms)
-                all_terms.extend(kw_result.method_terms)
-                keywords = all_terms if all_terms else None
-            except Exception as e:
-                logger.warning("keyword_expansion_failed", error=str(e))
+                sources = list(self.connectors.connectors.keys()) if self.connectors else []
+                await self.event_broadcaster.publish(
+                    self.run_id, "search_started", {
+                        "sources": sources,
+                        "query": " ".join((keywords or [])[:5]),
+                        "max_results": min(state.budget.max_sources, 30),
+                    }
+                )
+            except Exception:
+                pass
 
         # Search academic databases
         try:
@@ -357,6 +425,19 @@ class ResearchWorkflow:
                 keywords=keywords,
                 limit=min(state.budget.max_sources, 30),
             )
+
+            # Broadcast results summary
+            if self.event_broadcaster and self.run_id:
+                try:
+                    await self.event_broadcaster.publish(
+                        self.run_id, "search_results", {
+                            "total_found": result.total_found,
+                            "papers_count": len(result.papers),
+                            "search_queries": result.search_queries_used,
+                        }
+                    )
+                except Exception:
+                    pass
 
             # Convert found papers to PaperSummary and add to state
             for rp in result.papers:
@@ -375,6 +456,23 @@ class ResearchWorkflow:
                     )
                 )
 
+                # Broadcast each paper found
+                if self.event_broadcaster and self.run_id:
+                    try:
+                        await self.event_broadcaster.publish(
+                            self.run_id, "paper_found", {
+                                "id": paper_id,
+                                "title": paper.title,
+                                "authors": paper.authors[:3] if isinstance(paper.authors, list) else [],
+                                "year": paper.year,
+                                "source": paper.source,
+                                "doi": paper.doi,
+                                "url": paper.url,
+                            }
+                        )
+                    except Exception:
+                        pass
+
             state.sources_searched += result.total_found
             logger.info(
                 "literature_retrieved",
@@ -385,6 +483,17 @@ class ResearchWorkflow:
         except Exception as e:
             logger.error("literature_retrieval_failed", error=str(e))
             state.add_error("literature_retrieval", str(e))
+
+        # Broadcast completion
+        if self.event_broadcaster and self.run_id:
+            try:
+                await self.event_broadcaster.publish(
+                    self.run_id, "search_complete", {
+                        "papers_count": len(state.papers),
+                    }
+                )
+            except Exception:
+                pass
 
         state.current_phase = "literature_retrieved"
         return state
