@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_db
 from ..services.idea_service import IdeaService
+from ..services.research_run_service import ResearchRunService
 from ..schemas.idea import (
     IdeaCreate,
     IdeaUpdate,
