@@ -23,7 +23,12 @@ settings = get_settings()
 
 def _get_redis():
     """Get async Redis client."""
-    return aioredis.from_url(settings.redis_url, decode_responses=True)
+    return aioredis.from_url(
+        settings.redis_url,
+        decode_responses=True,
+        socket_keepalive=True,
+        socket_timeout=None,
+    )
 
 
 def _get_cache_service(redis_client=None) -> CacheService:
@@ -153,38 +158,66 @@ async def _event_generator(run_id: str) -> AsyncGenerator[str, None]:
         await redis_client.close()
         return
 
+    # Check if run is already completed/failed (events may have been already sent)
+    from ..database import async_session_factory
+    from ..services.research_run_service import ResearchRunService
+    run_completed = False
     try:
-        # Send initial connection event
-        yield f"data: {json.dumps({'type': 'connected', 'timestamp': __import__('datetime').datetime.utcnow().isoformat()})}\n\n"
+        async with async_session_factory() as check_db:
+            check_svc = ResearchRunService(check_db)
+            run = await check_svc.get_run(run_id)
+            if run and run.state in ("completed", "failed"):
+                # Send stored events from DB
+                from sqlalchemy import select
+                from ..models.research_run import ResearchRunEvent
+                stmt = select(ResearchRunEvent).where(
+                    ResearchRunEvent.run_id == run_id
+                ).order_by(ResearchRunEvent.created_at)
+                result = await check_db.execute(stmt)
+                for evt in result.scalars().all():
+                    sse_data = {
+                        "type": evt.event_type,
+                        "timestamp": evt.created_at.isoformat() if evt.created_at else "",
+                        "data": evt.details or {},
+                    }
+                    yield f"data: {json.dumps(sse_data, default=str)}\n\n"
+                run_completed = True
+    except Exception:
+        pass
 
-        while True:
-            try:
-                message = await asyncio.wait_for(
-                    pubsub.get_message(ignore_subscribe_messages=True),
-                    timeout=30,  # Heartbeat timeout
-                )
-                if message and message["type"] == "message":
-                    data = message["data"]
-                    if isinstance(data, bytes):
-                        data = data.decode()
-                    yield f"data: {data}\n\n"
+    if run_completed:
+        await broadcaster.unsubscribe(pubsub)
+        await redis_client.close()
+        return
 
-                    # Parse to check if run completed
-                    try:
-                        event = json.loads(data)
-                        if event.get("type") in ("run_completed", "run_failed"):
-                            break
-                    except json.JSONDecodeError:
-                        pass
+    # Send initial connection event
+    yield f"data: {json.dumps({'type': 'connected', 'timestamp': __import__('datetime').datetime.utcnow().isoformat()})}\n\n"
 
-            except asyncio.TimeoutError:
-                # Send heartbeat to keep connection alive
-                yield f": heartbeat\n\n"
+    try:
+        # Use listen() which blocks properly — not get_message() which polls
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                data = message["data"]
+                if isinstance(data, bytes):
+                    data = data.decode()
+                yield f"data: {data}\n\n"
+
+                # Check if run completed
+                try:
+                    event = json.loads(data)
+                    if event.get("type") in ("run_completed", "run_failed"):
+                        break
+                except json.JSONDecodeError:
+                    pass
 
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        yield f"data: {json.dumps({'type': 'error', 'data': {'message': str(e)}})}\n\n"
+        # Only send error event if connection is still alive
+        try:
+            yield f"data: {json.dumps({'type': 'error', 'data': {'message': str(e)}})}\n\n"
+        except Exception:
+            pass
     finally:
         await broadcaster.unsubscribe(pubsub)
         await redis_client.close()

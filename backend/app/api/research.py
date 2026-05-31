@@ -173,7 +173,12 @@ async def start_research_run(
     # Set up event broadcaster for live streaming
     try:
         import redis.asyncio as aioredis
-        redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+        redis_client = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_keepalive=True,
+            socket_timeout=None,
+        )
         event_broadcaster = EventBroadcaster(redis_client)
     except Exception:
         event_broadcaster = None
