@@ -90,9 +90,10 @@ async def _run_workflow_background(
                 event_broadcaster=event_broadcaster,
             )
 
-            # Mark run as started
+            # Mark run as started and commit so frontend can see it
             run_service = ResearchRunService(db)
             await run_service.start_run(run_id)
+            await db.commit()
 
             state = await orchestrator.run_research(
                 project_id=project_id,
@@ -109,12 +110,12 @@ async def _run_workflow_background(
         logger.error("background_run_failed", run_id=run_id, error=str(e))
         # Try to mark the run as failed
         try:
-            async with async_session_factory() as db:
-                run_service = ResearchRunService(db)
+            async with async_session_factory() as db2:
+                run_service = ResearchRunService(db2)
                 await run_service.fail_run(run_id, str(e))
-                await db.commit()
-        except Exception:
-            pass
+                await db2.commit()
+        except Exception as e2:
+            logger.error("failed_to_mark_failed", error=str(e2))
 
 
 @router.post("/run")
