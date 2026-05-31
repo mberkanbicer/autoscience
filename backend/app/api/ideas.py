@@ -217,29 +217,32 @@ async def generate_ideas_from_literature(
     
     # Step 1: Search literature
     from ..connectors.manager import create_default_manager
-    manager = create_default_manager()
+    from ..connectors.base import SearchQuery
+    from ..config import get_settings
     
+    settings = get_settings()
+    manager = create_default_manager(
+        searxng_url=settings.searxng_url,
+    )
+    
+    search_query = SearchQuery(text=topic, limit=20)
     all_papers = []
     try:
         # Search SearXNG
         if "searxng" in manager.connectors:
-            results = await manager.connectors["searxng"].search(
-                query=topic,
-                max_results=20,
+            result = await manager.connectors["searxng"].search(
+                query=search_query,
                 categories=["science"],
             )
-            all_papers.extend(results)
+            all_papers.extend(result.papers)
     except Exception as e:
         logger.warning("searxng_search_failed", error=str(e))
     
     try:
         # Also search OpenAlex
         if "openalex" in manager.connectors:
-            results = await manager.connectors["openalex"].search(
-                query=topic,
-                max_results=20,
-            )
-            all_papers.extend(results)
+            result = await manager.connectors["openalex"].search(search_query)
+            all_papers.extend(result.papers)
     except Exception as e:
         logger.warning("openalex_search_failed", error=str(e))
     
