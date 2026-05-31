@@ -211,13 +211,9 @@ Literature retrieval completed successfully."""
 
 **Statement:** {h.statement}
 
-**Independent Variable:** {h.independent_variable}
+**Confidence:** {h.confidence or 0:.2f}
 
-**Dependent Variable:** {h.dependent_variable}
-
-**Failure Condition:** {h.failure_condition}
-
-**Confidence:** {h.confidence:.2f}
+**Status:** {h.status}
 """
             for i, h in enumerate(state.hypotheses)
         ])
