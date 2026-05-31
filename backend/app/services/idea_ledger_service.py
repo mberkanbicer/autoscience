@@ -36,7 +36,7 @@ class IdeaLedgerService:
             select(Idea).where(
                 Idea.project_id == project_id,
                 Idea.current_text == normalized_text,
-            )
+            ).limit(1)
         )
         existing = result.scalar_one_or_none()
         if existing:

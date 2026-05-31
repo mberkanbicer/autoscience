@@ -636,14 +636,20 @@ class ResearchWorkflow:
         """Make decision on next action and store it."""
         try:
             classification = state.current_classification or "pending"
+            # Map classification to valid decision type
+            decision_map = {
+                'strong': 'promote', 'promising': 'continue', 'moderate': 'continue',
+                'weak': 'revise', 'poor': 'archive', 'pending': 'continue',
+            }
+            decision_type = decision_map.get(classification, 'continue')
             if self.idea_ledger:
                 await self.idea_ledger.add_decision(
                     idea_id=state.idea_id,
-                    decision=f"Research completed: {len(state.papers)} papers, {len(state.questions)} questions, {len(state.hypotheses)} hypotheses. Classification: {classification}",
-                    reason=f"Based on {len(state.papers)} papers from 5 academic databases.",
+                    decision=decision_type,
+                    reason=f"{len(state.papers)} papers, {len(state.questions)} questions, {len(state.hypotheses)} hypotheses. Classification: {classification}",
                     run_id=state.run_id,
                 )
-            state.add_event("decision_recorded", details={"classification": classification})
+            state.add_event("decision_recorded", details={"classification": classification, "decision": decision_type})
         except Exception as e:
             logger.warning("decision_recording_failed", error=str(e))
 
