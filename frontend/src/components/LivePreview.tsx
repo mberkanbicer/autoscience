@@ -27,6 +27,8 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
   const [searchSources, setSearchSources] = useState<string[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const clearPreview = useCallback(() => {
     setEvents([]);
@@ -40,7 +42,6 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
 
   useEffect(() => {
     if (!runId || !isActive) {
-      // Disconnect if no run or not active
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -51,7 +52,6 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
 
     clearPreview();
 
-    // Connect to SSE endpoint
     const eventSource = new EventSource(`/api/v1/search/stream/${runId}`);
     eventSourceRef.current = eventSource;
 
@@ -65,20 +65,19 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
         setEvents(prev => [...prev, searchEvent]);
 
         switch (searchEvent.type) {
+          case 'connected':
+            break;
           case 'keywords':
             setKeywords(searchEvent.data.keywords || []);
             break;
-
           case 'search_started':
             setSearchSources(searchEvent.data.sources || []);
             setCurrentStep(`Searching ${searchEvent.data.sources?.length || 0} sources...`);
             break;
-
           case 'search_results':
             setTotalFound(searchEvent.data.total_found || 0);
             setCurrentStep(`Found ${searchEvent.data.papers_count} papers from ${searchEvent.data.total_found} results`);
             break;
-
           case 'paper_found':
             setPapers(prev => {
               const exists = prev.some(p => p.id === searchEvent.data.id);
@@ -86,42 +85,35 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
               return [...prev, searchEvent.data];
             });
             break;
-
           case 'search_complete':
             setCurrentStep(`Search complete — ${searchEvent.data.papers_count} papers collected`);
             setIsComplete(true);
             break;
-
           case 'run_completed':
             setCurrentStep('Research run completed');
             setIsComplete(true);
-            onComplete?.();
+            onCompleteRef.current?.();
             eventSource.close();
             break;
-
           case 'run_failed':
             setCurrentStep(`Run failed: ${searchEvent.data.error}`);
             setIsComplete(true);
             eventSource.close();
             break;
-
           case 'step_started':
             setCurrentStep(searchEvent.data.label || searchEvent.data.step);
             break;
         }
 
-        // Auto-scroll to bottom
         if (containerRef.current) {
           containerRef.current.scrollTop = containerRef.current.scrollHeight;
         }
       } catch (e) {
-        // Ignore parse errors (heartbeats etc)
       }
     };
 
     eventSource.onerror = () => {
       setIsConnected(false);
-      // Auto-reconnect is handled by EventSource API
     };
 
     return () => {
@@ -129,7 +121,7 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
       eventSourceRef.current = null;
       setIsConnected(false);
     };
-  }, [runId, isActive, onComplete, clearPreview]);
+  }, [runId, isActive]);  // REMOVED onComplete and clearPreview from deps
 
   if (!runId || !isActive) {
     return null;
