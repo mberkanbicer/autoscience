@@ -172,6 +172,36 @@ async def get_project_stats(
         select(func.count(Hypothesis.id)).where(Hypothesis.project_id == project_id)
     )
 
+    # Count scores (via ideas table)
+    from ..models.idea import IdeaScore
+
+    score_count = await db.execute(
+        select(func.count(IdeaScore.id)).where(IdeaScore.idea_id.in_(
+            select(Idea.id).where(Idea.project_id == project_id)
+        ))
+    )
+
+    # Count reports
+    from ..models.report import ResearchReport
+
+    report_count = await db.execute(
+        select(func.count(ResearchReport.id)).where(ResearchReport.project_id == project_id)
+    )
+
+    # Count wiki notes
+    from ..models.report import KnowledgeNote
+
+    wiki_count = await db.execute(
+        select(func.count(KnowledgeNote.id)).where(KnowledgeNote.project_id == project_id)
+    )
+
+    # Count clusters
+    from ..models.paper import PaperCluster
+
+    cluster_count = await db.execute(
+        select(func.count(PaperCluster.id)).where(PaperCluster.project_id == project_id)
+    )
+
     return ProjectStats(
         total_ideas=idea_row.total,
         active_ideas=idea_row.active,
@@ -183,4 +213,7 @@ async def get_project_stats(
         total_conflicts=conflict_count.scalar() or 0,
         total_questions=question_count.scalar() or 0,
         total_hypotheses=hypothesis_count.scalar() or 0,
+        total_reports=report_count.scalar() or 0,
+        total_wiki_notes=wiki_count.scalar() or 0,
+        total_clusters=cluster_count.scalar() or 0,
     )

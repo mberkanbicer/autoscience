@@ -54,6 +54,10 @@ class ClusteringEngine:
         if not papers:
             return ClusteringResult()
 
+        # If no LLM, use simple keyword-based clustering
+        if not self.llm.has_provider():
+            return self._simple_cluster(papers, cluster_type)
+
         # Prepare paper summaries
         papers_summary = self._prepare_papers_summary(papers)
 
@@ -103,6 +107,46 @@ class ClusteringEngine:
             clustering_notes=notes,
             total_clusters=total_clusters,
             avg_cluster_size=avg_size,
+        )
+
+    def _simple_cluster(self, papers: list[dict[str, Any]], cluster_type: str = "topic") -> ClusteringResult:
+        """Simple keyword-based clustering when no LLM is available."""
+        import re
+        from collections import defaultdict
+
+        # Group papers by shared title words
+        stop_words = {'the', 'a', 'an', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'with', 'and', 'or', 'is', 'are', 'a', 'from'}
+        word_papers = defaultdict(list)
+        
+        for p in papers:
+            title = (p.get('title', '') or '').lower()
+            words = set(re.findall(r'\w+', title)) - stop_words - {w for w in re.findall(r'\w+', title) if len(w) <= 2}
+            for word in words:
+                word_papers[word].append(p.get('id', p.get('title', '')))
+        
+        # Find top keywords by frequency
+        top_words = sorted(word_papers.keys(), key=lambda w: len(word_papers[w]), reverse=True)[:8]
+        
+        clusters = []
+        used_papers = set()
+        for word in top_words:
+            paper_ids = [pid for pid in word_papers[word] if pid not in used_papers]
+            if len(paper_ids) >= 2:
+                cluster = PaperCluster(
+                    id=str(uuid4()),
+                    name=word.title(),
+                    description=f'Papers related to {word}',
+                    cluster_type=cluster_type,
+                    paper_ids=paper_ids,
+                    size=len(paper_ids),
+                )
+                clusters.append(cluster)
+                used_papers.update(paper_ids)
+
+        return ClusteringResult(
+            clusters=clusters[:5],
+            clustering_notes=f'Keyword-based clustering of {len(papers)} papers',
+            total_clusters=len(clusters[:5]),
         )
 
     def _prepare_papers_summary(self, papers: list[dict[str, Any]]) -> str:

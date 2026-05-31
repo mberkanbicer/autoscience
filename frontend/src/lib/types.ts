@@ -28,6 +28,9 @@ export interface ProjectStats {
   total_conflicts: number;
   total_questions: number;
   total_hypotheses: number;
+  total_reports: number;
+  total_wiki_notes: number;
+  total_clusters: number;
 }
 
 export interface Idea {

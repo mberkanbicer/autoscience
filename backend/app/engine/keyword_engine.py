@@ -55,8 +55,29 @@ class KeywordExpansionEngine:
     def __init__(self, llm_router: LLMRouter):
         self.llm = llm_router
 
+    def _simple_expand(self, idea: str) -> KeywordExpansion:
+        """Simple text-based keyword expansion when no LLM is available."""
+        import re
+        # Split on common delimiters and filter short/stop words
+        stop_words = {'the', 'a', 'an', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'with', 'and', 'or', 'is', 'are', 'be', 'this', 'that', 'using', 'based', 'from'}
+        words = re.split(r'[\s,;:.!?]+', idea.lower())
+        meaningful = [w for w in words if len(w) > 2 and w not in stop_words]
+        return KeywordExpansion(
+            core_concepts=meaningful[:5],
+            synonyms=meaningful[:3],
+            method_terms=[],
+            application_terms=[],
+            metric_terms=[],
+            adjacent_field_terms=[],
+            negative_terms=[],
+        )
+
     async def expand_keywords(self, idea: str, domain: str | None = None) -> KeywordExpansion:
         """Expand an idea into comprehensive keywords."""
+        # If no LLM available, use simple text-based expansion
+        if not self.llm.has_provider():
+            return self._simple_expand(idea)
+
         system = """You are a scientific keyword expansion expert.
 
 Given a research idea, generate comprehensive keywords for academic literature search.
@@ -252,6 +273,9 @@ Generate comprehensive search keywords as JSON."""
         queries: list[SearchQueryPlan],
     ) -> str:
         """Create strategy notes explaining the search approach."""
+        if not self.llm.has_provider():
+            return f"Search strategy for: {idea[:100]}. Generated {len(queries)} queries across multiple types."
+
         system = """You are a research strategy documenter.
 
 Given a research idea, keywords, and search queries, create a brief strategy note explaining:

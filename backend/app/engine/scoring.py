@@ -85,6 +85,10 @@ class IdeaScoringEngine:
         idea_id = idea.get("id", str(uuid4()))
         idea_text = idea.get("current_text") or idea.get("text", "")
 
+        # If no LLM, use metadata-based scoring
+        if not self.llm.has_provider():
+            return self._simple_score(idea_id, idea_text, papers, conflicts)
+
         # Get LLM scores
         scores_data = await self._llm_score(
             idea_text=idea_text,
@@ -117,6 +121,42 @@ class IdeaScoringEngine:
         # Classify idea
         score.classification = self._classify(score.overall_value)
 
+        return score
+
+    def _simple_score(self, idea_id: str, idea_text: str, papers: list | None, conflicts: list | None) -> IdeaScore:
+        """Simple metadata-based scoring when no LLM is available."""
+        # Base scores
+        novelty = 5.0
+        feasibility = 6.0
+        importance = 5.0
+        evidence = 4.0 if papers and len(papers) > 5 else 3.0
+        validation = 4.0
+        differentiation = 5.0
+        data_avail = 5.0 if papers and len(papers) > 0 else 3.0
+        skill = 5.0
+        user_align = 7.0
+        prior_art = 4.0 if conflicts and len(conflicts) > 0 else 5.0
+        safety = 7.0
+        cost = 6.0
+
+        score = IdeaScore(
+            idea_id=idea_id,
+            novelty=novelty,
+            feasibility=feasibility,
+            importance=importance,
+            evidence_support=evidence,
+            validation_clarity=validation,
+            differentiation=differentiation,
+            data_availability=data_avail,
+            skill_leverage=skill,
+            user_alignment=user_align,
+            prior_art_risk=prior_art,
+            safety_risk=safety,
+            cost_risk=cost,
+            rationale='Simple metadata-based scoring (no LLM available)',
+        )
+        score.overall_value = self._calculate_overall_value(score)
+        score.classification = self._classify(score.overall_value)
         return score
 
     async def score_ideas(

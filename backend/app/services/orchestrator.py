@@ -197,67 +197,133 @@ class ResearchOrchestrator:
         return state
 
     async def _store_results(self, state: ResearchState) -> None:
-        """Store research results in the database."""
-        # Store papers
+        """Store research results in the database.
+
+        Writes directly to DB models to avoid service-layer interface mismatches.
+        All operations are wrapped in try/except so one failure doesn't block others.
+        """
+        from uuid import uuid4
+        from ..models.paper import Paper, PaperCluster, ClusterLabel, ClusterConflict
+        from ..models.research_question import ResearchQuestion, Hypothesis
+        from ..models.idea import IdeaScore
+
+        stored = {"papers": 0, "clusters": 0, "conflicts": 0, "questions": 0, "hypotheses": 0, "scores": 0}
+
+        def safe(obj, field, default=None):
+            """Safely get attribute from Pydantic model or dict."""
+            try:
+                if hasattr(obj, 'model_fields') and field in obj.model_fields:
+                    return getattr(obj, field, default)
+                elif hasattr(obj, field):
+                    return getattr(obj, field)
+                return default
+            except Exception:
+                return default
+
+        # --- Papers ---
         for paper in state.papers:
             try:
-                await self.paper_service.create_paper(
+                db_paper = Paper(
+                    id=str(uuid4()),
                     project_id=state.project_id,
-                    data={
-                        "title": paper.title,
-                        "authors": paper.authors if isinstance(paper.authors, list) else [str(paper.authors)],
-                        "year": paper.year,
-                        "doi": paper.doi,
-                        "abstract": getattr(paper, 'abstract', None),
-                        "venue": getattr(paper, 'venue', None),
-                        "citation_count": paper.citation_count,
-                        "paper_type": paper.paper_type,
-                    },
+                    title=paper.title,
+                    authors=paper.authors if isinstance(paper.authors, list) else [str(paper.authors)],
+                    year=paper.year,
+                    doi=paper.doi,
+                    abstract=safe(paper, 'abstract'),
+                    venue=safe(paper, 'venue'),
+                    citation_count=paper.citation_count,
+                    paper_type=paper.paper_type,
                 )
+                self.db.add(db_paper)
+                stored["papers"] += 1
             except Exception as e:
                 logger.warning("store_paper_failed", title=paper.title[:50], error=str(e))
 
-        # Store clusters
+        # --- Clusters ---
         for cluster in state.clusters:
-            await self.cluster_service.store_clusters(
-                project_id=state.project_id,
-                clusters=[cluster],
-            )
+            try:
+                db_cluster = PaperCluster(
+                    id=cluster.id or str(uuid4()),
+                    project_id=state.project_id,
+                    name=cluster.name,
+                    description=cluster.description,
+                    cluster_type='topic',
+                    paper_ids=[],
+                )
+                self.db.add(db_cluster)
+                stored["clusters"] += 1
+            except Exception as e:
+                logger.warning("store_cluster_failed", error=str(e))
 
-        # Store conflicts
+        # --- Conflicts ---
         for conflict in state.conflicts:
-            await self.conflict_service.store_conflicts(
-                project_id=state.project_id,
-                result={"conflicts": [conflict]},
-            )
+            try:
+                db_conflict = ClusterConflict(
+                    id=conflict.id or str(uuid4()),
+                    project_id=state.project_id,
+                    conflict_type=conflict.conflict_type,
+                    description=conflict.description,
+                    severity=conflict.severity or 0.5,
+                    research_opportunity=f'Investigate {conflict.conflict_type} conflict',
+                )
+                self.db.add(db_conflict)
+                stored["conflicts"] += 1
+            except Exception as e:
+                logger.warning("store_conflict_failed", error=str(e))
 
-        # Store questions
+        # --- Questions ---
         for question in state.questions:
             try:
-                await self.question_service.store_questions(
+                db_question = ResearchQuestion(
+                    id=question.id or str(uuid4()),
                     project_id=state.project_id,
-                    result={"questions": [{"text": question.question, "rank": question.rank}]},
                     run_id=state.run_id,
                     idea_id=state.idea_id,
+                    question=question.question,
+                    rank=question.rank,
+                    status="generated",
                 )
+                self.db.add(db_question)
+                stored["questions"] += 1
             except Exception as e:
                 logger.warning("store_question_failed", error=str(e))
 
-        # Store hypotheses
+        # --- Hypotheses ---
         for hypothesis in state.hypotheses:
             try:
-                await self.hypothesis_service.store_hypotheses(
+                db_hypothesis = Hypothesis(
+                    id=hypothesis.id or str(uuid4()),
                     project_id=state.project_id,
-                    result={"hypotheses": [{"statement": hypothesis.statement, "confidence": hypothesis.confidence}]},
                     idea_id=state.idea_id,
+                    statement=hypothesis.statement,
+                    confidence=hypothesis.confidence,
+                    version=1,
+                    status="draft",
                 )
+                self.db.add(db_hypothesis)
+                stored["hypotheses"] += 1
             except Exception as e:
                 logger.warning("store_hypothesis_failed", error=str(e))
 
-        # Store score
-        if state.scores:
-            score = state.scores[0]
-            await self.scoring_service.store_score(score)
+        # --- Score ---
+        if state.scores and state.idea_id:
+            try:
+                score = state.scores[0]
+                db_score = IdeaScore(
+                    id=str(uuid4()),
+                    idea_id=state.idea_id,
+                    overall_value=safe(score, 'overall_value'),
+                    scoring_rationale='Auto-scored during research workflow',
+                )
+                self.db.add(db_score)
+                stored["scores"] += 1
+            except Exception as e:
+                logger.warning("store_score_failed", error=str(e))
+
+        # Commit all stored records
+        await self.db.flush()
+        logger.info("store_results_done", stored=stored)
 
     async def run_idle_cycle(
         self,

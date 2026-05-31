@@ -86,8 +86,11 @@ class LiteratureEngine:
         frontier = [p for p in ranked_papers if p.recency_score > 0.8][:20]
         reviews = [p for p in ranked_papers if p.review_score > 0.5][:10]
 
-        # Generate retrieval notes
-        notes = await self._generate_retrieval_notes(idea, ranked_papers)
+        # Generate retrieval notes (skip if no LLM)
+        try:
+            notes = await self._generate_retrieval_notes(idea, ranked_papers)
+        except Exception:
+            notes = f"Found {len(ranked_papers)} papers for: {idea[:100]}"
 
         return LiteratureResult(
             idea=idea,

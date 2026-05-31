@@ -490,8 +490,8 @@ export default function RunsPage() {
               onChange={(e) => setNewRun({ ...newRun, run_type: e.target.value })}
               options={[
                 { value: 'user_directed', label: 'User Directed' },
-                { value: 'idle_exploration', label: 'Idle Exploration' },
-                { value: 'literature_review', label: 'Literature Review' },
+                { value: 'idle_autonomous', label: 'Idle Autonomous' },
+                { value: 'validation', label: 'Validation' },
               ]}
             />
           </div>

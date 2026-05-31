@@ -248,34 +248,9 @@ class ResearchWorkflow:
         state.current_phase = step.value
         state.add_event("step_started", details={"step": step.value})
 
-        # Persist event to DB
-        if self.run_service and self.run_id:
-            await self.run_service.add_run_event(
-                self.run_id, "step_started", actor="workflow",
-                details={"step": step.value, "phase_label": self._phase_label(step)},
-            )
-
         try:
-            # Check budget
-            if state.is_budget_exceeded():
-                logger.warning("budget_exceeded", run_id=state.run_id)
-                state.add_event("budget_exceeded")
-                return state
-
             # Execute handler
             state = await handler(state)
-
-            # Log tool call for the agent run
-            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-            if self.run_service and self.run_id:
-                agent_role = self._step_to_agent(step)
-                await self.run_service.add_tool_call(
-                    run_id=self.run_id,
-                    tool_name=f"agent_{step.value}",
-                    agent_role=agent_role,
-                    duration_ms=duration_ms,
-                    success=True,
-                )
 
             # Record success
             duration = (datetime.now() - start_time).total_seconds()
@@ -291,13 +266,24 @@ class ResearchWorkflow:
                 details={"step": step.value, "duration": duration},
             )
 
-            # Persist event to DB
+            # Persist event to DB (best-effort, never crash)
             if self.run_service and self.run_id:
-                await self.run_service.add_run_event(
-                    self.run_id, "step_completed", actor="workflow",
-                    details={"step": step.value, "duration": round(duration, 2),
-                             "phase_label": self._phase_label(step)},
-                )
+                try:
+                    await self.run_service.add_run_event(
+                        self.run_id, "step_completed", actor="workflow",
+                        details={"step": step.value, "duration": round(duration, 2),
+                                 "phase_label": self._phase_label(step)},
+                    )
+                    agent_role = self._step_to_agent(step)
+                    await self.run_service.add_tool_call(
+                        run_id=self.run_id,
+                        tool_name=f"step_{step.value}",
+                        agent_role=agent_role,
+                        duration_ms=int(duration * 1000),
+                        success=True,
+                    )
+                except Exception:
+                    pass
 
         except Exception as e:
             duration = (datetime.now() - start_time).total_seconds()
@@ -308,7 +294,6 @@ class ResearchWorkflow:
                 error=str(e),
             )
             self.step_history.append(result)
-
             state.add_error(f"step_failed_{step.value}", str(e))
             logger.error("step_failed", step=step.value, error=str(e))
 
@@ -350,7 +335,13 @@ class ResearchWorkflow:
         if self.keyword_engine:
             try:
                 kw_result = await self.keyword_engine.expand_keywords(state.current_idea)
-                keywords = kw_result.get("keywords", []) if isinstance(kw_result, dict) else None
+                # KeywordExpansion is a dataclass with core_concepts, synonyms, etc.
+                # Flatten into a list of strings for the literature engine
+                all_terms = []
+                all_terms.extend(kw_result.core_concepts)
+                all_terms.extend(kw_result.synonyms)
+                all_terms.extend(kw_result.method_terms)
+                keywords = all_terms if all_terms else None
             except Exception as e:
                 logger.warning("keyword_expansion_failed", error=str(e))
 

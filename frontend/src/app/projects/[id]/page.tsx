@@ -24,6 +24,7 @@ import {
   GitBranch,
   MessageSquareText,
   BookOpen,
+  Network,
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
@@ -112,8 +113,9 @@ export default function ProjectDetailPage() {
               { label: 'Hypotheses', value: stats.total_hypotheses, icon: <FlaskConical size={24} /> },
               { label: 'Conflicts', value: stats.total_conflicts, icon: <MessageSquare size={24} /> },
               { label: 'Skills', value: stats.total_skills, icon: <GraduationCap size={24} /> },
-              { label: 'Reports', value: 0, icon: <BookOpen size={24} /> },
-              { label: 'Wiki Notes', value: 0, icon: <BookOpen size={24} /> },
+              { label: 'Reports', value: stats.total_reports || 0, icon: <BookOpen size={24} /> },
+              { label: 'Wiki Notes', value: stats.total_wiki_notes || 0, icon: <BookOpen size={24} /> },
+              { label: 'Clusters', value: stats.total_clusters || 0, icon: <Network size={24} /> },
             ]}
           />
         )}

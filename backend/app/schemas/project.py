@@ -66,3 +66,6 @@ class ProjectStats(BaseSchema):
     total_conflicts: int = 0
     total_questions: int = 0
     total_hypotheses: int = 0
+    total_reports: int = 0
+    total_wiki_notes: int = 0
+    total_clusters: int = 0

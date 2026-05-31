@@ -65,6 +65,10 @@ class ConflictDetectionEngine:
         if len(papers) < 2:
             return ConflictDetectionResult()
 
+        # If no LLM, use simple metadata-based conflict detection
+        if not self.llm.has_provider():
+            return self._simple_detect_conflicts(papers, cluster_id)
+
         # Detect different types of conflicts
         finding_conflicts = await self._detect_finding_conflicts(papers)
         method_conflicts = await self._detect_method_conflicts(papers)
@@ -93,6 +97,48 @@ class ConflictDetectionEngine:
             total_conflicts=len(all_conflicts),
             total_gaps=len(gaps),
             high_severity_count=high_severity,
+        )
+
+    def _simple_detect_conflicts(self, papers: list[dict[str, Any]], cluster_id: str | None = None) -> ConflictDetectionResult:
+        """Simple conflict detection when no LLM is available."""
+        conflicts = []
+        gaps = []
+        
+        # Detect year-based conflicts (papers from different eras might contradict)
+        years = [(p.get('year'), p.get('id', p.get('title', ''))) for p in papers if p.get('year')]
+        if len(years) >= 2:
+            years.sort(key=lambda x: x[0])
+            old = years[:len(years)//2]
+            new = years[len(years)//2:]
+            if old and new:
+                conflicts.append(Conflict(
+                    id=str(uuid4()),
+                    conflict_type='recency',
+                    description=f'Knowledge may have evolved: {len(old)} older papers vs {len(new)} newer papers',
+                    supporting_papers=[y[1] for y in new[:5]],
+                    opposing_papers=[y[1] for y in old[:5]],
+                    severity=0.4,
+                    cluster_id=cluster_id,
+                ))
+        
+        # Detect citation gaps
+        cited = [p for p in papers if p.get('citation_count', 0) and p['citation_count'] > 100]
+        uncited = [p for p in papers if not p.get('citation_count') or p['citation_count'] <= 10]
+        if cited and uncited:
+            gaps.append(Gap(
+                id=str(uuid4()),
+                description=f'{len(uncited)} low-citation papers may indicate under-validated research',
+                gap_type='limited_validation',
+                related_papers=[p.get('id', p.get('title', '')) for p in uncited[:5]],
+                severity=0.3,
+            ))
+        
+        return ConflictDetectionResult(
+            conflicts=conflicts,
+            gaps=gaps,
+            analysis_notes=f'Simple conflict analysis of {len(papers)} papers',
+            total_conflicts=len(conflicts),
+            total_gaps=len(gaps),
         )
 
     async def _detect_finding_conflicts(

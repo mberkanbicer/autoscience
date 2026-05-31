@@ -58,6 +58,10 @@ class HypothesisGenerationEngine:
         if not questions:
             return HypothesisGenerationResult()
 
+        # If no LLM, generate simple template hypotheses
+        if not self.llm.has_provider():
+            return self._simple_generate_hypotheses(questions, idea_context, max_hypotheses)
+
         hypotheses = []
 
         # Generate hypothesis for each top question
@@ -85,6 +89,52 @@ class HypothesisGenerationEngine:
             hypotheses=validated,
             generation_notes=notes,
             total_generated=len(validated),
+        )
+
+    def _simple_generate_hypotheses(
+        self,
+        questions: list[dict[str, Any]],
+        idea_context: str,
+        max_hypotheses: int = 5,
+    ) -> HypothesisGenerationResult:
+        """Generate simple template hypotheses when no LLM is available."""
+        hypotheses = []
+        
+        for i, q in enumerate(questions[:max_hypotheses]):
+            q_text = q.get('question', q.get('text', '')) if isinstance(q, dict) else str(q)
+            q_id = q.get('id', '') if isinstance(q, dict) else ''
+            hypotheses.append(Hypothesis(
+                id=str(uuid4()),
+                statement=f'H1: {q_text[:100]}',
+                question_id=q_id,
+                independent_variable='method',
+                dependent_variable='performance',
+                context=idea_context[:200] if idea_context else '',
+                expected_direction='positive',
+                confidence=0.4,
+                version=1,
+                status='draft',
+            ))
+        
+        # Add a general hypothesis about the idea
+        if idea_context:
+            hypotheses.append(Hypothesis(
+                id=str(uuid4()),
+                statement=f'H0: {idea_context[:100]} shows measurable improvement over existing approaches',
+                question_id='',
+                independent_variable='approach',
+                dependent_variable='outcome',
+                context=idea_context[:200],
+                expected_direction='positive',
+                confidence=0.3,
+                version=1,
+                status='draft',
+            ))
+        
+        return HypothesisGenerationResult(
+            hypotheses=hypotheses[:max_hypotheses],
+            generation_notes=f'Simple template-based hypothesis generation from {len(questions)} questions',
+            total_generated=len(hypotheses[:max_hypotheses]),
         )
 
     async def _generate_single_hypothesis(

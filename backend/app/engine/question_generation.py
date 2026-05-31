@@ -56,6 +56,10 @@ class QuestionGenerationEngine:
         max_questions: int = 15,
     ) -> QuestionGenerationResult:
         """Generate research questions from conflicts and gaps."""
+        # If no LLM, generate simple template questions
+        if not self.llm.has_provider():
+            return self._simple_generate_questions(conflicts, gaps, idea_context, max_questions)
+
         all_questions = []
 
         # Generate questions from conflicts
@@ -93,6 +97,62 @@ class QuestionGenerationEngine:
             total_generated=len(deduplicated),
             total_selected=len(selected),
             total_rejected=len(rejected),
+        )
+
+    def _simple_generate_questions(
+        self,
+        conflicts: list[Conflict],
+        gaps: list[Gap],
+        idea_context: str,
+        max_questions: int = 15,
+    ) -> QuestionGenerationResult:
+        """Generate simple template questions when no LLM is available."""
+        questions = []
+        
+        # Generate questions from conflicts
+        for i, conflict in enumerate(conflicts[:5]):
+            questions.append(ResearchQuestion(
+                id=str(uuid4()),
+                question=f'How do we reconcile the {conflict.conflict_type} conflict: {conflict.description[:100]}?',
+                source_conflicts=[conflict.id],
+                source_gaps=[],
+                novelty_score=0.5,
+                feasibility_score=0.6,
+                evidence_score=0.5,
+                overall_score=0.5,
+            ))
+        
+        # Generate questions from gaps
+        for gap in gaps[:3]:
+            questions.append(ResearchQuestion(
+                id=str(uuid4()),
+                question=f'What {gap.gap_type} gap exists: {gap.description[:100]}?',
+                source_conflicts=[],
+                source_gaps=[gap.id],
+                novelty_score=0.6,
+                feasibility_score=0.5,
+                evidence_score=0.4,
+                overall_score=0.5,
+            ))
+        
+        # Add general question about the idea
+        if idea_context:
+            questions.append(ResearchQuestion(
+                id=str(uuid4()),
+                question=f'What are the key open challenges in: {idea_context[:100]}?',
+                source_conflicts=[],
+                source_gaps=[],
+                novelty_score=0.5,
+                feasibility_score=0.7,
+                evidence_score=0.5,
+                overall_score=0.6,
+            ))
+        
+        return QuestionGenerationResult(
+            questions=questions[:max_questions],
+            generation_notes=f'Simple template-based question generation from {len(conflicts)} conflicts and {len(gaps)} gaps',
+            total_generated=len(questions),
+            total_selected=len(questions[:max_questions]),
         )
 
     async def _generate_from_conflicts(

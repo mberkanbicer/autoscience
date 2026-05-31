@@ -174,11 +174,9 @@ Literature retrieval completed successfully."""
     def _generate_conflicts_section(self, state: ResearchState) -> str:
         """Generate conflicts section."""
         conflicts_list = "\n".join([
-            f"""### {c.conflict_type.title()} Conflict (Severity: {c.severity:.2f})
+            f"""### {c.conflict_type.title()} Conflict (Severity: {c.severity or 0.5:.2f})
 
 {c.description}
-
-**Research Opportunity:** {c.research_opportunity}
 """
             for c in state.conflicts
         ])
