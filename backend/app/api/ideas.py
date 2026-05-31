@@ -2,6 +2,9 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
+
+logger = structlog.get_logger()
 
 from ..dependencies import get_db
 from ..services.idea_service import IdeaService
@@ -162,6 +165,184 @@ async def delete_idea(
     deleted = await service.delete_idea(idea_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Idea not found")
+
+
+@router.post("/generate")
+async def generate_ideas_from_literature(
+    project_id: str = Query(...),
+    topic: str = Query(..., min_length=5, description="Research topic or field to explore"),
+    num_ideas: int = Query(5, ge=1, le=10, description="Number of ideas to generate"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate research ideas by analyzing recent literature on a topic.
+    
+    Searches SearXNG + academic databases, analyzes trends/gaps/contradictions,
+    and uses LLM to generate actionable research ideas.
+    """
+    from ..llm.router import LLMRouter
+    from ..config import get_settings
+    from ..services.idea_ledger_service import IdeaLedgerService
+    
+    settings = get_settings()
+    
+    # Build LLM router from env
+    llm_router = LLMRouter()
+    if settings.openrouter_api_key:
+        from ..llm.openrouter_provider import OpenRouterProvider
+        llm_router.providers["openrouter"] = OpenRouterProvider(
+            api_key=settings.openrouter_api_key,
+            model=settings.openrouter_model or "openai/gpt-4o",
+        )
+        llm_router.default_provider = "openrouter"
+    elif settings.openai_api_key:
+        from ..llm.openai_provider import OpenAIProvider
+        llm_router.providers["openai"] = OpenAIProvider(
+            api_key=settings.openai_api_key,
+            model=settings.openai_model or "gpt-4o",
+        )
+        llm_router.default_provider = "openai"
+    
+    if not llm_router.has_provider():
+        raise HTTPException(
+            status_code=400,
+            detail="No LLM provider configured. Set an API key in Settings first."
+        )
+    
+    # Step 1: Search literature
+    from ..connectors.manager import create_default_manager
+    manager = create_default_manager()
+    
+    all_papers = []
+    try:
+        # Search SearXNG
+        if "searxng" in manager.connectors:
+            results = await manager.connectors["searxng"].search(
+                query=topic,
+                max_results=20,
+                categories=["science"],
+            )
+            all_papers.extend(results)
+    except Exception as e:
+        logger.warning("searxng_search_failed", error=str(e))
+    
+    try:
+        # Also search OpenAlex
+        if "openalex" in manager.connectors:
+            results = await manager.connectors["openalex"].search(
+                query=topic,
+                max_results=20,
+            )
+            all_papers.extend(results)
+    except Exception as e:
+        logger.warning("openalex_search_failed", error=str(e))
+    
+    if not all_papers:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No papers found for topic: {topic}"
+        )
+    
+    # Deduplicate by title
+    seen_titles = set()
+    unique_papers = []
+    for p in all_papers:
+        title_key = (p.title or "").lower().strip()[:80]
+        if title_key and title_key not in seen_titles:
+            seen_titles.add(title_key)
+            unique_papers.append(p)
+    
+    # Step 2: Analyze with LLM and generate ideas
+    papers_summary = "\n".join([
+        f"- {p.title} ({getattr(p, 'year', 'N/A')}) - {getattr(p, 'source', 'unknown')}: {(getattr(p, 'abstract', '') or '')[:150]}..."
+        for p in unique_papers[:20]
+    ])
+    
+    prompt = f"""You are a scientific research strategist. Analyze these recent papers on the topic "{topic}" and generate {num_ideas} novel, actionable research ideas.
+
+Recent Papers ({len(unique_papers)} found):
+{papers_summary}
+
+For each idea, provide:
+1. A clear, specific research idea title (one sentence)
+2. A 2-3 sentence description of what would be investigated
+3. Why it's important (1 sentence)
+4. Expected approach/methodology (1 sentence)
+5. Novelty level: high/medium/low
+
+Format each idea exactly like this:
+IDEA 1: [title]
+DESCRIPTION: [description]
+IMPORTANCE: [why important]
+APPROACH: [methodology]
+NOVELTY: [high/medium/low]
+---
+
+Generate ideas that are:
+- Specific enough to be actionable
+- Novel (not just repeating what's already been done)
+- Feasible with current methods
+- Addressing gaps, contradictions, or emerging trends in the literature"""
+    
+    response = await llm_router.generate(prompt, max_tokens=2000)
+    
+    # Step 3: Parse ideas from response
+    ideas = []
+    blocks = response.split("---")
+    for block in blocks:
+        block = block.strip()
+        if not block or "IDEA" not in block:
+            continue
+        
+        idea_data = {}
+        for line in block.split("\n"):
+            line = line.strip()
+            if line.startswith("IDEA"):
+                idea_data["title"] = line.split(":", 1)[1].strip() if ":" in line else ""
+            elif line.startswith("DESCRIPTION"):
+                idea_data["description"] = line.split(":", 1)[1].strip() if ":" in line else ""
+            elif line.startswith("IMPORTANCE"):
+                idea_data["importance"] = line.split(":", 1)[1].strip() if ":" in line else ""
+            elif line.startswith("APPROACH"):
+                idea_data["approach"] = line.split(":", 1)[1].strip() if ":" in line else ""
+            elif line.startswith("NOVELTY"):
+                idea_data["novelty"] = line.split(":", 1)[1].strip() if ":" in line else ""
+        
+        if idea_data.get("title"):
+            ideas.append(idea_data)
+    
+    # Step 4: Save ideas to database
+    idea_ledger = IdeaLedgerService(db)
+    saved_ideas = []
+    
+    for idea_data in ideas[:num_ideas]:
+        full_text = f"{idea_data['title']}\n\n{idea_data.get('description', '')}\n\nImportance: {idea_data.get('importance', '')}\n\nApproach: {idea_data.get('approach', '')}\n\nNovelty: {idea_data.get('novelty', 'medium')}"
+        
+        try:
+            idea = await idea_ledger.create_idea(
+                project_id=project_id,
+                text=full_text,
+                origin="literature_analysis",
+                flexibility=0.7,
+            )
+            saved_ideas.append({
+                "id": idea.id,
+                "title": idea_data["title"],
+                "description": idea_data.get("description", ""),
+                "importance": idea_data.get("importance", ""),
+                "approach": idea_data.get("approach", ""),
+                "novelty": idea_data.get("novelty", "medium"),
+            })
+        except Exception as e:
+            logger.warning("idea_save_failed", title=idea_data.get("title"), error=str(e))
+    
+    await db.commit()
+    
+    return {
+        "topic": topic,
+        "papers_analyzed": len(unique_papers),
+        "ideas_generated": len(saved_ideas),
+        "ideas": saved_ideas,
+    }
 
 
 @router.get("/{idea_id}/versions", response_model=list[IdeaVersionResponse])

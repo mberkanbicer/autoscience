@@ -13,6 +13,7 @@ class Idea(BaseModel):
     __tablename__ = "ideas"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    parent_idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
     origin: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # user_prompt | idle_generated | literature_gap | skill_generated | revived
@@ -30,6 +31,7 @@ class Idea(BaseModel):
 
     # Relationships
     project = relationship("Project", back_populates="ideas")
+    parent = relationship("Idea", remote_side="Idea.id", backref="sub_ideas")
     versions = relationship("IdeaVersion", back_populates="idea", lazy="selectin")
     scores = relationship("IdeaScore", back_populates="idea", lazy="selectin")
     classifications = relationship("IdeaClassification", back_populates="idea", lazy="selectin")

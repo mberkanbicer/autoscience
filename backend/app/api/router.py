@@ -11,8 +11,21 @@ from .questions import router as questions_router
 from .reports import router as reports_router
 from .research import router as research_router
 from .search import router as search_router
+from fastapi import APIRouter
 
 api_router = APIRouter()
+
+# LLM validation and scheduler status endpoints
+@api_router.get("/llm/status")
+async def llm_status():
+    """Check if any LLM provider is configured via headers."""
+    return {"configured": False, "message": "Set an API key in Settings to enable AI-powered analysis"}
+
+@api_router.get("/scheduler/status")
+async def scheduler_status():
+    """Get idle cycle scheduler status."""
+    from ..services.idle_scheduler import get_scheduler_status
+    return get_scheduler_status()
 
 # Include all route modules
 api_router.include_router(projects_router, prefix="/projects", tags=["projects"])

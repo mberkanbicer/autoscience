@@ -41,8 +41,9 @@ class ReportConfig:
 class ReportGenerator:
     """Generator for research reports."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, llm_router=None):
         self.db = db
+        self.llm = llm_router
 
     async def generate_report(
         self,
@@ -54,24 +55,24 @@ class ReportGenerator:
 
         sections = []
 
-        # Executive Summary
+        # Executive Summary - use LLM if available
         if config.include_executive_summary:
-            sections.append(self._generate_executive_summary(state))
+            sections.append(await self._generate_executive_summary(state))
 
         # Original Idea
         sections.append(self._generate_idea_section(state))
 
-        # Literature Review
-        sections.append(self._generate_literature_section(state))
+        # Literature Review - use LLM if available
+        sections.append(await self._generate_literature_section(state))
 
-        # Conflicts and Gaps
-        sections.append(self._generate_conflicts_section(state))
+        # Conflicts and Gaps - use LLM if available
+        sections.append(await self._generate_conflicts_section(state))
 
         # Research Questions
         sections.append(self._generate_questions_section(state))
 
-        # Hypotheses
-        sections.append(self._generate_hypotheses_section(state))
+        # Hypotheses - use LLM if available
+        sections.append(await self._generate_hypotheses_section(state))
 
         # Validation Plan
         sections.append(self._generate_validation_section(state))
@@ -91,30 +92,66 @@ class ReportGenerator:
 
         return report
 
-    def _generate_executive_summary(self, state: ResearchState) -> str:
-        """Generate executive summary."""
+    async def _generate_executive_summary(self, state: ResearchState) -> str:
+        """Generate executive summary with LLM synthesis."""
+        if self.llm and self.llm.has_provider():
+            try:
+                papers_summary = "\n".join(
+                    f"- {p.title} ({p.year}) - {p.source}: {(p.abstract or '')[:150]}..."
+                    for p in state.papers[:15]
+                )
+                conflicts_summary = "\n".join(
+                    f"- {c.conflict_type}: {c.description[:200]}"
+                    for c in state.conflicts[:5]
+                )
+                questions_summary = "\n".join(
+                    f"- {q.question}"
+                    for q in state.questions[:5]
+                )
+                hypotheses_summary = "\n".join(
+                    f"- {h.statement} (confidence: {h.confidence or 0:.2f})"
+                    for h in state.hypotheses[:5]
+                )
+                prompt = f"""You are a scientific research analyst. Write an executive summary for this research run.
+
+Research Idea: {state.current_idea}
+
+Papers Analyzed ({len(state.papers)} total):
+{papers_summary}
+
+Conflicts Found ({len(state.conflicts)}):
+{conflicts_summary or 'None detected.'}
+
+Research Questions ({len(state.questions)}):
+{questions_summary or 'None generated.'}
+
+Hypotheses ({len(state.hypotheses)}):
+{hypotheses_summary or 'None formed.'}
+
+Write a concise executive summary (3-5 paragraphs) covering:
+1. What was researched and why
+2. Key findings from the literature
+3. Main conflicts or gaps identified
+4. The most promising hypotheses
+5. Recommended next steps"""
+                response = await self.llm.generate(prompt, max_tokens=1000)
+                return f"# Executive Summary\n\n{response.strip()}\n\n## Key Metrics\n\n- Papers Analyzed: {len(state.papers)}\n- Clusters: {len(state.clusters)}\n- Conflicts: {len(state.conflicts)}\n- Questions: {len(state.questions)}\n- Hypotheses: {len(state.hypotheses)}"
+            except Exception as e:
+                logger.warning("llm_summary_failed", error=str(e))
+        # Fallback: structured summary
         return f"""# Executive Summary
-
-## Research Run Overview
-
-- **Run ID:** {state.run_id}
-- **Run Type:** {state.run_type}
-- **Current Phase:** {state.current_phase}
-- **Status:** {state.state}
 
 ## Key Metrics
 
 - Papers Analyzed: {len(state.papers)}
-- Clusters Identified: {len(state.clusters)}
-- Conflicts Detected: {len(state.conflicts)}
-- Questions Generated: {len(state.questions)}
-- Hypotheses Formed: {len(state.hypotheses)}
+- Clusters: {len(state.clusters)}
+- Conflicts: {len(state.conflicts)}
+- Questions: {len(state.questions)}
+- Hypotheses: {len(state.hypotheses)}
 
 ## Research Idea
 
 {state.current_idea[:500]}{'...' if len(state.current_idea) > 500 else ''}
-
-## Summary
 
 This research run analyzed {len(state.papers)} papers, identified {len(state.conflicts)} conflicts, 
 generated {len(state.questions)} research questions, and formed {len(state.hypotheses)} hypotheses."""
@@ -139,55 +176,71 @@ generated {len(state.questions)} research questions, and formed {len(state.hypot
 
 User-directed research"""
 
-    def _generate_literature_section(self, state: ResearchState) -> str:
-        """Generate literature review section."""
-        papers_by_cluster = {}
-        for cluster in state.clusters:
-            papers_by_cluster[cluster.name] = [
-                p for p in state.papers
-                if p.id in (cluster.paper_ids if hasattr(cluster, 'paper_ids') else [])
-            ]
-
+    async def _generate_literature_section(self, state: ResearchState) -> str:
+        """Generate literature review section with LLM synthesis."""
         papers_list = "\n".join([
-            f"- **{p.title}** ({p.year}) - {p.citation_count or 0} citations"
-            for p in state.papers[:20]
+            f"- **{p.title}** ({p.year}) - {p.source}"
+            for p in state.papers[:25]
         ])
+        clusters_list = "\n".join([f"- {c.name}: {c.description}" for c in state.clusters])
+
+        if self.llm and self.llm.has_provider() and state.papers:
+            try:
+                prompt = f"""You are a literature review analyst. Synthesize findings from these papers.
+
+Research Topic: {state.current_idea}
+
+Papers Found ({len(state.papers)} total, showing first 25):
+{papers_list}
+
+Clusters:
+{clusters_list or 'No clustering available.'}
+
+Write a literature review (2-4 paragraphs) covering:
+1. Main themes and trends
+2. Key methodologies
+3. Notable findings
+4. Gaps or under-explored areas"""
+                response = await self.llm.generate(prompt, max_tokens=800)
+                return f"# Literature Review\n\n{response.strip()}\n\n## Papers ({len(state.papers)} total)\n\n{papers_list}\n\n## Clusters\n\n{clusters_list or 'No clusters identified.'}"
+            except Exception as e:
+                logger.warning("llm_literature_review_failed", error=str(e))
 
         return f"""# Literature Review
 
-## Papers Analyzed
-
-Total papers: {len(state.papers)}
+## Papers Analyzed ({len(state.papers)} total)
 
 {papers_list}
 
 ## Clusters
 
-{len(state.clusters)} clusters identified:
+{clusters_list or 'No clusters identified.'}"""
 
-{chr(10).join(f'- {c.name}: {c.description}' for c in state.clusters)}
-
-## Literature Notes
-
-Literature retrieval completed successfully."""
-
-    def _generate_conflicts_section(self, state: ResearchState) -> str:
-        """Generate conflicts section."""
+    async def _generate_conflicts_section(self, state: ResearchState) -> str:
+        """Generate conflicts section with LLM analysis."""
         conflicts_list = "\n".join([
-            f"""### {c.conflict_type.title()} Conflict (Severity: {c.severity or 0.5:.2f})
-
-{c.description}
-"""
+            f"- **{c.conflict_type.title()}** (severity {c.severity or 0.5:.2f}): {c.description}"
             for c in state.conflicts
         ])
+        if self.llm and self.llm.has_provider() and state.conflicts:
+            try:
+                conflicts_data = "\n".join(
+                    f"- {c.conflict_type}, severity {c.severity or 0.5:.2f}: {c.description[:200]}"
+                    for c in state.conflicts[:10]
+                )
+                prompt = f"""Analyze these research conflicts for: {state.current_idea}
 
+Conflicts:\n{conflicts_data}\n
+Write a brief analysis (2 paragraphs) about what they mean and how to resolve them."""
+                response = await self.llm.generate(prompt, max_tokens=500)
+                return f"# Conflicts and Gaps\n\n{response.strip()}\n\n## Detected ({len(state.conflicts)})\n\n{conflicts_list if conflicts_list else 'No conflicts detected.'}"
+            except Exception as e:
+                logger.warning("llm_conflict_analysis_failed", error=str(e))
         return f"""# Conflicts and Gaps
-
-## Detected Conflicts
 
 {len(state.conflicts)} conflicts identified.
 
-{conflicts_list if conflicts_list else "No conflicts detected."}"""
+{conflicts_list if conflicts_list else 'No conflicts detected.'}"""
 
     def _generate_questions_section(self, state: ResearchState) -> str:
         """Generate research questions section."""
@@ -204,27 +257,31 @@ Literature retrieval completed successfully."""
 
 {questions_list if questions_list else "No questions generated."}"""
 
-    def _generate_hypotheses_section(self, state: ResearchState) -> str:
-        """Generate hypotheses section."""
+    async def _generate_hypotheses_section(self, state: ResearchState) -> str:
+        """Generate hypotheses section with LLM analysis."""
         hypotheses_list = "\n".join([
-            f"""### Hypothesis {i+1}
-
-**Statement:** {h.statement}
-
-**Confidence:** {h.confidence or 0:.2f}
-
-**Status:** {h.status}
-"""
+            f"{i+1}. **{h.statement}** (confidence: {h.confidence or 0:.2f}, status: {h.status})"
             for i, h in enumerate(state.hypotheses)
         ])
+        if self.llm and self.llm.has_provider() and state.hypotheses:
+            try:
+                hyp_data = "\n".join(
+                    f"{i+1}. {h.statement} (confidence: {h.confidence or 0:.2f})"
+                    for i, h in enumerate(state.hypotheses[:10])
+                )
+                prompt = f"""Evaluate these research hypotheses for: {state.current_idea}
 
+Hypotheses:\n{hyp_data}\n
+Write a brief analysis about which are most promising and what evidence would validate them."""
+                response = await self.llm.generate(prompt, max_tokens=500)
+                return f"# Hypotheses\n\n{response.strip()}\n\n## All ({len(state.hypotheses)})\n\n{hypotheses_list if hypotheses_list else 'No hypotheses formed.'}"
+            except Exception as e:
+                logger.warning("llm_hypothesis_analysis_failed", error=str(e))
         return f"""# Hypotheses
-
-## Formed Hypotheses
 
 {len(state.hypotheses)} hypotheses formed.
 
-{hypotheses_list if hypotheses_list else "No hypotheses formed."}"""
+{hypotheses_list if hypotheses_list else 'No hypotheses formed.'}"""
 
     def _generate_validation_section(self, state: ResearchState) -> str:
         """Generate validation plan section."""

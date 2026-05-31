@@ -88,7 +88,7 @@ class ResearchOrchestrator:
         self.scoring_service = IdeaScoringService(db)
         self.skill_service = SkillMemoryService(db)
         self.knowledge_service = KnowledgeBaseService(db, llm_router)
-        self.report_generator = ReportGenerator(db)
+        self.report_generator = ReportGenerator(db, llm_router)
         self.audit_service = AuditService(db)
         self.safety_service = SafetyService(db)
 

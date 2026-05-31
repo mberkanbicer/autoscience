@@ -16,8 +16,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan events."""
     # Startup
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
+    
+    # Start idle cycle scheduler
+    from .database import async_session_factory
+    from .services.idle_scheduler import start_idle_scheduler
+    await start_idle_scheduler(async_session_factory, interval_minutes=30)
+    
     yield
+    
     # Shutdown
+    from .services.idle_scheduler import stop_idle_scheduler
+    await stop_idle_scheduler()
     print(f"Shutting down {settings.app_name}")
 
 

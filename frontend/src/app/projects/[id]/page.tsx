@@ -33,9 +33,14 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasApiKey, setHasApiKey] = useState(true);
 
   useEffect(() => {
     loadProject();
+    // Check if any API key is configured
+    const settings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
+    const configured = !!(settings.openrouter_api_key || settings.openai_api_key || settings.anthropic_api_key);
+    setHasApiKey(configured);
   }, [projectId]);
 
   const loadProject = async () => {
@@ -100,6 +105,22 @@ export default function ProjectDetailPage() {
       />
 
       <div className="p-6 space-y-6">
+        {/* LLM Warning */}
+        {!hasApiKey && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <Settings size={18} className="text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">No LLM API key configured</p>
+              <p className="text-sm text-amber-700 mt-1">
+                Research runs will work but AI analysis (synthesis, hypotheses, reports) will be limited.{' '}
+                <Link href="/settings" className="underline font-medium">Configure API keys →</Link>
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
         {stats && (
           <StatsGrid

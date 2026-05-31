@@ -680,7 +680,59 @@ class ResearchWorkflow:
             logger.error("hypothesis_generation_failed", error=str(e))
 
         state.current_phase = "hypotheses_formed"
+
+        # Capture sub-ideas from promising hypotheses
+        await self._capture_sub_ideas(state)
+
         return state
+
+    async def _capture_sub_ideas(self, state: ResearchState):
+        """Capture sub-ideas from hypotheses and questions that suggest new directions."""
+        if not state.hypotheses or not state.idea_id:
+            return
+
+        try:
+            from ..services.idea_ledger_service import IdeaLedgerService
+            from ..models.idea import Idea as IdeaModel
+            from sqlalchemy import select
+
+            idea_ledger = IdeaLedgerService(self.db)
+
+            # Find high-confidence hypotheses that suggest new research directions
+            for hyp in state.hypotheses:
+                if hyp.confidence and hyp.confidence >= 0.6:
+                    # Check if this hypothesis already generated a sub-idea
+                    existing = await self.db.execute(
+                        select(IdeaModel).where(
+                            IdeaModel.parent_idea_id == state.idea_id,
+                            IdeaModel.current_text.like(f"%{hyp.statement[:50]}%")
+                        ).limit(1)
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    # Create sub-idea
+                    sub_text = f"Investigate: {hyp.statement}\n\nThis emerged as a promising hypothesis (confidence: {hyp.confidence:.2f}) during research on: {state.current_idea[:200]}"
+                    sub_idea = await idea_ledger.create_idea(
+                        project_id=state.project_id,
+                        text=sub_text,
+                        origin="skill_generated",
+                        flexibility=0.7,
+                    )
+                    # Link to parent
+                    await self.db.execute(
+                        __import__('sqlalchemy').update(IdeaModel)
+                        .where(IdeaModel.id == sub_idea.id)
+                        .values(parent_idea_id=state.idea_id)
+                    )
+                    state.add_event("sub_idea_captured", details={
+                        "sub_idea_id": sub_idea.id,
+                        "parent_idea_id": state.idea_id,
+                        "hypothesis": hyp.statement[:100],
+                    })
+                    logger.info("sub_idea_captured", sub_idea_id=sub_idea.id, hypothesis=hyp.statement[:80])
+        except Exception as e:
+            logger.warning("sub_idea_capture_failed", error=str(e))
 
     async def _plan_validation(self, state: ResearchState) -> ResearchState:
         """Plan validation using the validation engine."""
@@ -777,14 +829,17 @@ class ResearchWorkflow:
                 skill = SkillModel(
                     id=str(uuid4()),
                     project_id=state.project_id,
-                    skill_name=f"Research: {state.current_idea[:60]}",
-                    skill_type="research_method",
-                    description=f"Completed research workflow: {', '.join(steps_completed[:5])}",
+                    name=f"Research: {state.current_idea[:60]}",
+                    skill_type="functional",
+                    purpose=f"Completed research workflow with {len(state.papers)} papers analyzed across {len(steps_completed)} steps",
+                    procedure=steps_completed[:10],
+                    inputs=[state.current_idea],
+                    outputs=[f"{len(state.papers)} papers", f"{len(state.clusters)} clusters", f"{len(state.hypotheses)} hypotheses"],
                     trigger_conditions=["user_directed"],
-                    effectiveness_score=len(state.papers) / max(len(steps_completed), 1),
+                    status="candidate",
                 )
                 self.db.add(skill)
-                state.add_event("skill_created", details={"skill_name": skill.skill_name})
+                state.add_event("skill_created", details={"skill_name": skill.name})
         except Exception as e:
             logger.warning("skill_creation_failed", error=str(e))
 

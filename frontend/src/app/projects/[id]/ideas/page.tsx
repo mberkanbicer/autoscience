@@ -42,6 +42,10 @@ export default function IdeasPage() {
   const [deleting, setDeleting] = useState(false);
   const [newIdea, setNewIdea] = useState({ text: '' });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateTopic, setGenerateTopic] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generateResult, setGenerateResult] = useState<any>(null);
 
   useEffect(() => {
     loadIdeas();
@@ -142,7 +146,9 @@ export default function IdeasPage() {
         }
       );
       if (response.ok) {
-        router.push(`/projects/${projectId}/runs`);
+        const result = await response.json();
+        // Stay on page — user can start multiple runs
+        alert(`Research started! Run ID: ${result.run_id?.slice(0, 8)}...\n\nGo to Runs page to track progress.`);
       } else {
         const err = await response.json().catch(() => ({}));
         alert('Failed: ' + (err.detail || 'Unknown error'));
@@ -151,6 +157,39 @@ export default function IdeasPage() {
       alert('Failed to start research: ' + (error.message || 'Unknown error'));
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleGenerateFromLiterature = async () => {
+    if (!generateTopic.trim()) return;
+    setGenerating(true);
+    setGenerateResult(null);
+    try {
+      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
+      const response = await fetch(
+        `/api/v1/ideas/generate?project_id=${projectId}&topic=${encodeURIComponent(generateTopic)}&num_ideas=5`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
+            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+          },
+        }
+      );
+      if (response.ok) {
+        const result = await response.json();
+        setGenerateResult(result);
+        await loadIdeas();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert('Failed: ' + (err.detail || 'Unknown error'));
+      }
+    } catch (error: any) {
+      alert('Failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -173,10 +212,16 @@ export default function IdeasPage() {
         title="Ideas"
         subtitle={`${ideas.length} ideas · ${ideas.filter(i => i.status === 'active').length} active`}
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus size={18} className="mr-2" />
-            New Idea
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setShowGenerateModal(true)}>
+              <Sparkles size={18} className="mr-2" />
+              Generate from Literature
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus size={18} className="mr-2" />
+              New Idea
+            </Button>
+          </div>
         }
       />
 
@@ -311,6 +356,14 @@ export default function IdeasPage() {
                       </Badge>
                     </div>
                   )}
+
+                  {idea.parent_idea_id && (
+                    <div className="mt-2">
+                      <Badge variant="default" size="sm">
+                        sub-idea
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}
@@ -390,6 +443,74 @@ export default function IdeasPage() {
           <Button variant="danger" onClick={handleDelete} loading={deleting}>
             Delete Idea
           </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Generate from Literature Modal */}
+      <Modal
+        isOpen={showGenerateModal}
+        onClose={() => !generating && setShowGenerateModal(false)}
+        title="Generate Ideas from Literature"
+        size="lg"
+      >
+        {generateResult ? (
+          <div className="space-y-4">
+            <div className="bg-green-50 rounded-lg p-4 text-sm text-green-800">
+              <p className="font-medium">Generated {generateResult.ideas_generated} ideas from {generateResult.papers_analyzed} papers</p>
+              <p className="mt-1">Ideas have been added to your ideas list.</p>
+            </div>
+            <div className="space-y-3">
+              {generateResult.ideas.map((idea: any, i: number) => (
+                <div key={i} className="bg-gray-50 rounded-lg p-4">
+                  <p className="font-medium text-gray-900 text-sm">{idea.title}</p>
+                  <p className="text-gray-600 text-sm mt-1">{idea.description}</p>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                    {idea.novelty && <Badge variant="info" size="sm">Novelty: {idea.novelty}</Badge>}
+                    {idea.importance && <span>{idea.importance}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : generating ? (
+          <div className="flex flex-col items-center py-8">
+            <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
+            <h3 className="text-lg font-medium">Searching Literature & Generating Ideas...</h3>
+            <p className="text-sm text-gray-600 mt-1">Analyzing recent papers for gaps and opportunities.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
+              Enter a research topic or field. The system will search recent literature, identify gaps and trends, and generate {5} research ideas.
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Research Topic or Field</label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., metasurface beam steering, CRISPR gene therapy, climate model uncertainty..."
+                value={generateTopic}
+                onChange={(e) => setGenerateTopic(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerateFromLiterature()}
+              />
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          {generateResult ? (
+            <Button onClick={() => { setShowGenerateModal(false); setGenerateResult(null); setGenerateTopic(''); }}>
+              Done
+            </Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => setShowGenerateModal(false)} disabled={generating}>
+                Cancel
+              </Button>
+              <Button onClick={handleGenerateFromLiterature} loading={generating} disabled={!generateTopic.trim()}>
+                <Sparkles size={16} className="mr-2" /> Generate Ideas
+              </Button>
+            </>
+          )}
         </ModalFooter>
       </Modal>
     </Layout>

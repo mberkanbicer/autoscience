@@ -36,6 +36,7 @@ export interface ProjectStats {
 export interface Idea {
   id: string;
   project_id: string;
+  parent_idea_id?: string | null;
   origin: string;
   initial_text: string;
   current_text: string;
