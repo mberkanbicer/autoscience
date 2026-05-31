@@ -184,6 +184,7 @@ async def generate_ideas_from_literature(
     """Generate research ideas by analyzing recent literature on a topic."""
     from ..llm.router import LLMRouter
     from ..services.idea_ledger_service import IdeaLedgerService
+    from ..llm.base import Message
     
     # Build LLM router from headers (same as research endpoint)
     llm_router = LLMRouter()
@@ -293,11 +294,16 @@ Generate ideas that are:
 - Feasible with current methods
 - Addressing gaps, contradictions, or emerging trends in the literature"""
     
-    response = await llm_router.generate(prompt, max_tokens=2000)
-    
-    # Step 3: Parse ideas from response
+    response = await llm_router.complete(
+        messages=[
+            Message(role="system", content="You are a scientific research strategist."),
+            Message(role="user", content=prompt),
+        ],
+        max_tokens=2000,
+    )
+    response_text = response.content
     ideas = []
-    blocks = response.split("---")
+    blocks = response_text.split("---")
     for block in blocks:
         block = block.strip()
         if not block or "IDEA" not in block:
