@@ -65,6 +65,15 @@ class ReportService:
         )
         return result.scalar_one_or_none()
 
+    async def delete_report(self, report_id: str) -> bool:
+        """Delete a report by ID. Returns True if deleted, False if not found."""
+        report = await self.get_report(report_id)
+        if not report:
+            return False
+        await self.db.delete(report)
+        await self.db.flush()
+        return True
+
 
 class KnowledgeService:
     """Service for knowledge note operations."""
@@ -142,3 +151,12 @@ class KnowledgeService:
 
         await self.db.flush()
         return note
+
+    async def delete_note(self, note_id: str) -> bool:
+        """Delete a knowledge note by ID. Returns True if deleted, False if not found."""
+        note = await self.get_note(note_id)
+        if not note:
+            return False
+        await self.db.delete(note)
+        await self.db.flush()
+        return True

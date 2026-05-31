@@ -39,6 +39,7 @@ from ..services.knowledge_service import KnowledgeBaseService
 from ..services.report_generator import ReportGenerator
 from ..services.audit_service import AuditService
 from ..services.safety_service import SafetyService
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -160,6 +161,12 @@ class ResearchOrchestrator:
         # Store results
         await self._store_results(state)
 
+        # Ensure run is marked as completed (prevents stuck runs)
+        try:
+            await self.run_service.complete_run(run.id)
+        except Exception as e:
+            logger.warning("complete_run_failed", run_id=run.id, error=str(e))
+
         # Generate report
         report_content = await self.report_generator.generate_report(state)
         await self.report_generator.save_report(
@@ -228,8 +235,18 @@ class ResearchOrchestrator:
                 return default
 
         # --- Papers ---
+        # Deduplicate: fetch existing titles for this project
+        existing_titles_result = await self.db.execute(
+            select(Paper.title).where(Paper.project_id == state.project_id)
+        )
+        existing_paper_titles = set(t.strip().lower() for t in existing_titles_result.scalars().all())
+
         for paper in state.papers:
             try:
+                normalized_title = paper.title.strip().lower()
+                if normalized_title in existing_paper_titles:
+                    logger.info("skip_duplicate_paper", title=paper.title[:50])
+                    continue
                 db_paper = Paper(
                     id=str(uuid4()),
                     project_id=state.project_id,
@@ -243,6 +260,7 @@ class ResearchOrchestrator:
                     paper_type=paper.paper_type,
                 )
                 self.db.add(db_paper)
+                existing_paper_titles.add(normalized_title)
                 stored["papers"] += 1
             except Exception as e:
                 logger.warning("store_paper_failed", title=paper.title[:50], error=str(e))
@@ -280,8 +298,18 @@ class ResearchOrchestrator:
                 logger.warning("store_conflict_failed", error=str(e))
 
         # --- Questions ---
+        # Deduplicate: fetch existing question texts for this project
+        existing_q_result = await self.db.execute(
+            select(ResearchQuestion.question).where(ResearchQuestion.project_id == state.project_id)
+        )
+        existing_question_texts = set(q.strip().lower() for q in existing_q_result.scalars().all())
+
         for question in state.questions:
             try:
+                normalized_q = question.question.strip().lower()
+                if normalized_q in existing_question_texts:
+                    logger.info("skip_duplicate_question", question=question.question[:50])
+                    continue
                 db_question = ResearchQuestion(
                     id=question.id or str(uuid4()),
                     project_id=state.project_id,
@@ -292,13 +320,24 @@ class ResearchOrchestrator:
                     status="generated",
                 )
                 self.db.add(db_question)
+                existing_question_texts.add(normalized_q)
                 stored["questions"] += 1
             except Exception as e:
                 logger.warning("store_question_failed", error=str(e))
 
         # --- Hypotheses ---
+        # Deduplicate: fetch existing hypothesis statements for this project
+        existing_h_result = await self.db.execute(
+            select(Hypothesis.statement).where(Hypothesis.project_id == state.project_id)
+        )
+        existing_hypothesis_stmts = set(s.strip().lower() for s in existing_h_result.scalars().all())
+
         for hypothesis in state.hypotheses:
             try:
+                normalized_stmt = hypothesis.statement.strip().lower()
+                if normalized_stmt in existing_hypothesis_stmts:
+                    logger.info("skip_duplicate_hypothesis", statement=hypothesis.statement[:50])
+                    continue
                 db_hypothesis = Hypothesis(
                     id=hypothesis.id or str(uuid4()),
                     project_id=state.project_id,
@@ -309,6 +348,7 @@ class ResearchOrchestrator:
                     status="draft",
                 )
                 self.db.add(db_hypothesis)
+                existing_hypothesis_stmts.add(normalized_stmt)
                 stored["hypotheses"] += 1
             except Exception as e:
                 logger.warning("store_hypothesis_failed", error=str(e))

@@ -83,6 +83,7 @@ export const runsApi = {
   status: (id: string) => request<any>(`/api/v1/runs/${id}/status`),
   byIdea: (ideaId: string) => request<any[]>(`/api/v1/runs/by-idea/${ideaId}`),
   snapshot: (id: string) => request<any>(`/api/v1/runs/${id}/snapshot`),
+  delete: (id: string) => request<void>(`/api/v1/runs/${id}`, { method: 'DELETE' }),
 };
 
 // Papers
@@ -149,6 +150,7 @@ export const hypothesesApi = {
 export const reportsApi = {
   list: (projectId: string) => request<any[]>(`/api/v1/reports?project_id=${projectId}`),
   get: (id: string) => request<any>(`/api/v1/reports/${id}`),
+  delete: (id: string) => request<void>(`/api/v1/reports/${id}`, { method: 'DELETE' }),
 };
 
 // Wiki

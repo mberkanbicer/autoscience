@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { wikiApi } from '@/lib/api';
 import { KnowledgeNote } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { BookOpen, ArrowLeft, Search } from 'lucide-react';
+import { BookOpen, ArrowLeft, Search, Trash2 } from 'lucide-react';
 
 export default function WikiPage() {
   const params = useParams();
@@ -23,6 +23,7 @@ export default function WikiPage() {
   const [loading, setLoading] = useState(true);
   const [selectedNote, setSelectedNote] = useState<KnowledgeNote | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotes();
@@ -36,6 +37,20 @@ export default function WikiPage() {
       console.error('Failed to load wiki notes:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!window.confirm('Are you sure you want to delete this wiki note? This action cannot be undone.')) return;
+    try {
+      setDeletingId(noteId);
+      await wikiApi.delete(noteId);
+      setNotes(prev => prev.filter(n => n.id !== noteId));
+      if (selectedNote?.id === noteId) setSelectedNote(null);
+    } catch (error) {
+      console.error('Failed to delete wiki note:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -85,6 +100,10 @@ export default function WikiPage() {
                 <h2 className="text-xl font-bold text-gray-900">{selectedNote.title}</h2>
                 <p className="text-sm text-gray-500">{formatDate(selectedNote.created_at)}</p>
               </div>
+              <Button variant="danger" size="sm" onClick={() => handleDeleteNote(selectedNote.id)}>
+                <Trash2 size={16} className="mr-2" />
+                Delete
+              </Button>
             </div>
             <Card className="p-8">
               <div className="prose prose-gray max-w-none">
@@ -132,7 +151,17 @@ export default function WikiPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">{note.title}</h3>
                         <p className="text-gray-600 text-sm line-clamp-2">{note.content}</p>
                       </div>
-                      <span className="text-sm text-gray-400">{formatDate(note.created_at)}</span>
+                      <div className="flex items-center gap-2 shrink-0 ml-4">
+                        <span className="text-sm text-gray-400">{formatDate(note.created_at)}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-600"
+                          title="Delete note"
+                          disabled={deletingId === note.id}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -157,9 +186,21 @@ export default function WikiPage() {
                           className="p-6 cursor-pointer"
                           onClick={() => setSelectedNote(note)}
                         >
-                          <h3 className="font-semibold text-gray-900 mb-2">{note.title}</h3>
-                          <p className="text-sm text-gray-600 line-clamp-3 mb-3">{note.content}</p>
-                          <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900 mb-2">{note.title}</h3>
+                              <p className="text-sm text-gray-600 line-clamp-3 mb-3">{note.content}</p>
+                              <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
+                              className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-2"
+                              title="Delete note"
+                              disabled={deletingId === note.id}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </Card>
                       ))}
                     </div>

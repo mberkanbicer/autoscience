@@ -26,7 +26,22 @@ class IdeaLedgerService:
         origin: str = "user_prompt",
         flexibility: float | None = None,
     ) -> Idea:
-        """Create a new idea with initial version."""
+        """Create a new idea with initial version.
+
+        If an idea with the same text already exists for this project,
+        return the existing one instead of creating a duplicate.
+        """
+        normalized_text = text.strip()
+        result = await self.db.execute(
+            select(Idea).where(
+                Idea.project_id == project_id,
+                Idea.current_text == normalized_text,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            return existing
+
         idea = Idea(
             id=str(uuid4()),
             project_id=project_id,

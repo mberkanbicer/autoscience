@@ -1,22 +1,31 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { projectsApi } from '@/lib/api';
 import {
   LayoutDashboard,
   FolderKanban,
   Lightbulb,
-  FileSearch,
   FlaskConical,
-  MessageSquare,
   GraduationCap,
-  FileText,
   BookOpen,
   Settings,
   Activity,
   HelpCircle,
 } from 'lucide-react';
+
+const PIPELINE_STAGES = [
+  { key: 'ideas', label: 'Ideas', href: 'ideas', color: '#EAB308' },
+  { key: 'total_papers', label: 'Literature', href: 'papers', color: '#3B82F6' },
+  { key: 'total_clusters', label: 'Analysis', href: 'pipeline', color: '#8B5CF6' },
+  { key: 'total_conflicts', label: 'Conflicts', href: 'pipeline', color: '#EF4444' },
+  { key: 'total_questions', label: 'Questions', href: 'questions', color: '#14B8A6' },
+  { key: 'total_hypotheses', label: 'Hypotheses', href: 'hypotheses', color: '#7C3AED' },
+  { key: 'total_reports', label: 'Reports', href: 'reports', color: '#F97316' },
+];
 
 const mainNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,22 +39,12 @@ interface SidebarProps {
 
 export function Sidebar({ projectId }: SidebarProps) {
   const pathname = usePathname();
+  const [stats, setStats] = useState<any>(null);
 
-  const projectNavItems = projectId
-    ? [
-        { href: `/projects/${projectId}`, label: 'Overview', icon: LayoutDashboard },
-        { href: `/projects/${projectId}/ideas`, label: 'Ideas', icon: Lightbulb },
-        { href: `/projects/${projectId}/runs`, label: 'Research Runs', icon: Activity },
-        { href: `/projects/${projectId}/pipeline`, label: 'Pipeline', icon: Activity },
-        { href: `/projects/${projectId}/papers`, label: 'Papers', icon: FileSearch },
-        { href: `/projects/${projectId}/questions`, label: 'Questions', icon: MessageSquare },
-        { href: `/projects/${projectId}/hypotheses`, label: 'Hypotheses', icon: FlaskConical },
-        { href: `/projects/${projectId}/skills`, label: 'Skills', icon: GraduationCap },
-        { href: `/projects/${projectId}/reports`, label: 'Reports', icon: FileText },
-        { href: `/projects/${projectId}/wiki`, label: 'Wiki', icon: BookOpen },
-        { href: `/projects/${projectId}/settings`, label: 'Settings', icon: Settings },
-      ]
-    : [];
+  useEffect(() => {
+    if (!projectId) return;
+    projectsApi.stats(projectId).then(setStats).catch(() => {});
+  }, [projectId]);
 
   return (
     <div className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white z-40 flex flex-col">
@@ -89,15 +88,22 @@ export function Sidebar({ projectId }: SidebarProps) {
           );
         })}
 
-        {/* Project Navigation */}
-        {projectNavItems.length > 0 && (
+        {/* Project Navigation - Top items */}
+        {projectId && (
           <>
             <div className="pt-6 pb-2">
               <span className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Project
               </span>
             </div>
-            {projectNavItems.map((item) => {
+            {[
+              { href: `/projects/${projectId}`, label: 'Overview', icon: LayoutDashboard },
+              { href: `/projects/${projectId}/ideas`, label: 'Ideas', icon: Lightbulb },
+              { href: `/projects/${projectId}/runs`, label: 'Research Runs', icon: Activity },
+              { href: `/projects/${projectId}/skills`, label: 'Skills', icon: GraduationCap },
+              { href: `/projects/${projectId}/wiki`, label: 'Wiki', icon: BookOpen },
+              { href: `/projects/${projectId}/settings`, label: 'Settings', icon: Settings },
+            ].map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
               return (
@@ -116,6 +122,63 @@ export function Sidebar({ projectId }: SidebarProps) {
                 </Link>
               );
             })}
+          </>
+        )}
+
+        {/* Pipeline Stages */}
+        {projectId && (
+          <>
+            <div className="pt-4 pb-2">
+              <span className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Pipeline
+              </span>
+            </div>
+            <div className="relative ml-3">
+              {/* Vertical connector line */}
+              <div className="absolute left-[7px] top-3 bottom-3 w-px bg-gray-700" />
+              {/* Animated flow line */}
+              {stats && (
+                <div className="absolute left-[7px] top-3 w-px h-3/4 animate-pipeline-flow" style={{ opacity: 0.3 }} />
+              )}
+              <div className="space-y-0.5">
+                {PIPELINE_STAGES.map((stage) => {
+                  const count = stats ? (stats[stage.key] ?? stats[`total_${stage.key}`] ?? 0) : 0;
+                  const hasData = count > 0;
+                  const isActive = pathname.includes(`/projects/${projectId}/${stage.href}`);
+                  return (
+                    <Link
+                      key={stage.key}
+                      href={`/projects/${projectId}/${stage.href}`}
+                      className={cn(
+                        'flex items-center gap-3 pl-0 pr-3 py-1.5 rounded-r-xl text-sm transition-all',
+                        isActive
+                          ? 'bg-white/10 text-white'
+                          : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
+                      )}
+                    >
+                      {/* Dot indicator */}
+                      <div className="relative z-10 flex items-center justify-center">
+                        <div
+                          className={cn(
+                            'w-[15px] h-[15px] rounded-full border-2',
+                            isActive && 'animate-pulse-glow'
+                          )}
+                          style={{
+                            borderColor: stage.color,
+                            backgroundColor: hasData ? stage.color : 'transparent',
+                            boxShadow: isActive ? `0 0 8px ${stage.color}` : 'none',
+                          }}
+                        />
+                      </div>
+                      <span className="flex-1">{stage.label}</span>
+                      {stats && (
+                        <span className="text-xs text-gray-500 font-mono">{count}</span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           </>
         )}
       </nav>

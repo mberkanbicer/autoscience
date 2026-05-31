@@ -280,6 +280,46 @@ async def get_runs_by_idea(
     return list(result.scalars().all())
 
 
+@router.delete("/{run_id}", status_code=204)
+async def delete_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a research run and its associated events and tool calls."""
+    from sqlalchemy import delete as sql_delete
+    from ..models.research_run import ResearchRun, ResearchRunEvent, ToolCall
+
+    # Check run exists
+    service = ResearchRunService(db)
+    run = await service.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Delete associated tool calls
+    await db.execute(
+        sql_delete(ToolCall).where(ToolCall.run_id == run_id)
+    )
+    # Delete associated events
+    await db.execute(
+        sql_delete(ResearchRunEvent).where(ResearchRunEvent.run_id == run_id)
+    )
+    # Delete the run itself
+    await db.execute(
+        sql_delete(ResearchRun).where(ResearchRun.id == run_id)
+    )
+    await db.flush()
+
+    # Log the deletion
+    audit = AuditService(db)
+    await audit.log_event(
+        event_type="run_deleted",
+        project_id=run.project_id,
+        run_id=run_id,
+        actor="user",
+        action=f"Deleted research run {run_id}",
+    )
+
+
 @router.get("/{run_id}/snapshot", response_model=ResearchState)
 async def get_run_snapshot(
     run_id: str,

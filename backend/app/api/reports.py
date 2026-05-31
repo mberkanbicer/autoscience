@@ -43,6 +43,18 @@ async def get_report(
     return report
 
 
+@router.delete("/reports/{report_id}", status_code=204)
+async def delete_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a report."""
+    service = ReportService(db)
+    deleted = await service.delete_report(report_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+
 # Knowledge Wiki
 
 @router.get("/wiki", response_model=list[KnowledgeNoteResponse])

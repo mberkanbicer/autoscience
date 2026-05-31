@@ -16,7 +16,7 @@ import {
   Activity, Clock, DollarSign, Play, Loader2, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronRight, RotateCw, X, Search,
   Brain, FileSearch, Network, MessageSquare, FlaskConical, Star,
-  Wrench, CheckSquare,
+  Wrench, CheckSquare, Trash2, ChevronUp,
 } from 'lucide-react';
 
 const PHASE_ICONS: Record<string, any> = {
@@ -69,6 +69,8 @@ export default function RunsPage() {
   const [startResult, setStartResult] = useState<{ success: boolean; message: string } | null>(null);
   const [newRun, setNewRun] = useState({ idea: '', run_type: 'user_directed' });
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
 
   // Live progress state
   const [liveStatus, setLiveStatus] = useState<Record<string, any>>({});
@@ -160,6 +162,28 @@ export default function RunsPage() {
     } catch (error) {
       console.error('Failed to cancel run:', error);
     }
+  };
+
+  const handleDeleteRun = async (runId: string) => {
+    if (!window.confirm('Are you sure you want to delete this run? This action cannot be undone.')) return;
+    try {
+      setDeletingRunId(runId);
+      await runsApi.delete(runId);
+      await loadRuns();
+    } catch (error) {
+      console.error('Failed to delete run:', error);
+    } finally {
+      setDeletingRunId(null);
+    }
+  };
+
+  const toggleEventExpand = (eventId: string) => {
+    setExpandedEventIds(prev => {
+      const next = new Set(prev);
+      if (next.has(eventId)) next.delete(eventId);
+      else next.add(eventId);
+      return next;
+    });
   };
 
   const handleStartRun = async () => {
@@ -285,24 +309,38 @@ export default function RunsPage() {
         {status.recent_events && status.recent_events.length > 0 && (
           <div>
             <h5 className="text-sm font-medium text-gray-700 mb-2">
-              Live Events ({status.event_count})
+              Recent Events ({status.event_count})
             </h5>
             <div className="max-h-48 overflow-y-auto space-y-1">
-              {[...status.recent_events].reverse().map((event: any, idx: number) => (
-                <div key={event.id || idx} className="flex items-center gap-2 text-xs p-2 bg-white rounded border">
-                  {event.event_type.includes('completed') ? (
-                    <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-                  ) : event.event_type.includes('failed') ? (
-                    <XCircle size={12} className="text-red-500 shrink-0" />
-                  ) : (
-                    <ChevronRight size={12} className="text-blue-500 shrink-0" />
-                  )}
-                  <span className="text-gray-600">{event.details?.phase_label || event.event_type}</span>
-                  {event.details?.duration && (
-                    <span className="text-gray-400 ml-auto">{event.details.duration}s</span>
-                  )}
-                </div>
-              ))}
+              {[...status.recent_events].reverse().map((event: any, idx: number) => {
+                const eventId = event.id || `event-${idx}`;
+                const isExpanded = expandedEventIds.has(eventId);
+                return (
+                  <div key={eventId} className="bg-white rounded border">
+                    <div
+                      className="flex items-center gap-2 text-xs p-2 cursor-pointer hover:bg-gray-50"
+                      onClick={() => toggleEventExpand(eventId)}
+                    >
+                      {event.event_type?.includes('completed') ? (
+                        <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                      ) : event.event_type?.includes('failed') ? (
+                        <XCircle size={12} className="text-red-500 shrink-0" />
+                      ) : (
+                        <ChevronRight size={12} className="text-blue-500 shrink-0" />
+                      )}
+                      <span className="text-gray-500 font-mono shrink-0">{event.event_type}</span>
+                      <span className="text-gray-700">{event.details?.phase_label || ''}</span>
+                      <span className="text-gray-400 ml-auto">{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : ''}</span>
+                      {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
+                    </div>
+                    {isExpanded && (
+                      <pre className="px-3 pb-2 text-xs text-gray-600 bg-gray-50 rounded-b border-t overflow-x-auto max-h-40 overflow-y-auto">
+                        {JSON.stringify(event.details || {}, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -416,6 +454,20 @@ export default function RunsPage() {
                         <X size={16} />
                       </button>
                     )}
+                    {!isRunning && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteRun(run.id); }}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-600"
+                        title="Delete run"
+                        disabled={deletingRunId === run.id}
+                      >
+                        {deletingRunId === run.id ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* Expanded Details */}
@@ -429,15 +481,35 @@ export default function RunsPage() {
                             <div>
                               <p className="mb-2 font-medium">Run Events:</p>
                               <div className="space-y-1 max-h-48 overflow-y-auto">
-                                {status.recent_events.map((event: any, idx: number) => (
-                                  <div key={idx} className="flex items-center gap-2 text-xs p-2 bg-white rounded border">
-                                    <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-                                    <span>{event.details?.phase_label || event.event_type}</span>
-                                    {event.details?.duration && (
-                                      <span className="text-gray-400 ml-auto">{event.details.duration}s</span>
-                                    )}
-                                  </div>
-                                ))}
+                                {status.recent_events.map((event: any, idx: number) => {
+                                  const eventId = event.id || `event-${idx}`;
+                                  const isExpanded = expandedEventIds.has(eventId);
+                                  return (
+                                    <div key={eventId} className="bg-white rounded border">
+                                      <div
+                                        className="flex items-center gap-2 text-xs p-2 cursor-pointer hover:bg-gray-50"
+                                        onClick={() => toggleEventExpand(eventId)}
+                                      >
+                                        {event.event_type?.includes('completed') ? (
+                                          <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                                        ) : event.event_type?.includes('failed') ? (
+                                          <XCircle size={12} className="text-red-500 shrink-0" />
+                                        ) : (
+                                          <ChevronRight size={12} className="text-blue-500 shrink-0" />
+                                        )}
+                                        <span className="text-gray-500 font-mono shrink-0">{event.event_type}</span>
+                                        <span className="text-gray-700">{event.details?.phase_label || ''}</span>
+                                        <span className="text-gray-400 ml-auto">{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : ''}</span>
+                                        {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
+                                      </div>
+                                      {isExpanded && (
+                                        <pre className="px-3 pb-2 text-xs text-gray-600 bg-gray-50 rounded-b border-t overflow-x-auto max-h-40 overflow-y-auto">
+                                          {JSON.stringify(event.details || {}, null, 2)}
+                                        </pre>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           ) : (

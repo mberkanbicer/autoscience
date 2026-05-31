@@ -276,27 +276,40 @@ Validation plans have been designed for each hypothesis.
 The system has learned {skills_created} new research skills from this cycle."""
 
     def _generate_audit_section(self, state: ResearchState) -> str:
-        """Generate audit log section."""
+        """Generate audit log section with timeline."""
         events_list = "\n".join([
-            f"- {e.event_type}: {e.timestamp}"
-            for e in state.events[-20:]  # Last 20 events
+            f"- [{e.timestamp}] **{e.event_type}** (actor: {e.actor or 'system'})"
+            for e in state.events[-30:]
         ])
+
+        # Build a timeline of workflow phases
+        phase_events = [e for e in state.events if e.event_type in ("phase_changed", "step_completed")]
+        timeline = "\n".join([
+            f"{i+1}. **{e.event_type}** at {e.timestamp}"
+            for i, e in enumerate(phase_events[-15:])
+        ])
+
+        error_count = len(state.errors)
+        error_summary = ""
+        if state.errors:
+            error_summary = f"\n\n### Errors ({error_count})\n\n" + "\n".join(
+                f"- {e.get('error_type', 'unknown')}: {e.get('message', '')[:100]}"
+                for e in state.errors[:10]
+            )
 
         return f"""# Audit Log
 
-## Events
+## Research Timeline
 
-{len(state.events)} events recorded.
+{timeline if timeline else 'No timeline events recorded.'}
 
-{events_list if events_list else "No events recorded."}
+## Events ({len(state.events)} total)
+
+{events_list if events_list else 'No events recorded.'}
 
 ## Tool Calls
 
-{len(state.tool_calls)} tool calls made.
-
-## Errors
-
-{len(state.errors)} errors encountered."""
+{len(state.tool_calls)} tool calls made during this research run.{error_summary}"""
 
     async def save_report(
         self,

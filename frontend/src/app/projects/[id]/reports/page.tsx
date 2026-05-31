@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { reportsApi } from '@/lib/api';
 import { ResearchReport } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { FileText, ArrowLeft, Download, Copy, Check } from 'lucide-react';
+import { FileText, ArrowLeft, Download, Copy, Check, Trash2 } from 'lucide-react';
 
 export default function ReportsPage() {
   const params = useParams();
@@ -23,6 +23,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<ResearchReport | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadReports();
@@ -36,6 +37,20 @@ export default function ReportsPage() {
       console.error('Failed to load reports:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!window.confirm('Are you sure you want to delete this report? This action cannot be undone.')) return;
+    try {
+      setDeletingId(reportId);
+      await reportsApi.delete(reportId);
+      setReports(prev => prev.filter(r => r.id !== reportId));
+      if (selectedReport?.id === reportId) setSelectedReport(null);
+    } catch (error) {
+      console.error('Failed to delete report:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -83,6 +98,10 @@ export default function ReportsPage() {
                 <Button variant="secondary" size="sm">
                   <Download size={16} className="mr-2" />
                   Export
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => handleDeleteReport(selectedReport.id)}>
+                  <Trash2 size={16} className="mr-2" />
+                  Delete
                 </Button>
               </div>
             </div>
@@ -132,6 +151,18 @@ export default function ReportsPage() {
                           <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
                         </div>
                       </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-4"
+                        title="Delete report"
+                        disabled={deletingId === report.id}
+                      >
+                        {deletingId === report.id ? (
+                          <span className="block w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
                     </div>
                   </Card>
                 ))}
@@ -147,13 +178,25 @@ export default function ReportsPage() {
                     className="p-6 cursor-pointer"
                     onClick={() => setSelectedReport(report)}
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {report.title || 'Untitled Report'}
-                    </h3>
-                    <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                      {report.content_markdown}
-                    </p>
-                    <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          {report.title || 'Untitled Report'}
+                        </h3>
+                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                          {report.content_markdown}
+                        </p>
+                        <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-4"
+                        title="Delete report"
+                        disabled={deletingId === report.id}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -168,13 +211,25 @@ export default function ReportsPage() {
                     className="p-6 cursor-pointer"
                     onClick={() => setSelectedReport(report)}
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {report.title || 'Untitled Report'}
-                    </h3>
-                    <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                      {report.content_markdown}
-                    </p>
-                    <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          {report.title || 'Untitled Report'}
+                        </h3>
+                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                          {report.content_markdown}
+                        </p>
+                        <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-4"
+                        title="Delete report"
+                        disabled={deletingId === report.id}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </Card>
                 ))}
               </div>
