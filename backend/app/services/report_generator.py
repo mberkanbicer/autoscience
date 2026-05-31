@@ -97,7 +97,7 @@ class ReportGenerator:
         if self.llm and self.llm.has_provider():
             try:
                 papers_summary = "\n".join(
-                    f"- {p.title} ({p.year}) - {p.source}: {(p.abstract or '')[:150]}..."
+                    f"- {p.title} ({p.year}) - {', '.join(p.authors[:2]) if p.authors else 'Unknown'}"
                     for p in state.papers[:15]
                 )
                 conflicts_summary = "\n".join(
@@ -179,7 +179,7 @@ User-directed research"""
     async def _generate_literature_section(self, state: ResearchState) -> str:
         """Generate literature review section with LLM synthesis."""
         papers_list = "\n".join([
-            f"- **{p.title}** ({p.year}) - {p.source}"
+            f"- **{p.title}** ({p.year}) - {', '.join(p.authors[:2]) if p.authors else 'Unknown'}"
             for p in state.papers[:25]
         ])
         clusters_list = "\n".join([f"- {c.name}: {c.description}" for c in state.clusters])
