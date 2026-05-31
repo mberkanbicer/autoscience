@@ -174,6 +174,10 @@ export default function IdeasPage() {
             'Content-Type': 'application/json',
             'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
             'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
+            'X-OpenAI-API-Key': apiSettings.openai_api_key || '',
+            'X-OpenAI-Model': apiSettings.openai_model || 'gpt-4o',
+            'X-Anthropic-API-Key': apiSettings.anthropic_api_key || '',
+            'X-Anthropic-Model': apiSettings.anthropic_model || 'claude-sonnet-4-20250514',
             'X-Default-Provider': apiSettings.default_provider || 'openrouter',
           },
         }

@@ -1,6 +1,6 @@
 """Idea API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -173,34 +173,41 @@ async def generate_ideas_from_literature(
     topic: str = Query(..., min_length=5, description="Research topic or field to explore"),
     num_ideas: int = Query(5, ge=1, le=10, description="Number of ideas to generate"),
     db: AsyncSession = Depends(get_db),
+    x_openrouter_api_key: str | None = Header(None),
+    x_openrouter_model: str | None = Header(None),
+    x_openai_api_key: str | None = Header(None),
+    x_openai_model: str | None = Header(None),
+    x_anthropic_api_key: str | None = Header(None),
+    x_anthropic_model: str | None = Header(None),
+    x_default_provider: str | None = Header(None),
 ):
-    """Generate research ideas by analyzing recent literature on a topic.
-    
-    Searches SearXNG + academic databases, analyzes trends/gaps/contradictions,
-    and uses LLM to generate actionable research ideas.
-    """
+    """Generate research ideas by analyzing recent literature on a topic."""
     from ..llm.router import LLMRouter
-    from ..config import get_settings
     from ..services.idea_ledger_service import IdeaLedgerService
     
-    settings = get_settings()
-    
-    # Build LLM router from env
+    # Build LLM router from headers (same as research endpoint)
     llm_router = LLMRouter()
-    if settings.openrouter_api_key:
+    if x_openrouter_api_key:
         from ..llm.openrouter_provider import OpenRouterProvider
         llm_router.providers["openrouter"] = OpenRouterProvider(
-            api_key=settings.openrouter_api_key,
-            model=settings.openrouter_model or "openai/gpt-4o",
+            api_key=x_openrouter_api_key,
+            model=x_openrouter_model or "openai/gpt-4o",
         )
         llm_router.default_provider = "openrouter"
-    elif settings.openai_api_key:
+    elif x_openai_api_key:
         from ..llm.openai_provider import OpenAIProvider
         llm_router.providers["openai"] = OpenAIProvider(
-            api_key=settings.openai_api_key,
-            model=settings.openai_model or "gpt-4o",
+            api_key=x_openai_api_key,
+            model=x_openai_model or "gpt-4o",
         )
         llm_router.default_provider = "openai"
+    elif x_anthropic_api_key:
+        from ..llm.anthropic_provider import AnthropicProvider
+        llm_router.providers["anthropic"] = AnthropicProvider(
+            api_key=x_anthropic_api_key,
+            model=x_anthropic_model or "claude-sonnet-4-20250514",
+        )
+        llm_router.default_provider = "anthropic"
     
     if not llm_router.has_provider():
         raise HTTPException(
