@@ -194,6 +194,13 @@ class ResearchOrchestrator:
             hypotheses=len(state.hypotheses),
         )
 
+        # Commit all changes to DB
+        try:
+            await self.db.commit()
+        except Exception as e:
+            logger.warning("commit_failed", error=str(e))
+            await self.db.rollback()
+
         return state
 
     async def _store_results(self, state: ResearchState) -> None:

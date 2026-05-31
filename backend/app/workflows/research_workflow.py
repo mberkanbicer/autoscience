@@ -527,20 +527,20 @@ class ResearchWorkflow:
 
         try:
             question_dicts = [
-                {"text": q.question, "rank": q.rank}
+                {"id": q.id, "question": q.question, "rank": q.rank}
                 for q in state.questions
             ]
             result = await self.hypothesis_engine.generate_hypotheses(
-                idea=state.current_idea,
                 questions=question_dicts,
+                idea_context=state.current_idea,
             )
             if result and hasattr(result, 'hypotheses'):
-                for h in result.hypotheses[:10]:
+                for h in result.hypotheses:
                     state.hypotheses.append(
                         HypothesisSummary(
-                            id=h.get('id', ''),
-                            statement=h.get('statement', ''),
-                            confidence=h.get('confidence'),
+                            id=h.id if hasattr(h, 'id') else '',
+                            statement=h.statement if hasattr(h, 'statement') else str(h),
+                            confidence=h.confidence if hasattr(h, 'confidence') else 0.5,
                             status="draft",
                         )
                     )
