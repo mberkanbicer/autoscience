@@ -103,22 +103,20 @@ async def _run_idle_for_project(project_id: str, db_factory):
     
     try:
         async with db_factory() as db:
-            # Build LLM router from env settings
-            llm_router = LLMRouter()
-            if settings.openrouter_api_key:
-                from ..llm.openrouter_provider import OpenRouterProvider
-                llm_router.providers["openrouter"] = OpenRouterProvider(
-                    api_key=settings.openrouter_api_key,
-                    model=settings.openrouter_model or "openai/gpt-4o",
-                )
-                llm_router.default_provider = "openrouter"
-            elif settings.openai_api_key:
-                from ..llm.openai_provider import OpenAIProvider
-                llm_router.providers["openai"] = OpenAIProvider(
-                    api_key=settings.openai_api_key,
-                    model=settings.openai_model or "gpt-4o",
-                )
-                llm_router.default_provider = "openai"
+            # Build LLM router from env settings using the standard factory
+            from ..llm.router import create_default_router
+            llm_router = create_default_router(
+                openrouter_api_key=settings.openrouter_api_key,
+                openrouter_default_model=settings.openrouter_model or "openai/gpt-4o",
+                openrouter_base_url=settings.openrouter_base_url,
+                openai_api_key=settings.openai_api_key,
+                anthropic_api_key=settings.anthropic_api_key,
+                local_base_url=settings.local_llm_base_url,
+                local_model=settings.local_llm_model,
+                llamacpp_base_url=settings.llamacpp_base_url,
+                llamacpp_model=settings.llamacpp_model,
+                default_provider=settings.default_llm_provider or "openrouter",
+            )
             
             connector_manager = create_default_manager()
             

@@ -191,21 +191,21 @@ async def generate_ideas_from_literature(
         from ..llm.openrouter_provider import OpenRouterProvider
         llm_router.providers["openrouter"] = OpenRouterProvider(
             api_key=x_openrouter_api_key,
-            model=x_openrouter_model or "openai/gpt-4o",
+            default_model=x_openrouter_model or "openai/gpt-4o",
         )
         llm_router.default_provider = "openrouter"
     elif x_openai_api_key:
         from ..llm.openai_provider import OpenAIProvider
         llm_router.providers["openai"] = OpenAIProvider(
             api_key=x_openai_api_key,
-            model=x_openai_model or "gpt-4o",
+            default_model=x_openai_model or "gpt-4o",
         )
         llm_router.default_provider = "openai"
     elif x_anthropic_api_key:
         from ..llm.anthropic_provider import AnthropicProvider
         llm_router.providers["anthropic"] = AnthropicProvider(
             api_key=x_anthropic_api_key,
-            model=x_anthropic_model or "claude-sonnet-4-20250514",
+            default_model=x_anthropic_model or "claude-sonnet-4-20250514",
         )
         llm_router.default_provider = "anthropic"
     
