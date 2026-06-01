@@ -12,8 +12,8 @@ class Idea(BaseModel):
 
     __tablename__ = "ideas"
 
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
-    parent_idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id", ondelete="SET NULL"), nullable=True, index=True)
     origin: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # user_prompt | idle_generated | literature_gap | skill_generated | revived
@@ -46,7 +46,7 @@ class IdeaVersion(BaseModel):
 
     __tablename__ = "idea_versions"
 
-    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id"), nullable=False, index=True)
+    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False, index=True)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     change_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -60,7 +60,7 @@ class IdeaScore(BaseModel):
 
     __tablename__ = "idea_scores"
 
-    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id"), nullable=False, index=True)
+    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False, index=True)
     novelty: Mapped[float | None] = mapped_column(Float, nullable=True)
     feasibility: Mapped[float | None] = mapped_column(Float, nullable=True)
     importance: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -85,7 +85,7 @@ class IdeaClassification(BaseModel):
 
     __tablename__ = "idea_classifications"
 
-    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id"), nullable=False, index=True)
+    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False, index=True)
     classification: Mapped[str] = mapped_column(String(50), nullable=False)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -99,8 +99,8 @@ class IdeaDecision(BaseModel):
 
     __tablename__ = "idea_decisions"
 
-    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id"), nullable=False, index=True)
-    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True, index=True)
+    idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     decision: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # continue | revise | pivot | archive | reject | promote

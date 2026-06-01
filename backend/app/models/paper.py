@@ -12,7 +12,7 @@ class Paper(BaseModel):
 
     __tablename__ = "papers"
 
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     authors: Mapped[list] = mapped_column(JSON, default=list)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
@@ -43,7 +43,7 @@ class PaperSource(BaseModel):
 
     __tablename__ = "paper_sources"
 
-    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id"), nullable=False, index=True)
+    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
     connector: Mapped[str] = mapped_column(String(100), nullable=False)
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     raw_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -57,7 +57,7 @@ class PaperFulltext(BaseModel):
 
     __tablename__ = "paper_fulltexts"
 
-    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id"), nullable=False, index=True)
+    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
     fulltext: Mapped[str | None] = mapped_column(Text, nullable=True)
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
@@ -70,7 +70,7 @@ class PaperEmbedding(BaseModel):
 
     __tablename__ = "paper_embeddings"
 
-    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id"), nullable=False, index=True)
+    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
     embedding: Mapped[list | None] = mapped_column(JSON, nullable=True)  # Will use pgvector in production
     model_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
@@ -83,7 +83,7 @@ class PaperAnalysis(BaseModel):
 
     __tablename__ = "paper_analyses"
 
-    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id"), nullable=False, index=True)
+    paper_id: Mapped[str] = mapped_column(ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
     problem: Mapped[str | None] = mapped_column(Text, nullable=True)
     method: Mapped[str | None] = mapped_column(Text, nullable=True)
     dataset_sample: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -105,7 +105,7 @@ class PaperCluster(BaseModel):
 
     __tablename__ = "paper_clusters"
 
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     cluster_type: Mapped[str | None] = mapped_column(
@@ -124,7 +124,7 @@ class ClusterLabel(BaseModel):
 
     __tablename__ = "cluster_labels"
 
-    cluster_id: Mapped[str] = mapped_column(ForeignKey("paper_clusters.id"), nullable=False, index=True)
+    cluster_id: Mapped[str] = mapped_column(ForeignKey("paper_clusters.id", ondelete="CASCADE"), nullable=False, index=True)
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -137,8 +137,8 @@ class ClusterConflict(BaseModel):
 
     __tablename__ = "cluster_conflicts"
 
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
-    cluster_id: Mapped[str | None] = mapped_column(ForeignKey("paper_clusters.id"), nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    cluster_id: Mapped[str | None] = mapped_column(ForeignKey("paper_clusters.id", ondelete="CASCADE"), nullable=True, index=True)
     conflict_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # finding | method | dataset | metric | assumption | scope | theory_practice | recency | replication
