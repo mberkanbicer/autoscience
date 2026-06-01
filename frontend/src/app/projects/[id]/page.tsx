@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Layout } from '@/components/layout/Layout';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatsGrid } from '@/components/ui/StatCard';
 import { SkeletonStats } from '@/components/ui/Skeleton';
+import { ErrorDisplay, LoadingSpinner } from '@/components/ui/LoadState';
 import { projectsApi } from '@/lib/api';
 import { Project, ProjectStats } from '@/lib/types';
 import {
@@ -33,17 +34,12 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(true);
 
-  useEffect(() => {
-    loadProject();
-    // Check if any API key is configured
-    const settings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
-    const configured = !!(settings.openrouter_api_key || settings.openai_api_key || settings.anthropic_api_key);
-    setHasApiKey(configured);
-  }, [projectId]);
-
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [projectData, statsData] = await Promise.all([
         projectsApi.get(projectId),
@@ -51,12 +47,21 @@ export default function ProjectDetailPage() {
       ]);
       setProject(projectData);
       setStats(statsData);
-    } catch (error) {
-      console.error('Failed to load project:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load project';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    loadProject();
+    // Check if any API key is configured
+    const settings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
+    const configured = !!(settings.openrouter_api_key || settings.openai_api_key || settings.anthropic_api_key);
+    setHasApiKey(configured);
+  }, [loadProject]);
 
   if (loading) {
     return (
@@ -64,6 +69,17 @@ export default function ProjectDetailPage() {
         <Header title="Loading..." />
         <div className="p-6">
           <SkeletonStats />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout projectId={projectId}>
+        <Header title="Error" />
+        <div className="p-6">
+          <ErrorDisplay message={error} onRetry={loadProject} />
         </div>
       </Layout>
     );

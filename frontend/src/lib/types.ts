@@ -165,7 +165,7 @@ export interface Hypothesis {
 export interface ValidationPlan {
   id: string;
   hypothesis_id: string;
-  dataset_candidates: any[];
+  dataset_candidates: Record<string, unknown>[];
   benchmark_candidates: string[];
   baselines: string[];
   metrics: string[];
@@ -233,7 +233,7 @@ export interface ApprovalRequest {
   run_id?: string;
   action_type: string;
   action_description?: string;
-  action_payload?: any;
+  action_payload?: Record<string, unknown>;
   status: string;
   reviewer_notes?: string;
   resolved_at?: string;
@@ -248,7 +248,7 @@ export interface AuditLog {
   event_type: string;
   actor?: string;
   action?: string;
-  details?: any;
+  details?: Record<string, unknown>;
   created_at: string;
   updated_at?: string;
 }

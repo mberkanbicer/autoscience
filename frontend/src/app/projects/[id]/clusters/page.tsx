@@ -15,7 +15,7 @@ interface Cluster {
   cluster_type?: string;
   labels: string[];
   paper_count: number;
-  papers?: any[];
+  papers?: Record<string, unknown>[];
 }
 
 export default function ClustersPage() {
@@ -70,7 +70,7 @@ export default function ClustersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Paper Clusters</h1>
-        <Badge variant="info" size="lg">
+        <Badge variant="info" size="md">
           {clusters.length} clusters
         </Badge>
       </div>

@@ -10,31 +10,54 @@ import { SkeletonCard } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { projectsApi, runsApi, ideasApi, papersApi, questionsApi, hypothesesApi } from '@/lib/api';
 import {
-  Lightbulb,
-  FileSearch,
+  ArrowBigLeft,
   BarChart3,
-  Network,
-  AlertTriangle,
-  MessageSquare,
+  CheckCircle,
+  Activity,
+  Target,
+  Cpu,
+  FileSearch,
+  FileText,
   FlaskConical,
+  GitBranch,
+  Lightbulb,
+  MessageSquare,
+  Network,
   Star,
-  CheckCircle2,
+  AlertTriangle,
   Clock,
   ArrowRight,
   Loader2,
-  Activity,
-  Target,
 } from 'lucide-react';
+
+interface StageDataItem {
+  id?: string;
+  title?: string;
+  name?: string;
+  statement?: string;
+  description?: string;
+  subtitle?: string;
+  authors?: string | string[];
+  paper_count?: number;
+  confidence?: number;
+  overall_score?: number;
+  score?: number | null;
+  has_validation_plan?: boolean;
+  status?: string;
+  source?: string;
+  conflict_type?: string;
+  severity?: number;
+}
 
 interface PipelineStage {
   id: string;
   name: string;
-  icon: any;
+  icon: React.ElementType;
   color: string;
   bgColor: string;
   description: string;
   count: number;
-  items: any[];
+  items: StageDataItem[];
   status: 'idle' | 'active' | 'completed' | 'error';
 }
 
@@ -66,7 +89,7 @@ export default function PipelinePage() {
       const latestRun = runs[0];
       const isRunning = latestRun?.state === 'running';
 
-      const formatAuthors = (authors: any): string => {
+      const formatAuthors = (authors: string | string[] | undefined | null): string => {
         if (!authors) return 'Unknown';
         if (Array.isArray(authors)) return authors.length > 0 ? authors.join(', ') : 'Unknown';
         return String(authors);
@@ -81,9 +104,9 @@ export default function PipelinePage() {
           bgColor: 'bg-yellow-100',
           description: 'Research ideas and hypotheses to explore',
           count: ideas.length,
-          items: ideas.map((i: any) => ({
+          items: ideas.map((i) => ({
             id: i.id,
-            title: i.current_text || i.initial_text || i.text || 'Untitled',
+            title: i.current_text || i.initial_text || 'Untitled',
             subtitle: `Score: ${i.overall_score != null ? (i.overall_score * 100).toFixed(0) + '%' : 'N/A'}`,
             status: i.status,
           })),
@@ -97,7 +120,7 @@ export default function PipelinePage() {
           bgColor: 'bg-blue-100',
           description: 'Academic papers found from 5 sources',
           count: papers.length,
-          items: papers.slice(0, 10).map((p: any) => ({
+          items: papers.slice(0, 10).map((p) => ({
             id: p.id,
             title: p.title,
             subtitle: `${formatAuthors(p.authors)} (${p.year || 'N/A'})`,
@@ -113,7 +136,7 @@ export default function PipelinePage() {
           bgColor: 'bg-purple-100',
           description: 'Structured extraction from papers',
           count: papers.length,
-          items: papers.slice(0, 5).map((p: any) => ({
+          items: papers.slice(0, 5).map((p) => ({
             id: p.id,
             title: p.title,
             subtitle: p.abstract ? `Abstract available` : 'No abstract',
@@ -159,9 +182,9 @@ export default function PipelinePage() {
           bgColor: 'bg-teal-100',
           description: 'Generated research questions',
           count: questions.length,
-          items: questions.slice(0, 5).map((q: any) => ({
+          items: questions.slice(0, 5).map((q) => ({
             id: q.id,
-            title: q.question || q.text || 'Untitled question',
+            title: q.question || 'Untitled question',
             subtitle: q.rank ? `Priority: ${(q.rank * 100).toFixed(0)}%` : '',
           })),
           status: questions.length > 0 ? 'completed' : isRunning ? 'active' : 'idle',
@@ -174,9 +197,9 @@ export default function PipelinePage() {
           bgColor: 'bg-violet-100',
           description: 'Testable hypotheses formed',
           count: hypotheses.length,
-          items: hypotheses.slice(0, 5).map((h: any) => ({
+          items: hypotheses.slice(0, 5).map((h) => ({
             id: h.id,
-            title: h.statement || h.text || 'Untitled hypothesis',
+            title: h.statement || 'Untitled hypothesis',
             subtitle: h.confidence != null ? `Confidence: ${(h.confidence * 100).toFixed(0)}%` : '',
           })),
           status: hypotheses.length > 0 ? 'completed' : isRunning ? 'active' : 'idle',
@@ -188,13 +211,13 @@ export default function PipelinePage() {
           color: 'text-amber-600',
           bgColor: 'bg-amber-100',
           description: '12-dimension idea evaluation',
-          count: ideas.filter((i: any) => i.overall_score != null).length,
-          items: ideas.filter((i: any) => i.overall_score != null).slice(0, 3).map((i: any) => ({
+          count: ideas.filter((i) => i.overall_score != null).length,
+          items: ideas.filter((i) => i.overall_score != null).slice(0, 3).map((i) => ({
             id: i.id,
-            title: (i.current_text || i.text || '').slice(0, 60) + (i.current_text?.length > 60 ? '...' : ''),
+            title: (i.current_text || i.initial_text || '').slice(0, 60) + ((i.current_text?.length || 0) > 60 ? '...' : ''),
             subtitle: `Score: ${(i.overall_score! * 100).toFixed(0)}% | ${i.classification || 'unclassified'}`,
           })),
-          status: ideas.some((i: any) => i.overall_score != null) ? 'completed' : 'idle',
+          status: ideas.some((i) => i.overall_score != null) ? 'completed' : 'idle',
         },
         {
           id: 'validation',
@@ -204,7 +227,7 @@ export default function PipelinePage() {
           bgColor: 'bg-emerald-100',
           description: 'Experimental validation design',
           count: hypotheses.filter((h: any) => h.has_validation_plan).length,
-          items: hypotheses.filter((h: any) => h.has_validation_plan).slice(0, 3).map((h: any) => ({
+          items: hypotheses.filter((h: any) => h.has_validation_plan).slice(0, 3).map((h) => ({
             id: h.id,
             title: (h.statement || '').slice(0, 60),
             subtitle: 'Validation plan available',
@@ -224,7 +247,7 @@ export default function PipelinePage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 size={20} className="text-green-600" />;
+        return <CheckCircle size={20} className="text-green-600" />;
       case 'active':
         return <Loader2 size={20} className="text-blue-600 animate-spin" />;
       case 'error':
@@ -310,7 +333,7 @@ export default function PipelinePage() {
                     <p className="text-sm text-gray-500 italic">No items at this stage yet.</p>
                   ) : (
                     <div className="space-y-2">
-                      {selectedStageData.items.map((item: any) => (
+                      {selectedStageData.items.map((item: StageDataItem) => (
                         <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>

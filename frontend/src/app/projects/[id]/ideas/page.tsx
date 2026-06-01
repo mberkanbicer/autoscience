@@ -201,7 +201,7 @@ export default function IdeasPage() {
     switch (status) {
       case 'active': return 'success';
       case 'paused': return 'warning';
-      case 'rejected': return 'error';
+      case 'rejected': return 'danger';
       case 'promoted': return 'info';
       default: return 'default';
     }

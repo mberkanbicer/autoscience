@@ -1,9 +1,28 @@
 // API client for backend communication
 // Uses Next.js proxy - all requests go to /api/... and get proxied to backend
 
+import type {
+  Project,
+  Idea,
+  Paper,
+  ResearchRun,
+  ResearchReport,
+  ResearchQuestion,
+  Hypothesis,
+  Skill,
+  KnowledgeNote,
+  ApprovalRequest,
+  AuditLog,
+  ResearchState,
+  ValidationPlan,
+  ProjectStats,
+} from './types';
+
+type Json = Record<string, unknown>;
+
 interface RequestOptions {
   method?: string;
-  body?: unknown;
+  body?: Json;
   headers?: Record<string, string>;
 }
 
@@ -37,69 +56,72 @@ async function request<T>(
 }
 
 // Projects
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyVal = any;
+
 export const projectsApi = {
-  list: () => request<any[]>('/api/v1/projects'),
-  get: (id: string) => request<any>(`/api/v1/projects/${id}`),
-  create: (data: any) => request<any>('/api/v1/projects', { method: 'POST', body: data }),
-  update: (id: string, data: any) => request<any>(`/api/v1/projects/${id}`, { method: 'PUT', body: data }),
+  list: () => request<Project[]>('/api/v1/projects'),
+  get: (id: string) => request<Project>(`/api/v1/projects/${id}`),
+  create: (data: AnyVal) => request<Project>('/api/v1/projects', { method: 'POST', body: data }),
+  update: (id: string, data: AnyVal) => request<Project>(`/api/v1/projects/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) => request<void>(`/api/v1/projects/${id}`, { method: 'DELETE' }),
-  stats: (id: string) => request<any>(`/api/v1/projects/${id}/stats`),
+  stats: (id: string) => request<ProjectStats>(`/api/v1/projects/${id}/stats`),
 };
 
 // Ideas
 export const ideasApi = {
   list: (projectId: string, params?: Record<string, string>) => {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<any[]>(`/api/v1/ideas?project_id=${projectId}${query}`);
+    return request<Idea[]>(`/api/v1/ideas?project_id=${projectId}${query}`);
   },
-  get: (id: string) => request<any>(`/api/v1/ideas/${id}`),
-  create: (projectId: string, data: any) => 
-    request<any>(`/api/v1/ideas?project_id=${projectId}`, { method: 'POST', body: data }),
-  update: (id: string, data: any) => 
-    request<any>(`/api/v1/ideas/${id}`, { method: 'PUT', body: data }),
+  get: (id: string) => request<Idea>(`/api/v1/ideas/${id}`),
+  create: (projectId: string, data: AnyVal) => 
+    request<Idea>(`/api/v1/ideas?project_id=${projectId}`, { method: 'POST', body: data }),
+  update: (id: string, data: AnyVal) => 
+    request<Idea>(`/api/v1/ideas/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) => request<void>(`/api/v1/ideas/${id}`, { method: 'DELETE' }),
-  versions: (id: string) => request<any[]>(`/api/v1/ideas/${id}/versions`),
-  decisions: (id: string) => request<any[]>(`/api/v1/ideas/${id}/decisions`),
-  pause: (id: string) => request<any>(`/api/v1/ideas/${id}/pause`, { method: 'POST' }),
-  resume: (id: string) => request<any>(`/api/v1/ideas/${id}/resume`, { method: 'POST' }),
+  versions: (id: string) => request<Json[]>(`/api/v1/ideas/${id}/versions`),
+  decisions: (id: string) => request<Json[]>(`/api/v1/ideas/${id}/decisions`),
+  pause: (id: string) => request<AnyVal>(`/api/v1/ideas/${id}/pause`, { method: 'POST' }),
+  resume: (id: string) => request<AnyVal>(`/api/v1/ideas/${id}/resume`, { method: 'POST' }),
 };
 
 // Research Runs
 export const runsApi = {
   list: (projectId: string, params?: Record<string, string>) => {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<any[]>(`/api/v1/runs?project_id=${projectId}${query}`);
+    return request<ResearchRun[]>(`/api/v1/runs?project_id=${projectId}${query}`);
   },
-  get: (id: string) => request<any>(`/api/v1/runs/${id}`),
-  create: (projectId: string, data: any) => 
-    request<any>(`/api/v1/runs?project_id=${projectId}`, { method: 'POST', body: data }),
-  start: (id: string) => request<any>(`/api/v1/runs/${id}/start`, { method: 'POST' }),
-  pause: (id: string) => request<any>(`/api/v1/runs/${id}/pause`, { method: 'POST' }),
-  resume: (id: string) => request<any>(`/api/v1/runs/${id}/resume`, { method: 'POST' }),
-  complete: (id: string) => request<any>(`/api/v1/runs/${id}/complete`, { method: 'POST' }),
-  cancel: (id: string) => request<any>(`/api/v1/runs/${id}/cancel`, { method: 'POST' }),
+  get: (id: string) => request<ResearchRun>(`/api/v1/runs/${id}`),
+  create: (projectId: string, data: AnyVal) => 
+    request<ResearchRun>(`/api/v1/runs?project_id=${projectId}`, { method: 'POST', body: data }),
+  start: (id: string) => request<AnyVal>(`/api/v1/runs/${id}/start`, { method: 'POST' }),
+  pause: (id: string) => request<AnyVal>(`/api/v1/runs/${id}/pause`, { method: 'POST' }),
+  resume: (id: string) => request<AnyVal>(`/api/v1/runs/${id}/resume`, { method: 'POST' }),
+  complete: (id: string) => request<AnyVal>(`/api/v1/runs/${id}/complete`, { method: 'POST' }),
+  cancel: (id: string) => request<AnyVal>(`/api/v1/runs/${id}/cancel`, { method: 'POST' }),
   events: (id: string) => request<any[]>(`/api/v1/runs/${id}/events`),
   tools: (id: string) => request<any[]>(`/api/v1/runs/${id}/tools`),
   status: (id: string) => request<any>(`/api/v1/runs/${id}/status`),
-  byIdea: (ideaId: string) => request<any[]>(`/api/v1/runs/by-idea/${ideaId}`),
-  snapshot: (id: string) => request<any>(`/api/v1/runs/${id}/snapshot`),
+  byIdea: (ideaId: string) => request<ResearchRun[]>(`/api/v1/runs/by-idea/${ideaId}`),
+  snapshot: (id: string) => request<Json>(`/api/v1/runs/${id}/snapshot`),
   delete: (id: string) => request<void>(`/api/v1/runs/${id}`, { method: 'DELETE' }),
-  audit: (id: string) => request<any[]>(`/api/v1/runs/${id}/audit`),
+  audit: (id: string) => request<Json[]>(`/api/v1/runs/${id}/audit`),
 };
 
 // Papers
 export const papersApi = {
   list: (projectId: string, params?: Record<string, string>) => {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<any[]>(`/api/v1/papers?project_id=${projectId}${query}`);
+    return request<Paper[]>(`/api/v1/papers?project_id=${projectId}${query}`);
   },
-  get: (id: string) => request<any>(`/api/v1/papers/${id}`),
-  create: (projectId: string, data: any) => 
-    request<any>(`/api/v1/papers?project_id=${projectId}`, { method: 'POST', body: data }),
-  update: (id: string, data: any) => 
-    request<any>(`/api/v1/papers/${id}`, { method: 'PUT', body: data }),
+  get: (id: string) => request<Paper>(`/api/v1/papers/${id}`),
+  create: (projectId: string, data: AnyVal) => 
+    request<Paper>(`/api/v1/papers?project_id=${projectId}`, { method: 'POST', body: data }),
+  update: (id: string, data: AnyVal) => 
+    request<Paper>(`/api/v1/papers/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) => request<void>(`/api/v1/papers/${id}`, { method: 'DELETE' }),
-  analysis: (id: string) => request<any>(`/api/v1/papers/${id}/analysis`),
+  analysis: (id: string) => request<Json>(`/api/v1/papers/${id}/analysis`),
   clusters: (projectId: string) => request<any[]>(`/api/v1/papers/clusters?project_id=${projectId}`),
   conflicts: (projectId: string) => request<any[]>(`/api/v1/papers/conflicts?project_id=${projectId}`),
 };
@@ -108,81 +130,81 @@ export const papersApi = {
 export const skillsApi = {
   list: (params?: Record<string, string>) => {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<any[]>(`/api/v1/skills${query}`);
+    return request<Skill[]>(`/api/v1/skills${query}`);
   },
-  get: (id: string) => request<any>(`/api/v1/skills/${id}`),
-  create: (data: any) => request<any>('/api/v1/skills', { method: 'POST', body: data }),
-  update: (id: string, data: any) => 
-    request<any>(`/api/v1/skills/${id}`, { method: 'PUT', body: data }),
+  get: (id: string) => request<Skill>(`/api/v1/skills/${id}`),
+  create: (data: AnyVal) => request<Skill>('/api/v1/skills', { method: 'POST', body: data }),
+  update: (id: string, data: AnyVal) => 
+    request<Skill>(`/api/v1/skills/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) => request<void>(`/api/v1/skills/${id}`, { method: 'DELETE' }),
-  retire: (id: string) => request<any>(`/api/v1/skills/${id}/retire`, { method: 'POST' }),
-  versions: (id: string) => request<any[]>(`/api/v1/skills/${id}/versions`),
-  usage: (id: string) => request<any[]>(`/api/v1/skills/${id}/usage`),
+  retire: (id: string) => request<AnyVal>(`/api/v1/skills/${id}/retire`, { method: 'POST' }),
+  versions: (id: string) => request<Json[]>(`/api/v1/skills/${id}/versions`),
+  usage: (id: string) => request<Json[]>(`/api/v1/skills/${id}/usage`),
 };
 
 // Research Questions
 export const questionsApi = {
   list: (projectId: string, params?: Record<string, string>) => {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<any[]>(`/api/v1/questions?project_id=${projectId}${query}`);
+    return request<ResearchQuestion[]>(`/api/v1/questions?project_id=${projectId}${query}`);
   },
-  get: (id: string) => request<any>(`/api/v1/questions/${id}`),
-  create: (projectId: string, data: any) => 
-    request<any>(`/api/v1/questions?project_id=${projectId}`, { method: 'POST', body: data }),
+  get: (id: string) => request<ResearchQuestion>(`/api/v1/questions/${id}`),
+  create: (projectId: string, data: AnyVal) => 
+    request<ResearchQuestion>(`/api/v1/questions?project_id=${projectId}`, { method: 'POST', body: data }),
   reject: (id: string, reason: string) => 
-    request<any>(`/api/v1/questions/${id}/reject?reason=${encodeURIComponent(reason)}`, { method: 'POST' }),
+    request<AnyVal>(`/api/v1/questions/${id}/reject?reason=${encodeURIComponent(reason)}`, { method: 'POST' }),
 };
 
 // Hypotheses
 export const hypothesesApi = {
   list: (projectId: string, params?: Record<string, string>) => {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<any[]>(`/api/v1/hypotheses?project_id=${projectId}${query}`);
+    return request<Hypothesis[]>(`/api/v1/hypotheses?project_id=${projectId}${query}`);
   },
-  get: (id: string) => request<any>(`/api/v1/hypotheses/${id}`),
-  create: (projectId: string, data: any) => 
-    request<any>(`/api/v1/hypotheses?project_id=${projectId}`, { method: 'POST', body: data }),
-  update: (id: string, data: any) => 
-    request<any>(`/api/v1/hypotheses/${id}`, { method: 'PUT', body: data }),
-  validation: (id: string) => request<any>(`/api/v1/hypotheses/${id}/validation`),
+  get: (id: string) => request<Hypothesis>(`/api/v1/hypotheses/${id}`),
+  create: (projectId: string, data: AnyVal) => 
+    request<Hypothesis>(`/api/v1/hypotheses?project_id=${projectId}`, { method: 'POST', body: data }),
+  update: (id: string, data: AnyVal) => 
+    request<Hypothesis>(`/api/v1/hypotheses/${id}`, { method: 'PUT', body: data }),
+  validation: (id: string) => request<ValidationPlan>(`/api/v1/hypotheses/${id}/validation`),
 };
 
 // Reports
 export const reportsApi = {
-  list: (projectId: string) => request<any[]>(`/api/v1/reports?project_id=${projectId}`),
-  get: (id: string) => request<any>(`/api/v1/reports/${id}`),
+  list: (projectId: string) => request<ResearchReport[]>(`/api/v1/reports?project_id=${projectId}`),
+  get: (id: string) => request<ResearchReport>(`/api/v1/reports/${id}`),
   delete: (id: string) => request<void>(`/api/v1/reports/${id}`, { method: 'DELETE' }),
 };
 
 // Wiki
 export const wikiApi = {
-  list: (projectId: string) => request<any[]>(`/api/v1/wiki?project_id=${projectId}`),
-  get: (id: string) => request<any>(`/api/v1/wiki/${id}`),
-  create: (projectId: string, data: any) => 
-    request<any>(`/api/v1/wiki?project_id=${projectId}`, { method: 'POST', body: data }),
-  update: (id: string, data: any) => 
-    request<any>(`/api/v1/wiki/${id}`, { method: 'PUT', body: data }),
+  list: (projectId: string) => request<KnowledgeNote[]>(`/api/v1/wiki?project_id=${projectId}`),
+  get: (id: string) => request<KnowledgeNote>(`/api/v1/wiki/${id}`),
+  create: (projectId: string, data: AnyVal) => 
+    request<KnowledgeNote>(`/api/v1/wiki?project_id=${projectId}`, { method: 'POST', body: data }),
+  update: (id: string, data: AnyVal) => 
+    request<KnowledgeNote>(`/api/v1/wiki/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) => request<void>(`/api/v1/wiki/${id}`, { method: 'DELETE' }),
 };
 
 // Approvals
 export const approvalsApi = {
-  list: (projectId: string) => request<any[]>(`/api/v1/approvals?project_id=${projectId}`),
+  list: (projectId: string) => request<ApprovalRequest[]>(`/api/v1/approvals?project_id=${projectId}`),
   approve: (id: string, notes?: string) => 
-    request<any>(`/api/v1/approvals/${id}/approve`, { method: 'POST', body: { approved: true, reviewer_notes: notes } }),
+    request<AnyVal>(`/api/v1/approvals/${id}/approve`, { method: 'POST', body: { approved: true, reviewer_notes: notes } }),
   deny: (id: string, reason: string) => 
-    request<any>(`/api/v1/approvals/${id}/deny`, { method: 'POST', body: { approved: false, reviewer_notes: reason } }),
+    request<AnyVal>(`/api/v1/approvals/${id}/deny`, { method: 'POST', body: { approved: false, reviewer_notes: reason } }),
 };
 
 export const datasetsApi = {
-  list: (projectId: string) => request<any[]>(`/api/v1/datasets?project_id=${projectId}`),
-  create: (projectId: string, data: any) =>
-    request<any>(`/api/v1/datasets?project_id=${projectId}`, { method: 'POST', body: data }),
-  get: (id: string) => request<any>(`/api/v1/datasets/${id}`),
-  update: (id: string, data: any) =>
-    request<any>(`/api/v1/datasets/${id}`, { method: 'PUT', body: data }),
+  list: (projectId: string) => request<Json[]>(`/api/v1/datasets?project_id=${projectId}`),
+  create: (projectId: string, data: AnyVal) =>
+    request<AnyVal>(`/api/v1/datasets?project_id=${projectId}`, { method: 'POST', body: data }),
+  get: (id: string) => request<AnyVal>(`/api/v1/datasets/${id}`),
+  update: (id: string, data: AnyVal) =>
+    request<AnyVal>(`/api/v1/datasets/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) =>
-    request<any>(`/api/v1/datasets/${id}`, { method: 'DELETE' }),
+    request<AnyVal>(`/api/v1/datasets/${id}`, { method: 'DELETE' }),
 };
 
 export function exportReportUrl(reportId: string, format: 'markdown' | 'html' | 'json' = 'markdown'): string {

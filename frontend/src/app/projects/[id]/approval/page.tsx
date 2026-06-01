@@ -37,7 +37,7 @@ export default function ApprovalsPage() {
   async function loadApprovals() {
     try {
       const data = await approvalsApi.list(projectId);
-      setApprovals(data);
+      setApprovals(data as unknown as ApprovalItem[]);
     } catch (e) {
       console.error('Failed to load approvals:', e);
     } finally {
@@ -85,7 +85,7 @@ export default function ApprovalsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Approval Queue</h1>
-        <Badge variant="warning" size="lg">
+        <Badge variant="warning" size="md">
           {pending.length} pending
         </Badge>
       </div>

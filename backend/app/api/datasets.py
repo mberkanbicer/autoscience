@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_db
 from ..models.report import Dataset
-from ..schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
+from ..schemas import DatasetResponse
+from ..schemas.dataset import DatasetCreate, DatasetUpdate
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 

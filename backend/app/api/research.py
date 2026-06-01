@@ -114,6 +114,8 @@ async def _run_workflow_background(
                 run_service = ResearchRunService(db2)
                 await run_service.fail_run(run_id, str(e))
                 await db2.commit()
+        except ImportError:
+            logger.error("failed_to_mark_failed", error="Redis not available")
         except Exception as e2:
             logger.error("failed_to_mark_failed", error=str(e2))
 
@@ -180,9 +182,12 @@ async def start_research_run(
             socket_timeout=None,
         )
         event_broadcaster = EventBroadcaster(redis_client)
-    except Exception:
+    except ImportError:
         event_broadcaster = None
-        logger.warning("redis_unavailable", note="Events will not be streamed")
+        logger.warning("redis_unavailable", note="redis-py not installed, events will not be streamed")
+    except redis.ConnectionError:
+        event_broadcaster = None
+        logger.warning("redis_unavailable", note="Redis not reachable, events will not be streamed")
 
     # Start workflow in background
     asyncio.create_task(
