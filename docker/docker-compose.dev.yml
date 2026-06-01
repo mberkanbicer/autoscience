@@ -88,6 +88,7 @@ services:
       - ../frontend/postcss.config.js:/app/postcss.config.js
     command: >
       sh -c "npm install --silent 2>/dev/null &&
+             rm -rf .next &&
              npm run dev"
     extra_hosts:
       - "host.docker.internal:host-gateway"
