@@ -410,7 +410,7 @@ export default function RunsPage() {
                     <div className="text-gray-400">
                       {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     </div>
-                    <Badge variant="info">{run.run_type}</Badge>
+                    <Badge variant="info">{run.run_type || 'user_directed'}</Badge>
                     <StatusBadge status={run.state} />
                     <div className="flex-1" />
                     {isRunning && status && (

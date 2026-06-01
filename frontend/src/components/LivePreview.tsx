@@ -52,7 +52,10 @@ export function LivePreview({ runId, isActive, onComplete }: LivePreviewProps) {
 
     clearPreview();
 
-    const eventSource = new EventSource(`/api/v1/search/stream/${runId}`);
+    // Connect directly to backend for SSE (Next.js rewrites don't stream)
+    const isDev = process.env.NODE_ENV === 'development';
+    const baseUrl = isDev ? 'http://localhost:8000' : '';
+    const eventSource = new EventSource(`${baseUrl}/api/v1/search/stream/${runId}`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
