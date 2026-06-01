@@ -15,6 +15,8 @@ import {
   Settings,
   Activity,
   HelpCircle,
+  Layers,
+  CheckCircle,
 } from 'lucide-react';
 
 const PIPELINE_STAGES = [
@@ -101,6 +103,8 @@ export function Sidebar({ projectId }: SidebarProps) {
               { href: `/projects/${projectId}/ideas`, label: 'Ideas', icon: Lightbulb },
               { href: `/projects/${projectId}/runs`, label: 'Research Runs', icon: Activity },
               { href: `/projects/${projectId}/skills`, label: 'Skills', icon: GraduationCap },
+              { href: `/projects/${projectId}/clusters`, label: 'Clusters', icon: Layers },
+              { href: `/projects/${projectId}/approval`, label: 'Approvals', icon: CheckCircle },
               { href: `/projects/${projectId}/wiki`, label: 'Wiki', icon: BookOpen },
               { href: `/projects/${projectId}/settings`, label: 'Settings', icon: Settings },
             ].map((item) => {

@@ -55,6 +55,54 @@ async def delete_report(
         raise HTTPException(status_code=404, detail="Report not found")
 
 
+@router.get("/reports/{report_id}/export")
+async def export_report(
+    report_id: str,
+    format: str = Query("markdown", regex="^(markdown|html|json)$"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export a report in the specified format."""
+    from fastapi.responses import PlainTextResponse, HTMLResponse, JSONResponse
+    from sqlalchemy import select
+    from ..models.report import ResearchReport as ReportModel
+
+    result = await db.execute(select(ReportModel).where(ReportModel.id == report_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    if format == "markdown":
+        content = report.content_markdown or report.content_html or ""
+        return PlainTextResponse(
+            content=content,
+            media_type="text/markdown",
+            headers={"Content-Disposition": f"attachment; filename=report-{report.id[:8]}.md"},
+        )
+    elif format == "html":
+        content = report.content_html or report.content_markdown or ""
+        if not report.content_html:
+            # Convert markdown to basic HTML
+            import re
+            content = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>{report.title or 'Report'}</title>
+<style>body{{max-width:800px;margin:auto;padding:2em;font-family:system-ui,sans-serif;line-height:1.6}}
+pre{{background:#f4f4f4;padding:1em;border-radius:8px;overflow-x:auto}}
+code{{background:#f4f4f4;padding:0.2em 0.4em;border-radius:4px;font-size:0.9em}}
+img{{max-width:100%}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ddd;padding:8px;text-align:left}}
+</style></head><body><h1>{report.title or 'Research Report'}</h1><div>{content.replace(chr(10), '<br>')}</div></body></html>"""
+        return HTMLResponse(
+            content=content,
+            headers={"Content-Disposition": f"attachment; filename=report-{report.id[:8]}.html"},
+        )
+    else:  # json
+        from ..schemas.report import ResearchReportResponse
+        data = ResearchReportResponse.model_validate(report).model_dump()
+        return JSONResponse(
+            content=data,
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename=report-{report.id[:8]}.json"},
+        )
+
+
 # Knowledge Wiki
 
 @router.get("/wiki", response_model=list[KnowledgeNoteResponse])

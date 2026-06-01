@@ -55,6 +55,7 @@ services:
     volumes:
       # Mount source code for hot-reload
       - ../backend/app:/app/app
+      - ../backend/tests:/app/tests
       - ../backend/alembic:/app/alembic
       - ../backend/alembic.ini:/app/alembic.ini
       - ../backend/pyproject.toml:/app/pyproject.toml

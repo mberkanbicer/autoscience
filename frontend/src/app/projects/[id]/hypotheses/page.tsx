@@ -188,18 +188,56 @@ export default function HypothesesPage() {
                 {/* Validation Plan Display */}
                 {viewingValidation === hypothesis.id && validationPlan && (
                   <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-100">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                       <FileSearch size={14} className="text-blue-600" />
                       <span className="text-sm font-medium text-blue-800">Validation Plan</span>
+                      <span className="text-xs text-blue-500 ml-auto">
+                        Feasibility: {validationPlan.feasibility_score != null ? (validationPlan.feasibility_score * 100).toFixed(0) + '%' : 'N/A'}
+                      </span>
                     </div>
-                    {validationPlan.experiment_design && (
-                      <p className="text-sm text-blue-700 mb-2">{validationPlan.experiment_design}</p>
+                    {validationPlan.experimental_design && (
+                      <div className="mb-2">
+                        <p className="text-xs font-medium text-blue-700 mb-1">Experimental Design</p>
+                        <p className="text-sm text-blue-700">{validationPlan.experimental_design}</p>
+                      </div>
                     )}
-                    {validationPlan.datasets && (
-                      <p className="text-xs text-blue-600">Datasets: {validationPlan.datasets}</p>
+                    {validationPlan.dataset_candidates && validationPlan.dataset_candidates.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs font-medium text-blue-700 mb-1">Datasets</p>
+                        <div className="flex flex-wrap gap-1">
+                          {validationPlan.dataset_candidates.map((d: any, i: number) => (
+                            <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{d.name || d}</span>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    {validationPlan.baselines && (
-                      <p className="text-xs text-blue-600">Baselines: {validationPlan.baselines}</p>
+                    {validationPlan.baselines && validationPlan.baselines.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs font-medium text-blue-700 mb-1">Baselines</p>
+                        <div className="flex flex-wrap gap-1">
+                          {validationPlan.baselines.map((b: string, i: number) => (
+                            <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{b}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {validationPlan.metrics && validationPlan.metrics.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs font-medium text-blue-700 mb-1">Metrics</p>
+                        <div className="flex flex-wrap gap-1">
+                          {validationPlan.metrics.map((m: string, i: number) => (
+                            <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{m}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {validationPlan.feasibility_score != null && (
+                      <div className="mt-2 pt-2 border-t border-blue-200">
+                        <div className="flex items-center gap-4 text-xs text-blue-600">
+                          <span>Cost estimate: {validationPlan.cost_estimate != null ? '$' + validationPlan.cost_estimate.toFixed(0) : 'N/A'}</span>
+                          <span>Difficulty: {validationPlan.difficulty_estimate != null ? (validationPlan.difficulty_estimate * 100).toFixed(0) + '%' : 'N/A'}</span>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

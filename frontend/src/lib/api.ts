@@ -173,3 +173,27 @@ export const approvalsApi = {
   deny: (id: string, reason: string) => 
     request<any>(`/api/v1/approvals/${id}/deny`, { method: 'POST', body: { approved: false, reviewer_notes: reason } }),
 };
+
+export const datasetsApi = {
+  list: (projectId: string) => request<any[]>(`/api/v1/datasets?project_id=${projectId}`),
+  create: (projectId: string, data: any) =>
+    request<any>(`/api/v1/datasets?project_id=${projectId}`, { method: 'POST', body: data }),
+  get: (id: string) => request<any>(`/api/v1/datasets/${id}`),
+  update: (id: string, data: any) =>
+    request<any>(`/api/v1/datasets/${id}`, { method: 'PUT', body: data }),
+  delete: (id: string) =>
+    request<any>(`/api/v1/datasets/${id}`, { method: 'DELETE' }),
+};
+
+export function exportReportUrl(reportId: string, format: 'markdown' | 'html' | 'json' = 'markdown'): string {
+  return `/api/v1/reports/${reportId}/export?format=${format}`;
+}
+
+export const idleApi = {
+  trigger: (projectId: string) =>
+    request<any>(`/api/v1/research/idle?project_id=${projectId}`, { method: 'POST' }),
+};
+
+export const schedulerApi = {
+  status: () => request<any>('/api/v1/scheduler/status'),
+};

@@ -110,6 +110,101 @@ class ResearchWorkflow:
         self.db = db
         self.event_broadcaster = event_broadcaster
         self.scoring_engine = scoring_engine
+        self.knowledge_service = None
+
+    @property
+    def _knowledge(self):
+        """Lazy import and initialize KnowledgeBaseService."""
+        if self.knowledge_service is None and self.db is not None:
+            from ..services.knowledge_service import KnowledgeBaseService
+            self.knowledge_service = KnowledgeBaseService(self.db)
+        return self.knowledge_service
+
+    async def _generate_wiki_notes(self, state: ResearchState) -> None:
+        """Auto-generate wiki notes from research results."""
+        if not self._knowledge:
+            return
+        try:
+            # Paper notes (up to 10)
+            for p in state.papers[:10]:
+                try:
+                    content = await self._knowledge.generate_paper_note(
+                        paper_id=p.id,
+                        paper_data={"title": p.title, "authors": p.authors, "year": p.year},
+                    )
+                    await self._knowledge.create_note(
+                        project_id=state.project_id,
+                        note_type="paper",
+                        title=f"Paper: {p.title[:200]}",
+                        content=content,
+                        entity_id=p.id,
+                    )
+                except Exception:
+                    pass
+
+            # Cluster notes
+            for c in state.clusters:
+                try:
+                    content = await self._knowledge.generate_cluster_note({
+                        "name": c.name,
+                        "description": c.description,
+                        "paper_count": c.paper_count,
+                    })
+                    await self._knowledge.create_note(
+                        project_id=state.project_id,
+                        note_type="cluster",
+                        title=f"Cluster: {c.name[:200]}",
+                        content=content,
+                        entity_id=c.id,
+                    )
+                except Exception:
+                    pass
+
+            # Conflict notes
+            for c in state.conflicts:
+                try:
+                    content = await self._knowledge.generate_conflict_note({
+                        "conflict_type": c.conflict_type,
+                        "description": c.description,
+                        "severity": c.severity,
+                    })
+                    await self._knowledge.create_note(
+                        project_id=state.project_id,
+                        note_type="conflict",
+                        title=f"Conflict: {c.conflict_type[:200]}",
+                        content=content,
+                        entity_id=c.id,
+                    )
+                except Exception:
+                    pass
+
+            # Hypothesis notes (up to 5)
+            for h in state.hypotheses[:5]:
+                try:
+                    content = await self._knowledge.generate_hypothesis_note({
+                        "statement": h.statement,
+                        "confidence": h.confidence,
+                        "status": h.status,
+                    })
+                    await self._knowledge.create_note(
+                        project_id=state.project_id,
+                        note_type="hypothesis",
+                        title=f"Hypothesis: {h.statement[:200]}",
+                        content=content,
+                        entity_id=h.id,
+                    )
+                except Exception:
+                    pass
+
+            await self.db.flush()
+            logger.info("wiki_notes_generated",
+                        project=state.project_id,
+                        papers=len(state.papers),
+                        clusters=len(state.clusters),
+                        conflicts=len(state.conflicts),
+                        hypotheses=len(state.hypotheses))
+        except Exception as e:
+            logger.warning("wiki_note_generation_failed", error=str(e))
 
     async def run(self, state: ResearchState) -> ResearchState:
         """Run the complete research workflow."""
@@ -236,7 +331,10 @@ class ResearchWorkflow:
                 state, WorkflowStep.CREATE_SKILLS, self._create_skills
             )
 
-        # Step 13: Generate report
+        # Step 13: Generate wiki notes from research results
+        await self._generate_wiki_notes(state)
+
+        # Step 14: Generate report
         state = await self._execute_step(
             state, WorkflowStep.GENERATE_REPORT, self._generate_report
         )
@@ -266,6 +364,9 @@ class ResearchWorkflow:
         state = await self._execute_step(
             state, WorkflowStep.SCORE_IDEA, self._score_idea
         )
+
+        # Generate wiki notes
+        await self._generate_wiki_notes(state)
 
         return state
 

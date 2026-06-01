@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { reportsApi } from '@/lib/api';
+import { reportsApi, exportReportUrl } from '@/lib/api';
 import { ResearchReport } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import { FileText, ArrowLeft, Download, Copy, Check, Trash2 } from 'lucide-react';
@@ -95,10 +95,21 @@ export default function ReportsPage() {
                   {copied ? <Check size={16} className="mr-2" /> : <Copy size={16} className="mr-2" />}
                   {copied ? 'Copied!' : 'Copy'}
                 </Button>
-                <Button variant="secondary" size="sm">
-                  <Download size={16} className="mr-2" />
-                  Export
-                </Button>
+                <a href={exportReportUrl(selectedReport.id, 'markdown')} download
+                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  <Download size={14} />
+                  .md
+                </a>
+                <a href={exportReportUrl(selectedReport.id, 'html')} download
+                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  <Download size={14} />
+                  .html
+                </a>
+                <a href={exportReportUrl(selectedReport.id, 'json')} download
+                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  <Download size={14} />
+                  .json
+                </a>
                 <Button variant="danger" size="sm" onClick={() => handleDeleteReport(selectedReport.id)}>
                   <Trash2 size={16} className="mr-2" />
                   Delete

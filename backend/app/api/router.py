@@ -11,7 +11,7 @@ from .questions import router as questions_router
 from .reports import router as reports_router
 from .research import router as research_router
 from .search import router as search_router
-from fastapi import APIRouter
+from .datasets import router as datasets_router
 
 api_router = APIRouter()
 
@@ -37,3 +37,4 @@ api_router.include_router(questions_router, prefix="", tags=["questions"])
 api_router.include_router(reports_router, prefix="", tags=["reports"])
 api_router.include_router(research_router, prefix="/research", tags=["research"])
 api_router.include_router(search_router, prefix="/search", tags=["search"])
+api_router.include_router(datasets_router, prefix="/datasets", tags=["datasets"])

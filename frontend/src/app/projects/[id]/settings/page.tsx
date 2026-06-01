@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { SkeletonCard } from '@/components/ui/Skeleton';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, idleApi } from '@/lib/api';
 import { Project } from '@/lib/types';
-import { Save, Settings, Bell, Shield, Clock } from 'lucide-react';
+import { Save, Settings, Bell, Shield, Clock, Zap } from 'lucide-react';
 
 export default function SettingsPage() {
   const params = useParams();
@@ -204,6 +204,28 @@ export default function SettingsPage() {
                 setProject({ ...project, max_sources_per_cycle: parseInt(e.target.value) })
               }
             />
+
+            <div className="pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    setSaving(true);
+                    await idleApi.trigger(projectId);
+                    alert('Idle cycle started!');
+                  } catch (e) {
+                    alert('Failed to start idle cycle. Check that an API key is configured.');
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving || !project.idle_research_enabled}
+              >
+                <Zap size={14} className="mr-1" />
+                Run Idle Cycle Now
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
