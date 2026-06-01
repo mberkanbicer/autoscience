@@ -58,7 +58,7 @@ async def delete_report(
 @router.get("/reports/{report_id}/export")
 async def export_report(
     report_id: str,
-    format: str = Query("markdown", regex="^(markdown|html|json)$"),
+    format: str = Query("markdown", pattern="^(markdown|html|json)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """Export a report in the specified format."""

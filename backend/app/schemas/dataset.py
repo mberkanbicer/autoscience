@@ -13,7 +13,7 @@ class DatasetCreate(BaseModel):
     size_bytes: int | None = None
     row_count: int | None = None
     column_count: int | None = None
-    schema_json: dict[str, Any] | None = None
+    schema_data: dict[str, Any] | None = None
 
 
 class DatasetUpdate(BaseModel):

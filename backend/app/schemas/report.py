@@ -76,7 +76,7 @@ class DatasetResponse(TimestampSchema):
     size_bytes: int | None = None
     row_count: int | None = None
     column_count: int | None = None
-    schema_json: dict | None = None
+    schema_data: dict | None = None
 
 
 class AnalysisRunResponse(TimestampSchema):
