@@ -365,8 +365,8 @@ export default function SettingsPage() {
               <div>
                 <h4 className="font-medium text-warning/90">Important</h4>
                 <p className="text-sm text-warning/80 mt-1">
-                  API keys are stored in your browser's localStorage. For production use,
-                  configure them as environment variables in the backend.
+                   API keys are stored in your browser&apos;s localStorage. For production use,
+                   configure them as environment variables in the backend.
                 </p>
               </div>
             </div>

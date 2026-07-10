@@ -22,7 +22,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect, text
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-EXPECTED_HEAD = "f6a7b8c9d0e1"
+EXPECTED_HEAD = "f8a9b0c1d2e3"
 
 REQUIRED_TABLES = [
     "alembic_version",

@@ -161,8 +161,7 @@ export default function HomePage() {
 
            <div className="p-8 bg-primary/5 rounded-3xl border border-primary/10">
               <p className="text-center text-sm font-bold text-stone-600 dark:text-stone-400 italic">
-                "The system behaves like a persistent researcher’s brain: monitoring literature, 
-                detecting tensions, and learning reusable skills from every cycle."
+                 {"The system behaves like a persistent researcher’s brain: monitoring literature, detecting tensions, and learning reusable skills from every cycle."}
               </p>
            </div>
         </div>
@@ -223,7 +222,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-xl font-bold text-foreground mb-3 tracking-tight">Skill Acquisition</h3>
             <p className="text-muted-foreground leading-relaxed text-sm font-medium">
-              System memoizes successful research protocols into reusable "Skills" that optimize subsequent cognitive cycles.
+               System memoizes successful research protocols into reusable &ldquo;Skills&rdquo; that optimize subsequent cognitive cycles.
             </p>
           </Card>
 

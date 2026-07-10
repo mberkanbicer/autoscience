@@ -196,7 +196,7 @@ function renderEventData(event: ThinkingEvent) {
     case 'search_started':
       return (
         <p className="text-[10px] text-muted-foreground/70 italic">
-          Querying {data.sources?.join(', ')} for "{data.query}"
+           Querying {data.sources?.join(', ')} for &ldquo;{data.query}&rdquo;
         </p>
       );
     case 'paper_found':

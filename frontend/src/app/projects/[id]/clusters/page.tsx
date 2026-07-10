@@ -264,7 +264,7 @@ const openClusterDetails = async (cluster: PaperCluster) => {
                           <div key={i} className="p-5 bg-white dark:bg-stone-900/60 rounded-2xl border border-border/5 shadow-sm hover:border-primary/20 transition-all group">
                             <Badge className="mb-3 bg-primary/10 text-primary border-primary/20 group-hover:bg-primary group-hover:text-white transition-colors">{l.label}</Badge>
                             {l.rationale && (
-                              <p className="text-xs text-muted-foreground leading-relaxed font-medium italic">"{l.rationale}"</p>
+                               <p className="text-xs text-muted-foreground leading-relaxed font-medium italic">&ldquo;{l.rationale}&rdquo;</p>
                             )}
                           </div>
                         ))}

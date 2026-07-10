@@ -22,17 +22,17 @@ function SettingsBootstrap() {
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ArtifactProvider>
-        <SettingsBootstrap />
-        <ActivityTracker />
-        <ErrorBoundaryWrapper>{children}</ErrorBoundaryWrapper>
-      </ArtifactProvider>
       <ToastProvider>
-        <GlobalErrorToast />
+        <ArtifactProvider>
+          <SettingsBootstrap />
+          <ActivityTracker />
+          <ErrorBoundaryWrapper>{children}</ErrorBoundaryWrapper>
+          <GlobalErrorToast />
+        </ArtifactProvider>
+        <div className="fixed top-4 right-4 z-50">
+          <ThemeToggle />
+        </div>
       </ToastProvider>
-      <div className="fixed top-4 right-4 z-50">
-        <ThemeToggle />
-      </div>
     </QueryClientProvider>
   );
 }

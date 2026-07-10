@@ -256,7 +256,7 @@ export default function StudyStudioPage() {
                               {conflict.research_opportunity && (
                                 <div className="mt-6 p-4 bg-white/50 dark:bg-stone-900/50 rounded-xl border border-error/10">
                                    <p className="text-[9px] font-black text-error/60 uppercase tracking-widest mb-1">Synthetic Opportunity</p>
-                                   <p className="text-xs text-muted-foreground font-medium italic">"{conflict.research_opportunity}"</p>
+                                    <p className="text-xs text-muted-foreground font-medium italic">&ldquo;{conflict.research_opportunity}&rdquo;</p>
                                 </div>
                               )}
                            </div>
