@@ -1,3 +1,8 @@
+/**
+ * @vitest-environment node
+ * Node 24 provides native WebCrypto with full PBKDF2 support.
+ * jsdom's polyfill rejects the salt ArrayBuffer with ERR_INVALID_ARG_TYPE.
+ */
 import { describe, it, expect } from 'vitest';
 import { encryptSettings, decryptSettings } from '../settingsVault';
 
