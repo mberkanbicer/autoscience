@@ -1,10 +1,20 @@
 """Tests for simulated peer review."""
 
+import os
+
 import pytest
 from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not any([
+        os.environ.get("OPENAI_API_KEY"),
+        os.environ.get("ANTHROPIC_API_KEY"),
+        os.environ.get("OPENROUTER_API_KEY"),
+    ]),
+    reason="No LLM provider configured",
+)
 async def test_simulate_review_proposal(client: AsyncClient, sample_project):
     headers = {"X-User-Email": "editor@test.com", "X-User-Name": "Editor"}
 

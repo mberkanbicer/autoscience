@@ -11,14 +11,14 @@ async def test_health_check(client: AsyncClient):
     Notes:
         In test environments, external services (Redis, LLM providers,
         academic source connectors) are typically not configured or
-        unavailable, so the overall status may be ``"degraded"``.
-        We accept both ``"healthy"`` and ``"degraded"`` and verify that
+        unavailable, so the overall status may be ``"degraded"`` or
+        ``"unhealthy"``.  We accept all three statuses and verify that
         the endpoint structure is correct.
     """
     response = await client.get("/api/v1/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] in ("healthy", "degraded")
+    assert data["status"] in ("healthy", "degraded", "unhealthy")
     assert data["version"] == "0.1.0"
     assert "checks" in data
     assert "database" in data["checks"]
