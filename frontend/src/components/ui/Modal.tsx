@@ -49,25 +49,25 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       }}
     >
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" />
+        <div className="fixed inset-0 bg-secondary/30 backdrop-blur-md transition-opacity duration-500" />
         <div
           className={cn(
-            'relative w-full bg-white rounded-2xl shadow-2xl transform transition-all',
+            'relative w-full glass rounded-2xl shadow-2xl transform transition-all animate-in zoom-in-95 fade-in duration-300',
             sizes[size]
           )}
         >
           {title && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border/10">
+              <h2 className="text-xl font-bold text-foreground tracking-tight">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-all duration-300 hover:rotate-90"
               >
                 <X size={20} />
               </button>
             </div>
           )}
-          <div className="px-6 py-4">{children}</div>
+          <div className="px-6 py-6">{children}</div>
         </div>
       </div>
     </div>
@@ -80,7 +80,7 @@ interface ModalFooterProps {
 
 export function ModalFooter({ children }: ModalFooterProps) {
   return (
-    <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+    <div className="flex justify-end gap-3 px-6 py-5 border-t border-border/10 bg-muted/20 rounded-b-2xl">
       {children}
     </div>
   );

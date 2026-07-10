@@ -1,15 +1,16 @@
 """Idle cognition engine for autonomous background research."""
 
+import asyncio
+import random
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
-import random
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -159,6 +160,10 @@ class IdleCognitionEngine:
 
             return result
 
+        except asyncio.CancelledError:
+            raise
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             logger.error("idle_cycle_failed", cycle_id=cycle_id, error=str(e))
             return IdleCycleResult(
@@ -260,7 +265,7 @@ Detect citation conflicts and generate research questions."""
             [
                 f"- {idea.get('text', '')[:100]}... (reason: {idea.get('rejection_reason', 'N/A')})"
                 for idea in rejected_ideas[:5]
-            ]
+            ],
         )
 
         system = """You are a research idea revisitor.
@@ -343,7 +348,7 @@ Output a JSON object with:
 - new_skills_needed: New skills that should be created (array of strings)
 - summary: Brief summary (string)"""
 
-        user = f"""Analyze research processes and identify skill improvement opportunities."""
+        user = """Analyze research processes and identify skill improvement opportunities."""
 
         messages = [
             Message(role="system", content=system),

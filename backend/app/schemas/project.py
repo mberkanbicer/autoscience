@@ -11,6 +11,7 @@ class ProjectCreate(BaseSchema):
     name: str = Field(..., max_length=255)
     domain: str = Field(..., max_length=500)
     description: str | None = None
+    organization_id: str | None = None
     subject_scope: list[str] = Field(default_factory=list)
     out_of_scope: list[str] = Field(default_factory=list)
     default_flexibility: float = Field(default=0.6, ge=0.0, le=1.0)
@@ -43,6 +44,7 @@ class ProjectResponse(TimestampSchema):
     name: str
     domain: str
     description: str | None = None
+    organization_id: str | None = None
     subject_scope: list[str] = Field(default_factory=list)
     out_of_scope: list[str] = Field(default_factory=list)
     default_flexibility: float
@@ -69,3 +71,38 @@ class ProjectStats(BaseSchema):
     total_reports: int = 0
     total_wiki_notes: int = 0
     total_clusters: int = 0
+    latest_cognitive_entropy: float | None = None
+    latest_cognitive_mode: str | None = None
+    latest_focus_score: float | None = None
+    latest_focus_label: str | None = None
+    active_run_phase: str | None = None
+
+
+class GraphNode(BaseSchema):
+    """Schema for a graph node (Paper)."""
+
+    id: str
+    title: str
+    year: int | None = None
+    cluster_id: str | None = None
+    paper_type: str | None = None
+    citation_count: int = 0
+
+
+class GraphEdge(BaseSchema):
+    """Schema for a graph edge (Citation, Semantic, Conflict)."""
+
+    id: str
+    source: str
+    target: str
+    type: str  # citation | semantic | conflict
+    label: str | None = None
+    severity: float | None = None
+
+
+class ProjectGraphResponse(BaseSchema):
+    """Schema for the full project knowledge graph."""
+
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+

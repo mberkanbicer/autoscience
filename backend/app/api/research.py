@@ -1,20 +1,25 @@
 """Main API endpoint for research operations."""
 
 import asyncio
-import structlog
-from fastapi import APIRouter, Depends, HTTPException, Header
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Annotated, Optional
 
-from ..dependencies import get_db
-from ..database import async_session_factory
-from ..services.orchestrator import ResearchOrchestrator
-from ..services.research_run_service import ResearchRunService
-from ..services.event_stream import EventBroadcaster
-from ..llm.router import LLMRouter, create_default_router
-from ..connectors.manager import ConnectorManager, create_default_manager
-from ..config import get_settings
-from ..schemas.research_run import ResearchRunCreate
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import get_settings
+from app.connectors.manager import ConnectorManager
+from app.database import async_session_factory
+from app.dependencies import get_connector_manager, get_db
+from app.dependencies.auth import get_current_user, require_project_role
+from app.llm.router import LLMRouter, create_default_router
+from app.models.collaboration import User
+from app.schemas.research_run import ResearchRunCreate
+from app.schemas.validation import StartResearchRunRequest
+from app.services.event_stream import EventBroadcaster
+from app.services.orchestrator import ResearchOrchestrator
+from app.services.research_run_service import ResearchRunService
 
 logger = structlog.get_logger()
 
@@ -39,11 +44,11 @@ def get_llm_router(
 
     provider = default_provider or settings.default_llm_provider
     if or_key and not oa_key and not an_key:
-        provider = 'openrouter'
+        provider = "openrouter"
     elif oa_key and not or_key and not an_key:
-        provider = 'openai'
+        provider = "openai"
     elif an_key and not or_key and not oa_key:
-        provider = 'anthropic'
+        provider = "anthropic"
 
     logger.info("llm_router_created", provider=provider, has_openrouter=bool(or_key), has_openai=bool(oa_key), has_anthropic=bool(an_key))
 
@@ -58,15 +63,6 @@ def get_llm_router(
         llamacpp_base_url=settings.llamacpp_base_url,
         llamacpp_model=settings.llamacpp_model,
         default_provider=provider,
-    )
-
-
-def get_connector_manager() -> ConnectorManager:
-    """Get connector manager instance."""
-    return create_default_manager(
-        openalex_email=settings.unpaywall_email,
-        semantic_scholar_api_key=settings.semantic_scholar_api_key,
-        searxng_url=settings.searxng_url,
     )
 
 
@@ -95,7 +91,7 @@ async def _run_workflow_background(
             await run_service.start_run(run_id)
             await db.commit()
 
-            state = await orchestrator.run_research(
+            await orchestrator.run_research(
                 project_id=project_id,
                 idea_text=idea_text,
                 run_type=run_type,
@@ -106,6 +102,10 @@ async def _run_workflow_background(
             await db.commit()
             logger.info("background_run_completed", run_id=run_id)
 
+    except asyncio.CancelledError:
+        raise
+    except KeyboardInterrupt:
+        raise
     except Exception as e:
         logger.error("background_run_failed", run_id=run_id, error=str(e))
         # Try to mark the run as failed
@@ -116,24 +116,24 @@ async def _run_workflow_background(
                 await db2.commit()
         except ImportError:
             logger.error("failed_to_mark_failed", error="Redis not available")
+        except SQLAlchemyError as e2:
+            logger.error("failed_to_mark_failed_db_error", error=str(e2))
         except Exception as e2:
             logger.error("failed_to_mark_failed", error=str(e2))
 
 
 @router.post("/run")
 async def start_research_run(
-    project_id: str,
-    idea: str,
-    run_type: str = "user_directed",
-    flexibility: float = 0.6,
-    x_openrouter_api_key: Optional[str] = Header(None),
-    x_openrouter_model: Optional[str] = Header(None),
-    x_openai_api_key: Optional[str] = Header(None),
-    x_openai_model: Optional[str] = Header(None),
-    x_anthropic_api_key: Optional[str] = Header(None),
-    x_anthropic_model: Optional[str] = Header(None),
-    x_default_provider: Optional[str] = Header(None),
-    db: AsyncSession = Depends(get_db),
+    request: StartResearchRunRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    x_openrouter_api_key: Annotated[str | None, Header()] = None,
+    x_openrouter_model: Annotated[str | None, Header()] = None,
+    x_openai_api_key: Annotated[str | None, Header()] = None,
+    x_openai_model: Annotated[str | None, Header()] = None,
+    x_anthropic_api_key: Annotated[str | None, Header()] = None,
+    x_anthropic_model: Annotated[str | None, Header()] = None,
+    x_default_provider: Annotated[str | None, Header()] = None,
 ):
     """Start a research run (non-blocking).
 
@@ -141,6 +141,7 @@ async def start_research_run(
     Subscribe to GET /api/v1/search/stream/{run_id} for live events.
     Poll GET /api/v1/runs/{run_id} for completion status.
     """
+    await require_project_role(db, request.project_id, user.id, "editor")
     llm_router = get_llm_router(
         openrouter_api_key=x_openrouter_api_key,
         openrouter_model=x_openrouter_model,
@@ -153,27 +154,28 @@ async def start_research_run(
     connector_manager = get_connector_manager()
 
     # Create the idea and run record first (in the request's DB session)
-    from ..services.idea_ledger_service import IdeaLedgerService
+    from app.services.idea_ledger_service import IdeaLedgerService
     idea_ledger = IdeaLedgerService(db)
     idea_obj = await idea_ledger.create_idea(
-        project_id=project_id,
-        text=idea,
+        project_id=request.project_id,
+        text=request.idea,
         origin="user_prompt",
-        flexibility=flexibility,
+        flexibility=request.flexibility,
     )
 
     run_service = ResearchRunService(db)
     run = await run_service.create_run(
-        project_id=project_id,
+        project_id=request.project_id,
         data=ResearchRunCreate(
             idea_id=idea_obj.id,
-            run_type=run_type,
+            run_type=request.run_type,
         ),
     )
     await db.commit()
 
     # Set up event broadcaster for live streaming
     try:
+        import redis
         import redis.asyncio as aioredis
         redis_client = aioredis.from_url(
             settings.redis_url,
@@ -182,25 +184,22 @@ async def start_research_run(
             socket_timeout=None,
         )
         event_broadcaster = EventBroadcaster(redis_client)
-    except ImportError:
+    except (ImportError, redis.ConnectionError):
         event_broadcaster = None
-        logger.warning("redis_unavailable", note="redis-py not installed, events will not be streamed")
-    except redis.ConnectionError:
-        event_broadcaster = None
-        logger.warning("redis_unavailable", note="Redis not reachable, events will not be streamed")
+        logger.warning("redis_unavailable", note="Redis not reachable or client not installed, events will not be streamed")
 
     # Start workflow in background
     asyncio.create_task(
         _run_workflow_background(
             run_id=run.id,
-            project_id=project_id,
-            idea_text=idea,
-            run_type=run_type,
-            flexibility=flexibility,
+            project_id=request.project_id,
+            idea_text=request.idea,
+            run_type=request.run_type,
+            flexibility=request.flexibility,
             llm_router=llm_router,
             connector_manager=connector_manager,
             event_broadcaster=event_broadcaster,
-        )
+        ),
     )
 
     return {
@@ -214,10 +213,12 @@ async def start_research_run(
 
 @router.post("/idle")
 async def start_idle_cycle(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-):
+    project_id: Annotated[str, Query()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict:
     """Start an idle cognition cycle."""
+    await require_project_role(db, project_id, user.id, "editor")
     llm_router = get_llm_router()
     orchestrator = ResearchOrchestrator(
         db=db,
@@ -229,5 +230,8 @@ async def start_idle_cycle(
         result = await orchestrator.run_idle_cycle(project_id)
         return {"success": True, **result}
 
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error("idle_cycle_unexpected", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal error during idle cycle")

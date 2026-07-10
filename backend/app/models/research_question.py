@@ -20,7 +20,7 @@ class ResearchQuestion(BaseModel):
     source_gaps: Mapped[list] = mapped_column(JSON, default=list)
     rank: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(
-        String(50), default="generated", index=True
+        String(50), default="generated", index=True,
     )  # generated | selected | hypothesis_created | rejected
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -45,7 +45,7 @@ class Hypothesis(BaseModel):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(
-        String(50), default="draft", index=True
+        String(50), default="draft", index=True,
     )  # draft | validated | rejected | promoted
 
 

@@ -11,7 +11,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { questionsApi } from '@/lib/api';
 import { ResearchQuestion } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { MessageSquare, Hash, TrendingUp, Trash2, XCircle } from 'lucide-react';
+import { MessageSquare, Hash, TrendingUp, Trash2, XCircle, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function QuestionsPage() {
   const params = useParams();
@@ -69,40 +70,44 @@ export default function QuestionsPage() {
             description="Research questions are generated from literature conflicts and gaps."
           />
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-6">
             {questions.map((question, index) => (
-              <Card key={question.id} className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <span className="text-purple-600 font-bold">{index + 1}</span>
+              <Card key={question.id} className="p-8 group transition-all duration-500 hover:scale-[1.01]">
+                <div className="flex items-start gap-8">
+                  <div className="w-14 h-14 bg-tertiary/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner group-hover:bg-tertiary/20 transition-all duration-500">
+                    <span className="text-tertiary font-extrabold text-2xl">{index + 1}</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-gray-900 font-medium mb-2">{question.question}</p>
-                    <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0 pt-1">
+                    <p className="text-lg font-bold text-foreground/80 tracking-tight leading-relaxed mb-6">{question.question}</p>
+                    <div className="flex items-center gap-4 flex-wrap">
                       <StatusBadge status={question.status} />
                       {question.rank && (
-                        <Badge variant="purple">
-                          <TrendingUp size={12} className="mr-1" />
+                        <Badge variant="purple" className="bg-tertiary/5 uppercase text-[9px] font-bold tracking-[0.2em] px-3 py-1">
+                          <TrendingUp size={12} className="mr-2" />
                           Rank #{question.rank}
                         </Badge>
                       )}
-                      <span className="text-xs text-gray-400">
-                        {formatDate(question.created_at)}
+                      <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                        Recorded {formatDate(question.created_at)}
                       </span>
                       <button
                         onClick={() => handleDelete(question.id)}
                         disabled={deletingId === question.id}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50 ml-auto"
-                        title="Delete question"
+                        className="p-2 rounded-lg hover:bg-error/10 text-error transition-all duration-300 hover:scale-110 disabled:opacity-30 ml-auto"
+                        title="Invalidate Question"
                       >
-                        <Trash2 size={16} />
+                        {deletingId === question.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={20} />}
                       </button>
                     </div>
                     {question.rejection_reason && (
-                      <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                        <p className="text-sm text-red-700">
-                          <span className="font-medium">Rejection reason:</span> {question.rejection_reason}
-                        </p>
+                      <div className="mt-6 p-5 bg-error/5 rounded-2xl border border-error/10 flex items-start gap-4">
+                         <div className="p-1.5 bg-error/10 rounded-lg">
+                            <XCircle size={16} className="text-error" />
+                         </div>
+                         <div>
+                            <span className="text-[10px] font-bold text-error uppercase tracking-widest">Scientific Disqualification</span>
+                            <p className="text-xs font-medium text-error/80 mt-1.5 leading-relaxed">{question.rejection_reason}</p>
+                         </div>
                       </div>
                     )}
                   </div>

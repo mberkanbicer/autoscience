@@ -1,17 +1,16 @@
 """Safety and permissions system for governing autonomous actions."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from datetime import UTC, datetime, timezone
 from enum import Enum
+from typing import Any
 from uuid import uuid4
-from datetime import datetime
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
-from ..models.audit import ApprovalRequest, AuditLog
 
 import structlog
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.audit import ApprovalRequest, AuditLog
 
 logger = structlog.get_logger()
 
@@ -121,7 +120,7 @@ class ApprovalDecision:
     approved: bool
     reason: str | None = None
     decided_by: str = "user"
-    decided_at: datetime = field(default_factory=datetime.utcnow)
+    decided_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SafetyService:
@@ -232,7 +231,7 @@ class SafetyService:
     ) -> ApprovalRequest | None:
         """Approve or deny a request."""
         result = await self.db.execute(
-            select(ApprovalRequest).where(ApprovalRequest.id == request_id)
+            select(ApprovalRequest).where(ApprovalRequest.id == request_id),
         )
         request = result.scalar_one_or_none()
 
@@ -241,7 +240,7 @@ class SafetyService:
 
         request.status = "approved" if approved else "denied"
         request.reviewer_notes = reason
-        request.resolved_at = datetime.utcnow().isoformat()
+        request.resolved_at = datetime.now(UTC).isoformat()
 
         await self.db.flush()
 
@@ -260,7 +259,7 @@ class SafetyService:
     ) -> list[ApprovalRequest]:
         """Get pending approval requests."""
         query = select(ApprovalRequest).where(
-            ApprovalRequest.status == "pending"
+            ApprovalRequest.status == "pending",
         )
 
         if project_id:

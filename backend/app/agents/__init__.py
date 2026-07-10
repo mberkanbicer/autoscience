@@ -1,14 +1,14 @@
 """Agent definitions and registry."""
 
 from .base import (
-    AgentRole,
+    AGENT_CONFIGS,
     AgentConfig,
     AgentInput,
     AgentOutput,
+    AgentRole,
     BaseAgent,
     create_agent,
     create_all_agents,
-    AGENT_CONFIGS,
 )
 
 __all__ = [

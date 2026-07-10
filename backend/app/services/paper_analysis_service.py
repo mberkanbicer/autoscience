@@ -1,13 +1,13 @@
 """Paper analysis service for storing and managing analyses."""
 
-from uuid import uuid4
 from typing import Any
+from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.paper import PaperAnalysis
-from ..engine.paper_analysis import PaperAnalysisResult
+from app.engine.paper_analysis import PaperAnalysisResult
+from app.models.paper import PaperAnalysis
 
 
 class PaperAnalysisService:
@@ -91,7 +91,7 @@ class PaperAnalysisService:
     async def get_analysis(self, paper_id: str) -> PaperAnalysis | None:
         """Get analysis for a paper."""
         result = await self.db.execute(
-            select(PaperAnalysis).where(PaperAnalysis.paper_id == paper_id)
+            select(PaperAnalysis).where(PaperAnalysis.paper_id == paper_id),
         )
         return result.scalar_one_or_none()
 
@@ -101,14 +101,14 @@ class PaperAnalysisService:
         min_confidence: float = 0.0,
     ) -> list[PaperAnalysis]:
         """Get all analyses for papers in a project."""
-        from ..models.paper import Paper
+        from app.models.paper import Paper
 
         result = await self.db.execute(
             select(PaperAnalysis)
             .join(Paper, PaperAnalysis.paper_id == Paper.id)
             .where(Paper.project_id == project_id)
             .where(PaperAnalysis.confidence >= min_confidence)
-            .order_by(PaperAnalysis.confidence.desc())
+            .order_by(PaperAnalysis.confidence.desc()),
         )
         return list(result.scalars().all())
 

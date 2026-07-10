@@ -3,8 +3,8 @@
 from .research_workflow import (
     ResearchWorkflow,
     WorkflowConfig,
-    WorkflowStep,
     WorkflowStatus,
+    WorkflowStep,
     WorkflowStepResult,
 )
 

@@ -2,14 +2,13 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 
 import structlog
 
-from ..connectors.base import RawPaper, SearchQuery, SearchResult
-from ..connectors.manager import ConnectorManager
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.connectors.base import RawPaper, SearchQuery
+from app.connectors.manager import ConnectorManager
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -70,13 +69,8 @@ class LiteratureEngine:
             sort_by="relevance",
         )
 
-        # Search across sources
-        search_results = await self.connectors.search_all(query, sources)
-
-        # Merge and rank papers
-        all_papers = []
-        for source, result in search_results.items():
-            all_papers.extend(result.papers)
+        # Search across sources (parallel, cached, deduplicated)
+        all_papers = await self.connectors.search_and_merge(query, sources)
 
         # Rank papers
         ranked_papers = await self._rank_papers(idea, all_papers)
@@ -89,7 +83,10 @@ class LiteratureEngine:
         # Generate retrieval notes (skip if no LLM)
         try:
             notes = await self._generate_retrieval_notes(idea, ranked_papers)
-        except Exception:
+        except (ValueError, RuntimeError):
+            notes = f"Found {len(ranked_papers)} papers for: {idea[:100]}"
+        except Exception as exc:
+            logger.warning("retrieval_notes_failed", error=str(exc))
             notes = f"Found {len(ranked_papers)} papers for: {idea[:100]}"
 
         return LiteratureResult(
@@ -234,7 +231,7 @@ class LiteratureEngine:
             [
                 f"{i+1}. [{p.paper.citation_count or 0} citations] {p.paper.title} ({p.paper.year})"
                 for i, p in enumerate(papers)
-            ]
+            ],
         )
 
         system = """You are a scientific literature ranking expert.
@@ -279,13 +276,15 @@ Rank these papers by relevance as JSON."""
             # Re-sort by updated scores
             papers.sort(key=lambda p: p.overall_score, reverse=True)
 
+        except (ValueError, RuntimeError, KeyError) as e:
+            logger.error("llm_ranking_content_error", error=str(e))
         except Exception as e:
             logger.error("llm_ranking_failed", error=str(e))
 
         return papers
 
     async def _generate_retrieval_notes(
-        self, idea: str, papers: list[RankedPaper]
+        self, idea: str, papers: list[RankedPaper],
     ) -> str:
         """Generate notes about the literature retrieval."""
         if not papers:
@@ -303,7 +302,7 @@ Given a research idea and retrieved papers, provide brief notes on:
 Keep it concise (2-3 paragraphs)."""
 
         papers_summary = "\n".join(
-            [f"- {p.paper.title} ({p.paper.year})" for p in papers[:10]]
+            [f"- {p.paper.title} ({p.paper.year})" for p in papers[:10]],
         )
 
         user = f"""Idea: {idea}

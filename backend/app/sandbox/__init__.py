@@ -1,13 +1,8 @@
 """Data analysis sandbox."""
 
-from .executor import SandboxExecutor, SandboxConfig, ExecutionResult, ScriptGenerator
-from .artifacts import ArtifactStorage, ArtifactService
+from .executor import SandboxExecutor, SandboxResult
 
 __all__ = [
     "SandboxExecutor",
-    "SandboxConfig",
-    "ExecutionResult",
-    "ScriptGenerator",
-    "ArtifactStorage",
-    "ArtifactService",
+    "SandboxResult",
 ]

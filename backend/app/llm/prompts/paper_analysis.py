@@ -1,6 +1,6 @@
 """Prompt templates for paper analysis."""
 
-from ..base import Message
+from app.llm.base import Message
 
 
 def analyze_paper_prompt(
@@ -55,7 +55,7 @@ def detect_conflicts_prompt(
             f"Method: {p.get('method', 'N/A')}\n"
             f"Limitations: {p.get('limitations', 'N/A')}"
             for i, p in enumerate(papers)
-        ]
+        ],
     )
 
     system = f"""You are a scientific conflict detection expert. Version: {version}.
@@ -103,7 +103,7 @@ def generate_questions_prompt(
         [
             f"Conflict {i+1}: [{c.get('type', 'unknown')}] {c.get('description', '')}"
             for i, c in enumerate(conflicts)
-        ]
+        ],
     )
 
     system = f"""You are a research question generator. Version: {version}.
@@ -190,13 +190,13 @@ def score_idea_prompt(
     papers_text = ""
     if papers:
         papers_text = "\nRelevant papers:\n" + "\n".join(
-            [f"- {p.get('title', 'Unknown')}" for p in papers[:10]]
+            [f"- {p.get('title', 'Unknown')}" for p in papers[:10]],
         )
 
     conflicts_text = ""
     if conflicts:
         conflicts_text = "\nConflicts identified:\n" + "\n".join(
-            [f"- [{c.get('type')}] {c.get('description', '')}" for c in conflicts[:5]]
+            [f"- [{c.get('type')}] {c.get('description', '')}" for c in conflicts[:5]],
         )
 
     system = f"""You are an idea scoring expert. Version: {version}.

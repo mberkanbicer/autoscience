@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
+import { Paper, PaperCluster, ClusterConflict, ResearchQuestion, Hypothesis } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { projectsApi, runsApi, ideasApi, papersApi, questionsApi, hypothesesApi } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import {
   ArrowBigLeft,
   BarChart3,
@@ -150,12 +152,12 @@ export default function PipelinePage() {
           color: 'text-indigo-600',
           bgColor: 'bg-indigo-100',
           description: 'Papers grouped by theme',
-          count: clusters.length,
-          items: clusters.slice(0, 5).map((c: any) => ({
-            id: c.id,
-            title: c.name || 'Unnamed cluster',
-            subtitle: c.description || `${c.paper_count || 0} papers`,
-          })),
+count: clusters.length,
+           items: clusters.slice(0, 5).map((c: PaperCluster) => ({
+             id: c.id,
+             title: c.name || 'Unnamed cluster',
+             subtitle: c.description || `${c.paper_ids?.length || 0} papers`,
+           })),
           status: clusters.length > 0 ? 'completed' : isRunning ? 'active' : 'idle',
         },
         {
@@ -165,13 +167,13 @@ export default function PipelinePage() {
           color: 'text-red-600',
           bgColor: 'bg-red-100',
           description: 'Contradictions between papers',
-          count: conflicts.length,
-          items: conflicts.slice(0, 5).map((c: any) => ({
-            id: c.id,
-            title: c.conflict_type || 'Conflict',
-            subtitle: c.description || '',
-            score: c.severity,
-          })),
+count: conflicts.length,
+           items: conflicts.slice(0, 5).map((c: ClusterConflict) => ({
+             id: c.id,
+             title: c.conflict_type || 'Conflict',
+             subtitle: c.description || '',
+             score: c.severity,
+           })),
           status: conflicts.length > 0 ? 'completed' : isRunning ? 'active' : 'idle',
         },
         {
@@ -225,14 +227,14 @@ export default function PipelinePage() {
           icon: Target,
           color: 'text-emerald-600',
           bgColor: 'bg-emerald-100',
-          description: 'Experimental validation design',
-          count: hypotheses.filter((h: any) => h.has_validation_plan).length,
-          items: hypotheses.filter((h: any) => h.has_validation_plan).slice(0, 3).map((h) => ({
-            id: h.id,
-            title: (h.statement || '').slice(0, 60),
-            subtitle: 'Validation plan available',
-          })),
-          status: hypotheses.some((h: any) => h.has_validation_plan) ? 'completed' : isRunning ? 'active' : 'idle',
+description: 'Experimental validation design',
+           count: hypotheses.filter((h: Hypothesis) => (h as any).validation_plans?.length > 0).length,
+           items: hypotheses.filter((h: Hypothesis) => (h as any).validation_plans?.length > 0).slice(0, 3).map((h) => ({
+             id: h.id,
+             title: (h.statement || '').slice(0, 60),
+             subtitle: 'Validation plan available',
+           })),
+           status: hypotheses.some((h: Hypothesis) => (h as any).validation_plans?.length > 0) ? 'completed' : isRunning ? 'active' : 'idle',
         },
       ];
 
@@ -247,13 +249,13 @@ export default function PipelinePage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle size={20} className="text-green-600" />;
+        return <CheckCircle size={18} className="text-success" />;
       case 'active':
-        return <Loader2 size={20} className="text-blue-600 animate-spin" />;
+        return <Loader2 size={18} className="text-primary animate-spin" />;
       case 'error':
-        return <AlertTriangle size={20} className="text-red-600" />;
+        return <AlertTriangle size={18} className="text-error" />;
       default:
-        return <Clock size={20} className="text-gray-400" />;
+        return <Clock size={18} className="text-muted-foreground/30" />;
     }
   };
 
@@ -280,30 +282,38 @@ export default function PipelinePage() {
         ) : (
           <div className="space-y-6">
             {/* Pipeline Flow */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-4 bg-white/40 backdrop-blur-sm p-6 rounded-2xl border border-border/10 shadow-inner">
               {stages.map((stage, idx) => {
                 const Icon = stage.icon;
+                const isSelected = selectedStage === stage.id;
                 return (
                   <div key={stage.id} className="flex items-center">
                     <button
                       onClick={() => setSelectedStage(selectedStage === stage.id ? null : stage.id)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                        selectedStage === stage.id
-                          ? 'ring-2 ring-blue-500 bg-blue-50'
-                          : 'hover:bg-gray-50'
-                      }`}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-500 hover:scale-105',
+                        isSelected
+                          ? 'ring-2 ring-primary/40 bg-white shadow-lg'
+                          : 'hover:bg-white/60'
+                      )}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${stage.bgColor}`}>
-                        <Icon size={16} className={stage.color} />
+                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 shadow-inner', isSelected ? 'bg-primary text-white' : stage.bgColor)}>
+                        <Icon size={20} className={isSelected ? 'text-white' : stage.color} />
                       </div>
                       <div className="text-left">
-                        <div className="text-xs font-medium text-gray-900">{stage.name}</div>
-                        <div className="text-xs text-gray-500">{stage.count}</div>
+                        <div className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest leading-none mb-1">{stage.name}</div>
+                        <div className="text-sm font-bold text-foreground tracking-tight">{stage.count}</div>
                       </div>
-                      {getStatusIcon(stage.status)}
+                      <div className="ml-2">
+                         {getStatusIcon(stage.status)}
+                      </div>
                     </button>
                     {idx < stages.length - 1 && (
-                      <ArrowRight size={16} className="text-gray-300 mx-1" />
+                      <div className="flex items-center mx-1">
+                         <div className="w-4 h-px bg-border/20" />
+                         <ArrowRight size={14} className="text-muted-foreground/20" />
+                         <div className="w-4 h-px bg-border/20" />
+                      </div>
                     )}
                   </div>
                 );
@@ -312,45 +322,52 @@ export default function PipelinePage() {
 
             {/* Stage Details */}
             {selectedStageData && (
-              <Card>
-                <div className="p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedStageData.bgColor}`}>
-                      <selectedStageData.icon size={20} className={selectedStageData.color} />
+              <Card className="glass animate-in slide-in-from-top-6 duration-700">
+                <div className="p-8">
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner', selectedStageData.bgColor)}>
+                      <selectedStageData.icon size={28} className={selectedStageData.color} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{selectedStageData.name}</h3>
-                      <p className="text-sm text-gray-600">{selectedStageData.description}</p>
+                      <h3 className="text-2xl font-bold text-foreground tracking-tight">{selectedStageData.name}</h3>
+                      <p className="text-sm font-medium text-muted-foreground mt-1">{selectedStageData.description}</p>
                     </div>
                     <div className="ml-auto">
-                      <Badge variant={selectedStageData.status === 'completed' ? 'success' : selectedStageData.status === 'active' ? 'info' : 'default'}>
+                      <Badge variant={selectedStageData.status === 'completed' ? 'success' : selectedStageData.status === 'active' ? 'info' : 'default'} className="uppercase text-[10px] font-bold tracking-widest px-3 py-1 bg-opacity-10">
                         {selectedStageData.status}
                       </Badge>
                     </div>
                   </div>
 
                   {selectedStageData.items.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">No items at this stage yet.</p>
+                    <div className="py-12 text-center border-2 border-dashed border-border/10 rounded-2xl">
+                       <p className="text-sm font-bold text-muted-foreground/30 uppercase tracking-widest text-sm italic">No intellectual artifacts at this stage</p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="grid gap-3">
                       {selectedStageData.items.map((item: StageDataItem) => (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div key={item.id} className="flex items-center justify-between p-4 bg-white/40 backdrop-blur-sm border border-border/5 rounded-xl hover:bg-white/60 transition-all duration-300 group">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
+                            <p className="text-sm font-bold text-foreground/80 truncate tracking-tight">{item.title}</p>
                             {item.subtitle && (
-                              <p className="text-xs text-gray-500">{item.subtitle}</p>
+                              <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mt-1.5">{item.subtitle}</p>
                             )}
                           </div>
-                          {item.score != null && (
-                            <Badge variant="info" size="sm">
-                              {typeof item.score === 'number' ? item.score.toFixed(2) : item.score}
-                            </Badge>
-                          )}
-                          {item.status && (
-                            <Badge variant={item.status === 'active' || item.status === 'running' ? 'success' : 'default'} size="sm">
-                              {item.status}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-3">
+                             {item.score != null && (
+                               <div className="px-2 py-0.5 bg-primary/5 rounded-md border border-primary/10">
+                                 <span className="text-[10px] font-bold text-primary">
+                                   {typeof item.score === 'number' ? item.score.toFixed(2) : item.score}
+                                 </span>
+                               </div>
+                             )}
+                             {item.status && (
+                               <Badge variant={item.status === 'active' || item.status === 'running' ? 'success' : 'default'} size="sm" className="bg-opacity-10 text-[9px] uppercase font-bold tracking-tighter">
+                                 {item.status}
+                               </Badge>
+                             )}
+                             <ArrowRight size={14} className="text-muted-foreground/0 group-hover:text-muted-foreground/20 transition-all group-hover:translate-x-1" />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -360,58 +377,32 @@ export default function PipelinePage() {
             )}
 
             {/* Pipeline Summary */}
-            <Card>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pipeline Summary</h3>
-                <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {stages.find(s => s.id === 'ideas')?.count || 0}
+            <Card className="glass overflow-hidden border-border/5">
+              <div className="p-8">
+                <div className="flex items-center gap-3 mb-8">
+                   <div className="p-2 bg-muted rounded-lg border border-border/10">
+                      <BarChart3 size={18} className="text-muted-foreground/60" />
+                   </div>
+                   <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">Intellectual Velocity Summary</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-6">
+                  {[
+                    { id: 'ideas', label: 'Ideas', color: 'text-yellow-600' },
+                    { id: 'literature', label: 'Papers', color: 'text-blue-600' },
+                    { id: 'clustering', label: 'Clusters', color: 'text-indigo-600' },
+                    { id: 'conflicts', label: 'Conflicts', color: 'text-red-600' },
+                    { id: 'questions', label: 'Questions', color: 'text-teal-600' },
+                    { id: 'hypotheses', label: 'Hypotheses', color: 'text-violet-600' },
+                    { id: 'scoring', label: 'Scored', color: 'text-amber-600' },
+                    { id: 'validation', label: 'Validated', color: 'text-emerald-600' }
+                  ].map(stat => (
+                    <div key={stat.id} className="text-center group transition-all duration-500 hover:-translate-y-1">
+                      <div className={cn("text-3xl font-extrabold mb-1 tracking-tight transition-colors duration-500", stat.color)}>
+                        {stages.find(s => s.id === stat.id)?.count || 0}
+                      </div>
+                      <div className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest group-hover:text-muted-foreground transition-colors">{stat.label}</div>
                     </div>
-                    <div className="text-xs text-gray-600">Ideas</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {stages.find(s => s.id === 'literature')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Papers</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-indigo-600">
-                      {stages.find(s => s.id === 'clustering')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Clusters</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">
-                      {stages.find(s => s.id === 'conflicts')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Conflicts</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-teal-600">
-                      {stages.find(s => s.id === 'questions')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Questions</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-violet-600">
-                      {stages.find(s => s.id === 'hypotheses')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Hypotheses</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-amber-600">
-                      {stages.find(s => s.id === 'scoring')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Scored</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-emerald-600">
-                      {stages.find(s => s.id === 'validation')?.count || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Validated</div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </Card>

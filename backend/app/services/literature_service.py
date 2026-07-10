@@ -1,13 +1,13 @@
 """Literature retrieval service for storing and managing papers."""
 
-from uuid import uuid4
 from typing import Any
+from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.paper import Paper, PaperSource
-from ..connectors.base import RawPaper
+from app.connectors.base import RawPaper
+from app.models.paper import Paper, PaperSource
 
 
 class LiteratureService:
@@ -27,7 +27,7 @@ class LiteratureService:
         for raw_paper in papers:
             # Check if paper already exists by DOI or title
             existing = await self._find_existing_paper(
-                project_id, raw_paper.doi, raw_paper.title
+                project_id, raw_paper.doi, raw_paper.title,
             )
 
             if existing:
@@ -55,7 +55,7 @@ class LiteratureService:
                 select(Paper).where(
                     Paper.project_id == project_id,
                     Paper.doi == doi,
-                )
+                ),
             )
             paper = result.scalar_one_or_none()
             if paper:
@@ -66,7 +66,7 @@ class LiteratureService:
             select(Paper).where(
                 Paper.project_id == project_id,
                 Paper.title == title,
-            )
+            ),
         )
         return result.scalar_one_or_none()
 
@@ -167,7 +167,7 @@ class LiteratureService:
     async def get_paper_with_sources(self, paper_id: str) -> Paper | None:
         """Get a paper with all its source records."""
         result = await self.db.execute(
-            select(Paper).where(Paper.id == paper_id)
+            select(Paper).where(Paper.id == paper_id),
         )
         return result.scalar_one_or_none()
 
@@ -184,8 +184,8 @@ class LiteratureService:
             select(Paper).where(
                 Paper.project_id == project_id,
                 (Paper.title.ilike(search_pattern)) |
-                (Paper.abstract.ilike(search_pattern))
-            ).limit(limit)
+                (Paper.abstract.ilike(search_pattern)),
+            ).limit(limit),
         )
         return list(result.scalars().all())
 
@@ -195,7 +195,7 @@ class LiteratureService:
 
         # Total count
         total_result = await self.db.execute(
-            select(func.count(Paper.id)).where(Paper.project_id == project_id)
+            select(func.count(Paper.id)).where(Paper.project_id == project_id),
         )
         total = total_result.scalar() or 0
 
@@ -203,7 +203,7 @@ class LiteratureService:
         type_result = await self.db.execute(
             select(Paper.paper_type, func.count(Paper.id))
             .where(Paper.project_id == project_id)
-            .group_by(Paper.paper_type)
+            .group_by(Paper.paper_type),
         )
         by_type = {row[0] or "unknown": row[1] for row in type_result.all()}
 
@@ -213,7 +213,7 @@ class LiteratureService:
                 func.min(Paper.year).label("earliest"),
                 func.max(Paper.year).label("latest"),
                 func.avg(Paper.citation_count).label("avg_citations"),
-            ).where(Paper.project_id == project_id)
+            ).where(Paper.project_id == project_id),
         )
         year_stats = year_result.one()
 

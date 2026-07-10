@@ -1,34 +1,41 @@
 """Idea API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
-from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import select as sql_select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
-from ..dependencies import get_db
-from ..services.idea_service import IdeaService
-from ..services.research_run_service import ResearchRunService
-from ..schemas.idea import (
+from typing import Annotated
+
+from app.dependencies import get_db
+from app.dependencies.auth import get_current_user, require_project_role
+from app.models.collaboration import User
+from app.schemas.idea import (
     IdeaCreate,
-    IdeaUpdate,
-    IdeaResponse,
-    IdeaDetailResponse,
-    IdeaVersionResponse,
     IdeaDecisionResponse,
+    IdeaDetailResponse,
+    IdeaResponse,
+    IdeaUpdate,
+    IdeaVersionResponse,
 )
+from app.services.idea_service import IdeaService
+from app.services.research_run_service import ResearchRunService
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[IdeaResponse])
 async def list_ideas(
-    project_id: str = Query(...),
-    status: str | None = Query(None),
-    classification: str | None = Query(None),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    project_id: Annotated[str, Query()],
+    status: Annotated[str | None, Query()] = None,
+    classification: Annotated[str | None, Query()] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
     """List ideas for a project."""
     service = IdeaService(db)
@@ -44,11 +51,13 @@ async def list_ideas(
 
 @router.post("", response_model=IdeaResponse, status_code=201)
 async def create_idea(
-    project_id: str = Query(...),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    project_id: Annotated[str, Query()],
     idea_in: IdeaCreate = ...,
-    db: AsyncSession = Depends(get_db),
 ):
     """Create a new idea."""
+    await require_project_role(db, project_id, user.id, "editor")
     service = IdeaService(db)
     idea = await service.create_idea(project_id=project_id, data=idea_in)
     return idea
@@ -57,7 +66,7 @@ async def create_idea(
 @router.get("/{idea_id}", response_model=IdeaDetailResponse)
 async def get_idea(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get idea details."""
     service = IdeaService(db)
@@ -92,10 +101,15 @@ async def get_idea(
 async def update_idea(
     idea_id: str,
     idea_in: IdeaUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Update an idea."""
     service = IdeaService(db)
+    existing = await service.get_idea(idea_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Idea not found")
+    await require_project_role(db, existing.project_id, user.id, "editor")
     idea = await service.update_idea(idea_id, data=idea_in)
     if not idea:
         raise HTTPException(status_code=404, detail="Idea not found")
@@ -105,30 +119,33 @@ async def update_idea(
 @router.post("/{idea_id}/pause", response_model=IdeaResponse)
 async def pause_idea(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Pause an active idea and cancel any running research."""
     service = IdeaService(db)
     idea = await service.get_idea(idea_id)
     if not idea:
         raise HTTPException(status_code=404, detail="Idea not found")
+    await require_project_role(db, idea.project_id, user.id, "editor")
     if idea.status != "active":
         raise HTTPException(status_code=400, detail=f"Cannot pause idea in '{idea.status}' status")
-    
+
     # Cancel any running research for this idea
     from sqlalchemy import select as sql_select
-    from ..models.research_run import ResearchRun
+
+    from app.models.research_run import ResearchRun
     result = await db.execute(
         sql_select(ResearchRun).where(
             ResearchRun.idea_id == idea_id,
             ResearchRun.state.in_(["running", "created"]),
-        )
+        ),
     )
     running_runs = list(result.scalars().all())
     run_service = ResearchRunService(db)
     for run in running_runs:
         await run_service.cancel_run(run.id)
-    
+
     idea.status = "paused"
     await service.add_idea_decision(idea_id, "pause", f"Paused by user. Cancelled {len(running_runs)} running research.")
     await db.flush()
@@ -139,13 +156,15 @@ async def pause_idea(
 @router.post("/{idea_id}/resume", response_model=IdeaResponse)
 async def resume_idea(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Resume a paused idea."""
     service = IdeaService(db)
     idea = await service.get_idea(idea_id)
     if not idea:
         raise HTTPException(status_code=404, detail="Idea not found")
+    await require_project_role(db, idea.project_id, user.id, "editor")
     if idea.status != "paused":
         raise HTTPException(status_code=400, detail=f"Cannot resume idea in '{idea.status}' status")
     idea.status = "active"
@@ -158,74 +177,93 @@ async def resume_idea(
 @router.delete("/{idea_id}", status_code=204)
 async def delete_idea(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Delete an idea."""
-    service = IdeaService(db)
-    deleted = await service.delete_idea(idea_id)
-    if not deleted:
+    from app.models.idea import Idea as IdeaModel
+    from app.services.audit_service import AuditService
+
+    result = await db.execute(sql_select(IdeaModel).where(IdeaModel.id == idea_id))
+    idea = result.scalar_one_or_none()
+    if not idea:
         raise HTTPException(status_code=404, detail="Idea not found")
+    await require_project_role(db, idea.project_id, user.id, "editor")
+
+    service = IdeaService(db)
+    await service.delete_idea(idea_id)
+
+    # Log the deletion
+    audit = AuditService(db)
+    await audit.log_event(
+        event_type="idea_deleted",
+        project_id=idea.project_id,
+        actor="user",
+        action=f"Deleted idea {idea_id}",
+    )
+    await db.commit()
 
 
 @router.post("/generate")
 async def generate_ideas_from_literature(
-    project_id: str = Query(...),
-    topic: str = Query(..., min_length=5, description="Research topic or field to explore"),
-    num_ideas: int = Query(5, ge=1, le=10, description="Number of ideas to generate"),
-    db: AsyncSession = Depends(get_db),
-    x_openrouter_api_key: str | None = Header(None),
-    x_openrouter_model: str | None = Header(None),
-    x_openai_api_key: str | None = Header(None),
-    x_openai_model: str | None = Header(None),
-    x_anthropic_api_key: str | None = Header(None),
-    x_anthropic_model: str | None = Header(None),
-    x_default_provider: str | None = Header(None),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    project_id: Annotated[str, Query()],
+    topic: Annotated[str, Query(min_length=5, description="Research topic or field to explore")],
+    num_ideas: Annotated[int, Query(ge=1, le=10, description="Number of ideas to generate")] = 5,
+    x_openrouter_api_key: Annotated[str | None, Header()] = None,
+    x_openrouter_model: Annotated[str | None, Header()] = None,
+    x_openai_api_key: Annotated[str | None, Header()] = None,
+    x_openai_model: Annotated[str | None, Header()] = None,
+    x_anthropic_api_key: Annotated[str | None, Header()] = None,
+    x_anthropic_model: Annotated[str | None, Header()] = None,
+    x_default_provider: Annotated[str | None, Header()] = None,
 ):
     """Generate research ideas by analyzing recent literature on a topic."""
-    from ..llm.router import LLMRouter
-    from ..services.idea_ledger_service import IdeaLedgerService
-    from ..llm.base import Message
-    
+    from app.llm.base import Message
+    from app.llm.router import LLMRouter
+    from app.services.idea_ledger_service import IdeaLedgerService
+
     # Build LLM router from headers (same as research endpoint)
     llm_router = LLMRouter()
     if x_openrouter_api_key:
-        from ..llm.openrouter_provider import OpenRouterProvider
+        from app.llm.openrouter_provider import OpenRouterProvider
         llm_router.providers["openrouter"] = OpenRouterProvider(
             api_key=x_openrouter_api_key,
             default_model=x_openrouter_model or "openai/gpt-4o",
         )
         llm_router.default_provider = "openrouter"
     elif x_openai_api_key:
-        from ..llm.openai_provider import OpenAIProvider
+        from app.llm.openai_provider import OpenAIProvider
         llm_router.providers["openai"] = OpenAIProvider(
             api_key=x_openai_api_key,
             default_model=x_openai_model or "gpt-4o",
         )
         llm_router.default_provider = "openai"
     elif x_anthropic_api_key:
-        from ..llm.anthropic_provider import AnthropicProvider
+        from app.llm.anthropic_provider import AnthropicProvider
         llm_router.providers["anthropic"] = AnthropicProvider(
             api_key=x_anthropic_api_key,
             default_model=x_anthropic_model or "claude-sonnet-4-20250514",
         )
         llm_router.default_provider = "anthropic"
-    
+
     if not llm_router.has_provider():
         raise HTTPException(
             status_code=400,
-            detail="No LLM provider configured. Set an API key in Settings first."
+            detail="No LLM provider configured. Set an API key in Settings first.",
         )
-    
+
     # Step 1: Search literature
-    from ..connectors.manager import create_default_manager
-    from ..connectors.base import SearchQuery
-    from ..config import get_settings
-    
+    from app.config import get_settings
+    from app.connectors.base import SearchQuery
+    from app.connectors.manager import create_default_manager
+
     settings = get_settings()
     manager = create_default_manager(
         searxng_url=settings.searxng_url,
+        firecrawl_api_key=settings.firecrawl_api_key,
     )
-    
+
     search_query = SearchQuery(text=topic, limit=20)
     all_papers = []
     try:
@@ -236,23 +274,27 @@ async def generate_ideas_from_literature(
                 categories=["science"],
             )
             all_papers.extend(result.papers)
+    except httpx.RequestError as e:
+        logger.warning("searxng_search_network_error", error=str(e))
     except Exception as e:
         logger.warning("searxng_search_failed", error=str(e))
-    
+
     try:
         # Also search OpenAlex
         if "openalex" in manager.connectors:
             result = await manager.connectors["openalex"].search(search_query)
             all_papers.extend(result.papers)
+    except httpx.RequestError as e:
+        logger.warning("openalex_search_network_error", error=str(e))
     except Exception as e:
         logger.warning("openalex_search_failed", error=str(e))
-    
+
     if not all_papers:
         raise HTTPException(
             status_code=404,
-            detail=f"No papers found for topic: {topic}"
+            detail=f"No papers found for topic: {topic}",
         )
-    
+
     # Deduplicate by title
     seen_titles = set()
     unique_papers = []
@@ -261,13 +303,13 @@ async def generate_ideas_from_literature(
         if title_key and title_key not in seen_titles:
             seen_titles.add(title_key)
             unique_papers.append(p)
-    
+
     # Step 2: Analyze with LLM and generate ideas
     papers_summary = "\n".join([
         f"- {p.title} ({getattr(p, 'year', 'N/A')}) - {getattr(p, 'source', 'unknown')}: {(getattr(p, 'abstract', '') or '')[:150]}..."
         for p in unique_papers[:20]
     ])
-    
+
     prompt = f"""You are a scientific research strategist. Analyze these recent papers on the topic "{topic}" and generate {num_ideas} novel, actionable research ideas.
 
 Recent Papers ({len(unique_papers)} found):
@@ -293,7 +335,7 @@ Generate ideas that are:
 - Novel (not just repeating what's already been done)
 - Feasible with current methods
 - Addressing gaps, contradictions, or emerging trends in the literature"""
-    
+
     response = await llm_router.complete(
         messages=[
             Message(role="system", content="You are a scientific research strategist."),
@@ -308,7 +350,7 @@ Generate ideas that are:
         block = block.strip()
         if not block or "IDEA" not in block:
             continue
-        
+
         idea_data = {}
         for line in block.split("\n"):
             line = line.strip()
@@ -322,17 +364,17 @@ Generate ideas that are:
                 idea_data["approach"] = line.split(":", 1)[1].strip() if ":" in line else ""
             elif line.startswith("NOVELTY"):
                 idea_data["novelty"] = line.split(":", 1)[1].strip() if ":" in line else ""
-        
+
         if idea_data.get("title"):
             ideas.append(idea_data)
-    
+
     # Step 4: Save ideas to database
     idea_ledger = IdeaLedgerService(db)
     saved_ideas = []
-    
+
     for idea_data in ideas[:num_ideas]:
         full_text = f"{idea_data['title']}\n\n{idea_data.get('description', '')}\n\nImportance: {idea_data.get('importance', '')}\n\nApproach: {idea_data.get('approach', '')}\n\nNovelty: {idea_data.get('novelty', 'medium')}"
-        
+
         try:
             idea = await idea_ledger.create_idea(
                 project_id=project_id,
@@ -348,11 +390,13 @@ Generate ideas that are:
                 "approach": idea_data.get("approach", ""),
                 "novelty": idea_data.get("novelty", "medium"),
             })
+        except (ValueError, SQLAlchemyError) as e:
+            logger.warning("idea_save_db_error", title=idea_data.get("title"), error=str(e))
         except Exception as e:
             logger.warning("idea_save_failed", title=idea_data.get("title"), error=str(e))
-    
+
     await db.commit()
-    
+
     return {
         "topic": topic,
         "papers_analyzed": len(unique_papers),
@@ -364,7 +408,7 @@ Generate ideas that are:
 @router.get("/{idea_id}/versions", response_model=list[IdeaVersionResponse])
 async def get_idea_versions(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get idea version history."""
     service = IdeaService(db)
@@ -375,7 +419,7 @@ async def get_idea_versions(
 @router.get("/{idea_id}/decisions", response_model=list[IdeaDecisionResponse])
 async def get_idea_decisions(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get idea decision history."""
     service = IdeaService(db)

@@ -1,14 +1,13 @@
 """Idle cycle service for storing and managing idle cycles."""
 
-from uuid import uuid4
-from typing import Any
 from datetime import datetime
+from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
-from ..models.research_run import IdleCycle
-from ..engine.idle_cognition import IdleCycleResult
+from app.engine.idle_cognition import IdleCycleResult
+from app.models.research_run import IdleCycle
 
 
 class IdleCycleService:
@@ -63,7 +62,7 @@ class IdleCycleService:
     async def get_cycle(self, cycle_id: str) -> IdleCycle | None:
         """Get a cycle by ID."""
         result = await self.db.execute(
-            select(IdleCycle).where(IdleCycle.id == cycle_id)
+            select(IdleCycle).where(IdleCycle.id == cycle_id),
         )
         return result.scalar_one_or_none()
 
@@ -77,8 +76,8 @@ class IdleCycleService:
         # Total cycles
         total_result = await self.db.execute(
             select(func.count(IdleCycle.id)).where(
-                IdleCycle.project_id == project_id
-            )
+                IdleCycle.project_id == project_id,
+            ),
         )
         total = total_result.scalar() or 0
 
@@ -86,7 +85,7 @@ class IdleCycleService:
         mode_result = await self.db.execute(
             select(IdleCycle.idle_mode, func.count(IdleCycle.id))
             .where(IdleCycle.project_id == project_id)
-            .group_by(IdleCycle.idle_mode)
+            .group_by(IdleCycle.idle_mode),
         )
         by_mode = {row[0] or "unknown": row[1] for row in mode_result.all()}
 
@@ -97,7 +96,7 @@ class IdleCycleService:
                 func.sum(IdleCycle.questions_generated).label("questions"),
                 func.sum(IdleCycle.hypotheses_generated).label("hypotheses"),
                 func.sum(IdleCycle.skills_created).label("skills"),
-            ).where(IdleCycle.project_id == project_id)
+            ).where(IdleCycle.project_id == project_id),
         )
         outputs = outputs_result.one()
 
@@ -106,7 +105,7 @@ class IdleCycleService:
             select(
                 func.avg(IdleCycle.duration_seconds).label("avg_duration"),
                 func.sum(IdleCycle.duration_seconds).label("total_duration"),
-            ).where(IdleCycle.project_id == project_id)
+            ).where(IdleCycle.project_id == project_id),
         )
         duration_stats = duration_result.one()
 
@@ -137,7 +136,7 @@ class IdleCycleService:
                 IdleCycle.project_id == project_id,
                 IdleCycle.created_at >= cutoff,
             )
-            .order_by(IdleCycle.created_at.desc())
+            .order_by(IdleCycle.created_at.desc()),
         )
         return list(result.scalars().all())
 

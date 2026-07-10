@@ -15,33 +15,37 @@ export const StatCard = forwardRef<HTMLDivElement, StatCardProps>(
     <div
       ref={ref}
       className={cn(
-        'bg-white rounded-xl border border-gray-200 shadow-sm p-6',
+        'glass rounded-3xl p-10 transition-all duration-700 hover:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-3 hover:scale-[1.03] group relative overflow-hidden',
         className
       )}
       {...props}
     >
-      <div className="flex items-center justify-between">
+      <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-1000">
+         {icon}
+      </div>
+      <div className="flex items-center justify-between relative z-10">
         <div>
-          <p className="text-sm font-medium text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+          <p className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.4em] mb-3">{label}</p>
+          <p className="text-4xl font-black text-foreground tracking-tighter group-hover:text-primary transition-colors duration-700">{value}</p>
         </div>
         {icon && (
-          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+          <div className="w-16 h-16 bg-stone-100/50 backdrop-blur-md rounded-2xl flex items-center justify-center text-primary shadow-inner group-hover:bg-primary group-hover:text-stone-900 group-hover:rotate-[15deg] transition-all duration-700 ease-out">
             {icon}
           </div>
         )}
       </div>
       {change !== undefined && (
-        <div className="mt-3 flex items-center text-sm">
+        <div className="mt-8 flex items-center relative z-10">
           <span
             className={cn(
-              'font-medium',
-              change >= 0 ? 'text-green-600' : 'text-red-600'
+              'px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm',
+              change >= 0 
+                ? 'bg-success/10 text-success border-success/20 animate-pulse' 
+                : 'bg-error/10 text-error border-error/20'
             )}
           >
-            {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
+            {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% INTEL_VELOCITY
           </span>
-          <span className="text-gray-500 ml-2">vs last period</span>
         </div>
       )}
     </div>

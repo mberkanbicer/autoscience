@@ -1,10 +1,12 @@
 """Crossref academic source connector."""
 
-import httpx
-import structlog
+import json
 from typing import Any
 
-from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult
+import httpx
+import structlog
+
+from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult, create_connector_client
 
 logger = structlog.get_logger()
 
@@ -15,18 +17,17 @@ class CrossrefConnector(AcademicConnector):
     BASE_URL = "https://api.crossref.org"
 
     def __init__(self, email: str | None = None):
-        """
-        Initialize Crossref connector.
+        """Initialize Crossref connector.
 
         Args:
             email: Optional email for polite API access.
+
         """
         self.email = email
         headers = {"User-Agent": f"autoscience/0.1 (mailto:{email})" if email else "autoscience/0.1"}
 
-        self.client = httpx.AsyncClient(
+        self.client = create_connector_client(
             base_url=self.BASE_URL,
-            timeout=30.0,
             headers=headers,
         )
 
@@ -86,8 +87,17 @@ class CrossrefConnector(AcademicConnector):
                 has_more=len(papers) < total,
             )
 
-        except Exception as e:
-            logger.error("crossref_search_failed", error=str(e), query=query.text)
+        except httpx.HTTPStatusError as e:
+            logger.error("crossref_search_http_error", status_code=e.response.status_code, query=query.text)
+            raise
+        except httpx.TimeoutException:
+            logger.error("crossref_search_timeout", query=query.text)
+            raise
+        except httpx.RequestError as e:
+            logger.error("crossref_search_request_failed", error=str(e), query=query.text)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("crossref_search_json_failed", error=str(e), query=query.text)
             raise
 
     async def get_paper(self, identifier: str) -> RawPaper | None:
@@ -103,14 +113,23 @@ class CrossrefConnector(AcademicConnector):
 
             return self._parse_work(data.get("message", {}))
 
-        except Exception as e:
-            logger.error("crossref_get_paper_failed", error=str(e), identifier=identifier)
+        except httpx.HTTPStatusError as e:
+            logger.error("crossref_get_paper_http_error", status_code=e.response.status_code, identifier=identifier)
+            raise
+        except httpx.TimeoutException:
+            logger.error("crossref_get_paper_timeout", identifier=identifier)
+            raise
+        except httpx.RequestError as e:
+            logger.error("crossref_get_paper_request_failed", error=str(e), identifier=identifier)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("crossref_get_paper_json_failed", error=str(e), identifier=identifier)
             raise
 
     async def get_citations(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
         """Get papers that cite this paper (uses relation API)."""
         params = {
-            "filter": f"relation-type:is-referenced-by",
+            "filter": "relation-type:is-referenced-by",
             "rows": limit,
             "sort": "is-referenced-by-count",
             "order": "desc",
@@ -120,7 +139,7 @@ class CrossrefConnector(AcademicConnector):
             # Crossref doesn't have a direct citations endpoint
             # We search for papers that reference this DOI
             response = await self.client.get(
-                f"/works",
+                "/works",
                 params={**params, "query.bibliographic": paper_id},
             )
             response.raise_for_status()
@@ -134,8 +153,17 @@ class CrossrefConnector(AcademicConnector):
 
             return papers
 
-        except Exception as e:
-            logger.error("crossref_citations_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("crossref_citations_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            raise
+        except httpx.TimeoutException:
+            logger.error("crossref_citations_timeout", paper_id=paper_id)
+            raise
+        except httpx.RequestError as e:
+            logger.error("crossref_citations_request_failed", error=str(e), paper_id=paper_id)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("crossref_citations_json_failed", error=str(e), paper_id=paper_id)
             raise
 
     async def get_references(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -160,8 +188,17 @@ class CrossrefConnector(AcademicConnector):
 
             return papers
 
-        except Exception as e:
-            logger.error("crossref_references_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("crossref_references_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            raise
+        except httpx.TimeoutException:
+            logger.error("crossref_references_timeout", paper_id=paper_id)
+            raise
+        except httpx.RequestError as e:
+            logger.error("crossref_references_request_failed", error=str(e), paper_id=paper_id)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("crossref_references_json_failed", error=str(e), paper_id=paper_id)
             raise
 
     async def get_similar_works(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -184,8 +221,17 @@ class CrossrefConnector(AcademicConnector):
             # Filter out the original paper
             return [p for p in result.papers if p.source_id != paper_id]
 
-        except Exception as e:
-            logger.error("crossref_similar_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("crossref_similar_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            return []
+        except httpx.TimeoutException:
+            logger.error("crossref_similar_timeout", paper_id=paper_id)
+            return []
+        except httpx.RequestError as e:
+            logger.error("crossref_similar_request_failed", error=str(e), paper_id=paper_id)
+            return []
+        except json.JSONDecodeError as e:
+            logger.error("crossref_similar_json_failed", error=str(e), paper_id=paper_id)
             return []
 
     def _get_sort_param(self, sort_by: str) -> str:
@@ -269,7 +315,7 @@ class CrossrefConnector(AcademicConnector):
                 raw_metadata=work,
             )
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError) as e:
             logger.error("crossref_parse_failed", error=str(e))
             return None
 
@@ -278,5 +324,5 @@ class CrossrefConnector(AcademicConnector):
         try:
             response = await self.client.get("/works?rows=1")
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False

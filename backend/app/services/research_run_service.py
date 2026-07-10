@@ -1,13 +1,13 @@
 """Research run service layer."""
 
+from datetime import UTC, datetime, timezone
 from uuid import uuid4
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.research_run import ResearchRun, ResearchRunEvent, ToolCall
-from ..schemas.research_run import ResearchRunCreate, ResearchRunUpdate
+from app.models.research_run import ResearchRun, ResearchRunEvent, ToolCall
+from app.schemas.research_run import ResearchRunCreate, ResearchRunUpdate
 
 
 class ResearchRunService:
@@ -92,9 +92,9 @@ class ResearchRunService:
 
             # Set timestamps based on state
             if new_state == "running" and not run.started_at:
-                run.started_at = datetime.now(timezone.utc)
+                run.started_at = datetime.now(UTC)
             elif new_state in ("completed", "failed", "cancelled"):
-                run.completed_at = datetime.now(timezone.utc)
+                run.completed_at = datetime.now(UTC)
 
             event = ResearchRunEvent(
                 id=str(uuid4()),
@@ -128,9 +128,22 @@ class ResearchRunService:
         """Complete a research run."""
         return await self.update_run(run_id, ResearchRunUpdate(state="completed"))
 
-    async def fail_run(self, run_id: str) -> ResearchRun | None:
+    async def fail_run(self, run_id: str, error_msg: str | None = None) -> ResearchRun | None:
         """Mark a research run as failed."""
-        return await self.update_run(run_id, ResearchRunUpdate(state="failed"))
+        run = await self.get_run(run_id)
+        if run:
+            run.state = "failed"
+            if error_msg:
+                event = ResearchRunEvent(
+                    id=str(uuid4()),
+                    run_id=run_id,
+                    event_type="run_failed",
+                    actor="system",
+                    details={"error": error_msg},
+                )
+                self.db.add(event)
+            await self.db.flush()
+        return run
 
     async def cancel_run(self, run_id: str) -> ResearchRun | None:
         """Cancel a research run."""
@@ -141,7 +154,7 @@ class ResearchRunService:
         result = await self.db.execute(
             select(ResearchRunEvent)
             .where(ResearchRunEvent.run_id == run_id)
-            .order_by(ResearchRunEvent.created_at)
+            .order_by(ResearchRunEvent.created_at),
         )
         return list(result.scalars().all())
 
@@ -169,9 +182,36 @@ class ResearchRunService:
         result = await self.db.execute(
             select(ToolCall)
             .where(ToolCall.run_id == run_id)
-            .order_by(ToolCall.created_at)
+            .order_by(ToolCall.created_at),
         )
         return list(result.scalars().all())
+
+    async def update_step_history(self, run_id: str, step_history: list[dict]) -> ResearchRun | None:
+        """Persist workflow step history for observability."""
+        run = await self.get_run(run_id)
+        if not run:
+            return None
+        run.step_history = step_history
+        await self.db.flush()
+        return run
+
+    async def update_cognitive_metrics(
+        self,
+        run_id: str,
+        *,
+        cognitive_entropy: float | None = None,
+        cognitive_mode: str | None = None,
+    ) -> ResearchRun | None:
+        """Update live cognitive metrics on a research run."""
+        run = await self.get_run(run_id)
+        if not run:
+            return None
+        if cognitive_entropy is not None:
+            run.cognitive_entropy = cognitive_entropy
+        if cognitive_mode is not None:
+            run.cognitive_mode = cognitive_mode
+        await self.db.flush()
+        return run
 
     async def add_tool_call(
         self,

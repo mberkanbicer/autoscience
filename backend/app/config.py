@@ -14,6 +14,26 @@ class Settings(BaseSettings):
     app_env: Literal["development", "staging", "production"] = "development"
     app_debug: bool = False
     app_secret_key: str = "change-me-to-a-random-secret"
+    jwt_expire_hours: int = 72
+
+    # API Authentication
+    api_key: str = ""
+
+    # SMTP notifications (optional)
+    notification_email_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "noreply@autoscience.local"
+    smtp_use_tls: bool = True
+
+    # OAuth (optional — enables Google/GitHub login)
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: str = ""
+    oauth_redirect_uri: str = "http://localhost:3000/auth/callback"
 
     # Database
     database_url: str = "postgresql+asyncpg://autoscience:autoscience@localhost:5432/autoscience"
@@ -21,6 +41,8 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+    # Comma-separated cluster nodes (host:port or redis:// URLs). When set, cluster mode is used.
+    redis_cluster_nodes: str = ""
 
     # LLM Providers
     openai_api_key: str = ""
@@ -55,11 +77,16 @@ class Settings(BaseSettings):
     semantic_scholar_api_key: str = ""
     core_api_key: str = ""
     unpaywall_email: str = "your-email@example.com"
+    firecrawl_api_key: str = ""
+
+    # Kaggle (optional — enables dataset search)
+    kaggle_username: str = ""
+    kaggle_key: str = ""
 
     # SearXNG
     searxng_url: str = "https://search.bicers.me"
     searxng_categories: str = "science,general"
-    searxng_engines: str = ""  # comma-separated, empty = all
+    searxng_engines: str = ""
     cache_ttl_seconds: int = 3600
 
     # Sandbox
@@ -68,9 +95,18 @@ class Settings(BaseSettings):
     sandbox_memory_limit: str = "512m"
     sandbox_cpu_limit: float = 1.0
 
+    # Health Monitor
+    health_check_enabled: bool = True
+    health_check_interval_minutes: int = 5
+
     # Idle Cognition
     idle_enabled: bool = True
     idle_check_interval_minutes: int = 5
+
+    # Skill Evaluation Scheduler
+    skill_eval_enabled: bool = True
+    skill_eval_interval_hours: int = 24
+    skill_eval_dry_run: bool = False  # When True, evaluates but never mutates
 
     # Budget Defaults
     default_max_cost_per_run_usd: float = 5.0

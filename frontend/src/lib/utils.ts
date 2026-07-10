@@ -33,39 +33,39 @@ export function getStatusColor(status: string): string {
     case 'completed':
     case 'active':
     case 'approved':
-      return 'text-green-600 bg-green-100';
+      return 'text-success bg-success/10';
     case 'running':
     case 'in_progress':
-      return 'text-blue-600 bg-blue-100';
+      return 'text-primary bg-primary/10';
     case 'paused':
     case 'pending':
-      return 'text-yellow-600 bg-yellow-100';
+      return 'text-warning bg-warning/10';
     case 'failed':
     case 'rejected':
     case 'denied':
-      return 'text-red-600 bg-red-100';
+      return 'text-error bg-error/10';
     case 'cancelled':
     case 'archived':
-      return 'text-gray-600 bg-gray-100';
+      return 'text-muted-foreground bg-muted';
     default:
-      return 'text-gray-600 bg-gray-100';
+      return 'text-muted-foreground bg-muted';
   }
 }
 
 export function getClassificationColor(classification: string): string {
   switch (classification) {
     case 'high_value':
-      return 'text-green-700 bg-green-100';
+      return 'text-success bg-success/10';
     case 'promising':
-      return 'text-blue-700 bg-blue-100';
+      return 'text-primary bg-primary/10';
     case 'incremental':
-      return 'text-yellow-700 bg-yellow-100';
+      return 'text-warning bg-warning/10';
     case 'weak':
-      return 'text-orange-700 bg-orange-100';
+      return 'text-tertiary bg-tertiary/10';
     case 'reject':
-      return 'text-red-700 bg-red-100';
+      return 'text-error bg-error/10';
     default:
-      return 'text-gray-700 bg-gray-100';
+      return 'text-muted-foreground bg-muted';
   }
 }
 

@@ -1,12 +1,11 @@
 """Keyword expansion and search planning engine."""
 
 from dataclasses import dataclass, field
-from typing import Any
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -59,8 +58,8 @@ class KeywordExpansionEngine:
         """Simple text-based keyword expansion when no LLM is available."""
         import re
         # Split on common delimiters and filter short/stop words
-        stop_words = {'the', 'a', 'an', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'with', 'and', 'or', 'is', 'are', 'be', 'this', 'that', 'using', 'based', 'from'}
-        words = re.split(r'[\s,;:.!?]+', idea.lower())
+        stop_words = {"the", "a", "an", "for", "of", "in", "on", "at", "to", "by", "with", "and", "or", "is", "are", "be", "this", "that", "using", "based", "from"}
+        words = re.split(r"[\s,;:.!?]+", idea.lower())
         meaningful = [w for w in words if len(w) > 2 and w not in stop_words]
         return KeywordExpansion(
             core_concepts=meaningful[:5],
@@ -163,7 +162,7 @@ Generate comprehensive search keywords as JSON."""
                 year_to=current_year,
                 limit=20,
                 sort_by="citations",
-            )
+            ),
         )
 
         # Query 2: Frontier papers (last 12 months)
@@ -176,7 +175,7 @@ Generate comprehensive search keywords as JSON."""
                 year_to=current_year,
                 limit=20,
                 sort_by="date",
-            )
+            ),
         )
 
         # Query 3: Review/survey papers
@@ -189,7 +188,7 @@ Generate comprehensive search keywords as JSON."""
                 year_to=current_year,
                 limit=10,
                 sort_by="citations",
-            )
+            ),
         )
 
         # Query 4: Method-specific search
@@ -203,7 +202,7 @@ Generate comprehensive search keywords as JSON."""
                     year_to=current_year,
                     limit=15,
                     sort_by="relevance",
-                )
+                ),
             )
 
         # Query 5: Contradiction search
@@ -216,7 +215,7 @@ Generate comprehensive search keywords as JSON."""
                 year_to=current_year,
                 limit=10,
                 sort_by="relevance",
-            )
+            ),
         )
 
         # Query 6: Dataset/benchmark papers
@@ -231,7 +230,7 @@ Generate comprehensive search keywords as JSON."""
                     year_to=current_year,
                     limit=10,
                     sort_by="relevance",
-                )
+                ),
             )
 
         # Query 7: Adjacent field search
@@ -246,7 +245,7 @@ Generate comprehensive search keywords as JSON."""
                     year_to=current_year,
                     limit=10,
                     sort_by="relevance",
-                )
+                ),
             )
 
         # Query 8: Application-specific search
@@ -261,7 +260,7 @@ Generate comprehensive search keywords as JSON."""
                     year_to=current_year,
                     limit=10,
                     sort_by="relevance",
-                )
+                ),
             )
 
         return queries
@@ -287,7 +286,7 @@ Given a research idea, keywords, and search queries, create a brief strategy not
 Keep it concise and actionable."""
 
         queries_summary = "\n".join(
-            [f"- [{q.query_type}] {q.text} ({q.rationale})" for q in queries]
+            [f"- [{q.query_type}] {q.text} ({q.rationale})" for q in queries],
         )
 
         user = f"""Idea: {idea}

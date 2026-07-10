@@ -1,14 +1,15 @@
 """LLM provider router for selecting and managing providers."""
 
-import structlog
 from typing import Any
 
-from .base import LLMProvider, Message, CompletionResult, StructuredOutput
-from .openai_provider import OpenAIProvider
+import structlog
+
 from .anthropic_provider import AnthropicProvider
-from .local_provider import LocalProvider
-from .openrouter_provider import OpenRouterProvider
+from .base import CompletionResult, LLMProvider, Message, StructuredOutput
 from .llamacpp_provider import LlamaCppProvider
+from .local_provider import LocalProvider
+from .openai_provider import OpenAIProvider
+from .openrouter_provider import OpenRouterProvider
 
 logger = structlog.get_logger()
 
@@ -63,7 +64,7 @@ class LLMRouter:
         try:
             p = self.get_provider(provider)
             result = await p.complete(
-                messages, model=model, temperature=temperature, max_tokens=max_tokens, **kwargs
+                messages, model=model, temperature=temperature, max_tokens=max_tokens, **kwargs,
             )
             logger.info(
                 "completion_success",
@@ -73,6 +74,9 @@ class LLMRouter:
                 cost=result.cost_usd,
             )
             return result
+        except ValueError as e:
+            logger.error("completion_invalid_config", provider=provider, error=str(e))
+            raise
         except Exception as e:
             logger.error("completion_failed", provider=provider, error=str(e))
 
@@ -106,7 +110,8 @@ class LLMRouter:
                     )
 
             # All providers failed
-            raise RuntimeError(f"All LLM providers failed. Last error: {e}")
+            error = str(e)
+            raise RuntimeError(f"All LLM providers failed. Last error: {error}")
 
     async def complete_structured(
         self,
@@ -121,7 +126,7 @@ class LLMRouter:
         try:
             p = self.get_provider(provider)
             return await p.complete_structured(
-                messages, schema=schema, model=model, temperature=temperature, **kwargs
+                messages, schema=schema, model=model, temperature=temperature, **kwargs,
             )
         except Exception as e:
             logger.error("structured_completion_failed", provider=provider, error=str(e))
@@ -220,11 +225,17 @@ def create_default_router(
             ),
         )
 
-    # Set default and fallback chain
+    # Set default and fallback chain - use first available if requested default not available
     available = list(router.providers.keys())
-    if default_provider in available:
-        router.set_default(default_provider)
-        fallback = [p for p in available if p != default_provider]
-        router.set_fallback_chain(fallback)
+    if not available:
+        logger.warning("no_llm_providers_configured")
+        return router
+
+    # Use requested default if available, otherwise use first available
+    effective_default = default_provider if default_provider in available else available[0]
+    router.set_default(effective_default)
+    fallback = [p for p in available if p != effective_default]
+    router.set_fallback_chain(fallback)
+    logger.info("llm_router_configured", default=effective_default, providers=available)
 
     return router

@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from .base import LLMProvider, Message, CompletionResult, StructuredOutput
+from .base import CompletionResult, LLMProvider, Message, StructuredOutput
 
 # OpenRouter model pricing per 1M tokens (approximate, varies by model)
 OPENROUTER_PRICING = {

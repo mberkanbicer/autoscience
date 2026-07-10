@@ -2,12 +2,11 @@
 
 from dataclasses import dataclass, field
 from typing import Any
-from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -57,7 +56,7 @@ class PaperAnalysisEngine:
     ) -> PaperAnalysisResult:
         """Analyze a paper and extract structured information."""
         # Use full text if available, otherwise abstract
-        text_to_analyze = full_text if full_text else abstract
+        text_to_analyze = full_text or abstract
 
         if not text_to_analyze:
             return PaperAnalysisResult(
@@ -266,6 +265,12 @@ Analyze the relationship between this paper and the idea."""
                     full_text=paper.get("full_text"),
                 )
                 results.append(result)
+            except (ValueError, RuntimeError, KeyError) as e:
+                logger.error(
+                    "paper_analysis_error",
+                    paper_id=paper.get("id"),
+                    error=str(e),
+                )
             except Exception as e:
                 logger.error(
                     "paper_analysis_failed",
@@ -277,8 +282,8 @@ Analyze the relationship between this paper and the idea."""
                     PaperAnalysisResult(
                         paper_id=paper.get("id", ""),
                         confidence=0.0,
-                        analysis_notes=f"Analysis failed: {str(e)}",
-                    )
+                        analysis_notes=f"Analysis failed: {e!s}",
+                    ),
                 )
 
         return results
@@ -297,7 +302,7 @@ Analyze the relationship between this paper and the idea."""
                 f"Method: {a.method}\n"
                 f"Findings: {', '.join(a.findings[:3])}"
                 for i, a in enumerate(analyses[:5])
-            ]
+            ],
         )
 
         system = """You are a scientific comparison analyst.

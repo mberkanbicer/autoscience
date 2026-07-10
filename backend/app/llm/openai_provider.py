@@ -2,10 +2,9 @@
 
 from typing import Any
 
-import openai
 from openai import AsyncOpenAI
 
-from .base import LLMProvider, Message, CompletionResult, StructuredOutput
+from .base import CompletionResult, LLMProvider, Message, StructuredOutput
 
 # Model pricing per 1M tokens (as of 2025)
 MODEL_PRICING = {
@@ -104,12 +103,8 @@ class OpenAIProvider(LLMProvider):
         choice = response.choices[0]
         content = choice.message.content or "{}"
 
-        import json
-
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            data = {"error": "Failed to parse JSON", "raw": content}
+        from app.utils.json_utils import parse_llm_json
+        data = parse_llm_json(content)
 
         usage = {
             "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
@@ -119,10 +114,9 @@ class OpenAIProvider(LLMProvider):
 
         cost = self.estimate_cost(usage, model)
 
-        completion = CompletionResult(
-            content=content,
+        return StructuredOutput(
+            data=data,
             model=model,
-            provider=self.provider_name,
             usage=usage,
             cost_usd=cost,
             finish_reason=choice.finish_reason,

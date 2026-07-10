@@ -3,8 +3,11 @@
 from typing import Any
 
 import httpx
+import structlog
 
-from .base import LLMProvider, Message, CompletionResult, StructuredOutput
+from .base import CompletionResult, LLMProvider, Message, StructuredOutput
+
+logger = structlog.get_logger()
 
 
 class LlamaCppProvider(LLMProvider):
@@ -131,7 +134,10 @@ class LlamaCppProvider(LLMProvider):
         try:
             response = await self._client.get("/health")
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
+            return False
+        except Exception as exc:
+            logger.warning("health_check_failed", error=str(exc))
             return False
 
     async def get_models(self) -> list[dict[str, Any]]:
@@ -141,7 +147,10 @@ class LlamaCppProvider(LLMProvider):
             response.raise_for_status()
             data = response.json()
             return data.get("data", [])
-        except Exception:
+        except httpx.RequestError:
+            return []
+        except Exception as exc:
+            logger.warning("get_models_failed", error=str(exc))
             return []
 
     async def close(self) -> None:

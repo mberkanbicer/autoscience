@@ -1,13 +1,12 @@
 """Research question service for storing and managing questions."""
 
-from uuid import uuid4
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.research_question import ResearchQuestion as ResearchQuestionModel
-from ..engine.question_generation import ResearchQuestion, QuestionGenerationResult
+from app.engine.question_generation import QuestionGenerationResult
+from app.models.research_question import ResearchQuestion as ResearchQuestionModel
 
 
 class ResearchQuestionService:
@@ -68,7 +67,7 @@ class ResearchQuestionService:
     ) -> list[ResearchQuestionModel]:
         """Get all questions for a project."""
         query = select(ResearchQuestionModel).where(
-            ResearchQuestionModel.project_id == project_id
+            ResearchQuestionModel.project_id == project_id,
         )
 
         if status:
@@ -84,7 +83,7 @@ class ResearchQuestionService:
     async def get_question(self, question_id: str) -> ResearchQuestionModel | None:
         """Get a question by ID."""
         result = await self.db.execute(
-            select(ResearchQuestionModel).where(ResearchQuestionModel.id == question_id)
+            select(ResearchQuestionModel).where(ResearchQuestionModel.id == question_id),
         )
         return result.scalar_one_or_none()
 
@@ -113,7 +112,7 @@ class ResearchQuestionService:
     ) -> ResearchQuestionModel | None:
         """Reject a question with reason."""
         return await self.update_question_status(
-            question_id, "rejected", rejection_reason=reason
+            question_id, "rejected", rejection_reason=reason,
         )
 
     async def promote_to_hypothesis(
@@ -139,8 +138,8 @@ class ResearchQuestionService:
         # Total questions
         total_result = await self.db.execute(
             select(func.count(ResearchQuestionModel.id)).where(
-                ResearchQuestionModel.project_id == project_id
-            )
+                ResearchQuestionModel.project_id == project_id,
+            ),
         )
         total = total_result.scalar() or 0
 
@@ -148,7 +147,7 @@ class ResearchQuestionService:
         status_result = await self.db.execute(
             select(ResearchQuestionModel.status, func.count(ResearchQuestionModel.id))
             .where(ResearchQuestionModel.project_id == project_id)
-            .group_by(ResearchQuestionModel.status)
+            .group_by(ResearchQuestionModel.status),
         )
         by_status = {row[0] or "unknown": row[1] for row in status_result.all()}
 
@@ -157,7 +156,7 @@ class ResearchQuestionService:
             select(func.avg(ResearchQuestionModel.rank)).where(
                 ResearchQuestionModel.project_id == project_id,
                 ResearchQuestionModel.status == "selected",
-            )
+            ),
         )
         avg_rank = avg_rank_result.scalar() or 0
 
@@ -179,6 +178,6 @@ class ResearchQuestionService:
             select(ResearchQuestionModel).where(
                 ResearchQuestionModel.project_id == project_id,
                 ResearchQuestionModel.question.ilike(search_pattern),
-            )
+            ),
         )
         return list(result.scalars().all())

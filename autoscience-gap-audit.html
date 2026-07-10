@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoscience — Full Gap Audit Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, system-ui, sans-serif; font-size: 15px; line-height: 1.7; color: #1a1a1a; max-width: 1100px; margin: 0 auto; padding: 40px 24px; background: #fafafa; }
+  h1 { font-size: 32px; margin: 0 0 8px; font-weight: 800; letter-spacing: -0.03em; }
+  h2 { font-size: 22px; margin: 40px 0 12px; font-weight: 700; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 17px; margin: 28px 0 8px; font-weight: 600; }
+  p { margin: 8px 0; color: #475569; }
+  .meta { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+  .summary { display: flex; gap: 16px; flex-wrap: wrap; margin: 24px 0; }
+  .stat { background: #fff; border-radius: 12px; padding: 16px 20px; flex: 1; min-width: 120px; border: 1px solid #e2e8f0; }
+  .stat-num { font-size: 28px; font-weight: 800; line-height: 1.2; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; font-weight: 600; margin-top: 2px; }
+  .stat.done { border-left: 3px solid #22c55e; } .stat.done .stat-num { color: #16a34a; }
+  .stat.partial { border-left: 3px solid #f59e0b; } .stat.partial .stat-num { color: #d97706; }
+  .stat.missing { border-left: 3px solid #ef4444; } .stat.missing .stat-num { color: #dc2626; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  th { background: #f1f5f9; text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; font-weight: 700; }
+  td { padding: 10px 12px; border-top: 1px solid #f1f5f9; }
+  tr:hover { background: #f8fafc; }
+  .status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .status-done { background: #dcfce7; color: #16a34a; }
+  .status-partial { background: #fef3c7; color: #d97706; }
+  .status-missing { background: #fee2e2; color: #dc2626; }
+  .tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tag-p0 { background: #fee2e2; color: #dc2626; }
+  .tag-p1 { background: #fef3c7; color: #d97706; }
+  .tag-p2 { background: #dbeafe; color: #2563eb; }
+  .section { margin-top: 8px; }
+  .notes { font-size: 13px; color: #64748b; font-style: italic; margin: 4px 0 0; }
+  @media (max-width: 640px) { body { padding: 20px 12px; } .summary { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<h1>🧪 Autoscience — Full Gap Audit</h1>
+<p class="meta">Generated: July 9, 2026 · Comparing <code>REQUIREMENTS.md</code> against codebase</p>
+
+<div class="summary">
+  <div class="stat done"><div class="stat-num">74</div><div class="stat-label">Complete</div></div>
+  <div class="stat partial"><div class="stat-num">18</div><div class="stat-label">Partial / Needs Work</div></div>
+  <div class="stat missing"><div class="stat-num">10</div><div class="stat-label">Missing</div></div>
+</div>
+
+<p style="margin-bottom: 24px;"><strong>Total requirements tracked:</strong> 102 &middot; <strong>Completion:</strong> 73%</p>
+
+<!-- ============================================================ -->
+<h2>📚 1. Research Mode</h2>
+
+<h3>1.1 Multi-Source Literature Search</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Priority</th><th>Notes</th></tr>
+  <tr><td>arXiv connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p0">P0</span></td><td>Fully implemented in <code>connectors/arxiv.py</code></td></tr>
+  <tr><td>Semantic Scholar connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p0">P0</span></td><td>In <code>connectors/semantic_scholar.py</code></td></tr>
+  <tr><td>OpenAlex connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p0">P0</span></td><td>In <code>connectors/openalex.py</code></td></tr>
+  <tr><td>PubMed connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p1">P1</span></td><td>Fully implemented — REQUIREMENTS.md was outdated</td></tr>
+  <tr><td>Crossref connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p1">P1</span></td><td>Fully implemented in <code>connectors/crossref.py</code></td></tr>
+  <tr><td>DOAJ connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p1">P1</span></td><td>Fully implemented in <code>connectors/doaj.py</code></td></tr>
+  <tr><td>CORE connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p2">P2</span></td><td>Fully implemented in <code>connectors/core.py</code></td></tr>
+  <tr><td>Unpaywall connector</td><td><span class="status status-done">✅ Done</span></td><td><span class="tag tag-p2">P2</span></td><td>Fully implemented in <code>connectors/unpaywall.py</code></td></tr>
+  <tr><td>SearXNG federated search</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p2">P2</span></td><td>Optional — no SearXNG integration exists</td></tr>
+  <tr><td>Firecrawl web scraping</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p2">P2</span></td><td>Optional — no Firecrawl integration exists</td></tr>
+</table>
+
+<h3>1.2 Paper Analysis Engine</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Abstract analysis pipeline</td><td><span class="status status-done">✅ Done</span></td><td><code>engine/paper_analysis.py</code></td></tr>
+  <tr><td>Fulltext extraction (when available)</td><td><span class="status status-done">✅ Done</span></td><td>Falls back from fulltext to abstract</td></tr>
+  <tr><td>Structured extraction</td><td><span class="status status-done">✅ Done</span></td><td>Problem, method, findings, limitations</td></tr>
+  <tr><td>Claim extraction with evidence linking</td><td><span class="status status-done">✅ Done</span></td><td>Claim dataclass with evidence field</td></tr>
+  <tr><td>Method comparison engine</td><td><span class="status status-done">✅ Done</span></td><td><code>PaperAnalysisEngine.compare_papers()</code></td></tr>
+  <tr><td>Future work extraction</td><td><span class="status status-done">✅ Done</span></td><td>Extracted as array</td></tr>
+  <tr><td>Assumption detection</td><td><span class="status status-done">✅ Done</span></td><td>Extracted as array</td></tr>
+</table>
+
+<h3>1.3 Conflict Detection</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Finding conflicts</td><td><span class="status status-done">✅ Done</span></td><td><code>engine/conflict_detection.py</code></td></tr>
+  <tr><td>Method conflicts</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Dataset conflicts</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Assumption conflicts</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Scope conflicts</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Recency conflicts</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Theory-practice conflicts</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+</table>
+
+<h3>1.4 Research Question Generator</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Gap-to-question transformation</td><td><span class="status status-done">✅ Done</span></td><td>In workflow + question generation engine</td></tr>
+  <tr><td>Adjacent-field collisions</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Dataset discovery triggers</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Cross-domain question generation</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>🧪 2. Experiment Mode</h2>
+
+<h3>2.1 Dataset Discovery and Management</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Dataset search across repositories</td><td><span class="status status-done">✅ Done</span></td><td>HF, Zenodo connectors</td></tr>
+  <tr><td>Dataset metadata extraction</td><td><span class="status status-done">✅ Done</span></td><td></td></tr>
+  <tr><td>Dataset preview generation</td><td><span class="status status-done">✅ Done</span></td><td>Head, schema preview</td></tr>
+  <tr><td>Dataset upload with validation</td><td><span class="status status-done">✅ Done</span></td><td>P2.1 — CSV/JSON upload, schema inference</td></tr>
+  <tr><td>Dataset provenance tracking</td><td><span class="status status-done">✅ Done</span></td><td>P2.1 — uploaded_by, original_filename, provenance</td></tr>
+</table>
+
+<h3>2.2 Validation Experiment Designer</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Validation plan generation</td><td><span class="status status-done">✅ Done</span></td><td><code>engine/validation_planning.py</code></td></tr>
+  <tr><td>Baseline identification</td><td><span class="status status-done">✅ Done</span></td><td>Via LLM in ValidationPlanningEngine</td></tr>
+  <tr><td>Cost estimation</td><td><span class="status status-done">✅ Done</span></td><td>In ValidationPlan dataclass</td></tr>
+  <tr><td>Difficulty assessment</td><td><span class="status status-done">✅ Done</span></td><td>In ValidationPlan dataclass</td></tr>
+  <tr><td>Statistical power analysis</td><td><span class="status status-done">✅ Done</span></td><td><code>engine/power_analysis.py</code> + API</td></tr>
+  <tr><td>Simulation design</td><td><span class="status status-partial">◐ Partial</span></td><td><span class="tag tag-p1">P1</span></td><td>sandbox_generator.py creates scripts but no formal simulation framework</td></tr>
+</table>
+
+<h3>2.3 Data Analysis Sandbox</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Docker sandbox infrastructure</td><td><span class="status status-done">✅ Done</span></td><td><code>sandbox/executor.py</code></td></tr>
+  <tr><td>Python script generation from plans</td><td><span class="status status-done">✅ Done</span></td><td><code>engine/sandbox_generator.py</code></td></tr>
+  <tr><td>Safe execution with resource limits</td><td><span class="status status-done">✅ Done</span></td><td>Memory, CPU, network=none, read-only</td></tr>
+  <tr><td>Artifact capture (figures, tables)</td><td><span class="status status-done">✅ Done</span></td><td><code>sandbox/artifacts.py</code></td></tr>
+  <tr><td>Statistical test library</td><td><span class="status status-done">✅ Done</span></td><td>Power analysis, Plotly sandbox</td></tr>
+  <tr><td>Reproducibility guarantees</td><td><span class="status status-partial">◐ Partial</span></td><td><span class="tag tag-p2">P2</span></td><td>Docker ensures isolation; no formal reproducibility manifest</td></tr>
+</table>
+
+<h3>2.4 Results Synthesis</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Experimental results extraction</td><td><span class="status status-done">✅ Done</span></td><td>P0 — in manuscript_context_service</td></tr>
+  <tr><td>Hypothesis validation/refutation</td><td><span class="status status-done">✅ Done</span></td><td>P0 — _validate_hypotheses in workflow</td></tr>
+  <tr><td>Effect size calculation</td><td><span class="status status-partial">◐ Partial</span></td><td><span class="tag tag-p2">P2</span></td><td>Power analysis computes sample size; effect size extraction from results not implemented</td></tr>
+  <tr><td>Statistical significance reporting</td><td><span class="status status-partial">◐ Partial</span></td><td><span class="tag tag-p2">P2</span></td><td>Not consistently reported across modes</td></tr>
+  <tr><td>Results-to-claims pipeline</td><td><span class="status status-partial">◐ Partial</span></td><td><span class="tag tag-p1">P1</span></td><td>Results feed into manuscript but not as formal claims</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>📝 3. Article Mode</h2>
+
+<h3>3.1 Manuscript Generator</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>IMRaD structure</td><td><span class="status status-done">✅ Done</span></td><td>Introduction, Methods, Results, Discussion</td></tr>
+  <tr><td>Title generation</td><td><span class="status status-done">✅ Done</span></td><td>Via LLM</td></tr>
+  <tr><td>Abstract composition</td><td><span class="status status-done">✅ Done</span></td><td>From section summaries</td></tr>
+  <tr><td>Introduction drafting</td><td><span class="status status-done">✅ Done</span></td><td>Context, gap, contribution</td></tr>
+  <tr><td>Methods section</td><td><span class="status status-done">✅ Done</span></td><td>From validation plans</td></tr>
+  <tr><td>Results section</td><td><span class="status status-done">✅ Done</span></td><td>From experimental data</td></tr>
+  <tr><td>Discussion section</td><td><span class="status status-done">✅ Done</span></td><td>Interpretation, limitations, future work</td></tr>
+  <tr><td>References management</td><td><span class="status status-done">✅ Done</span></td><td>BibTeX generation</td></tr>
+</table>
+
+<h3>3.2 Citation System</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>BibTeX export</td><td><span class="status status-done">✅ Done</span></td><td>CitationManager</td></tr>
+  <tr><td>Bibliography generation</td><td><span class="status status-done">✅ Done</span></td><td>From paper references</td></tr>
+  <tr><td>Citation DOI resolution</td><td><span class="status status-done">✅ Done</span></td><td>Crossref connector</td></tr>
+  <tr><td>Reference formatting (APA, MLA, Chicago)</td><td><span class="status status-done">✅ Done</span></td><td>CitationManager.format_citation()</td></tr>
+</table>
+
+<h3>3.3 LaTeX Integration</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>LaTeX template system</td><td><span class="status status-done">✅ Done</span></td><td>Journal templates in engine/</td></tr>
+  <tr><td>Equation rendering</td><td><span class="status status-partial">◐ Partial</span></td><td>LaTeX math via KaTeX; no equation editor UI</td></tr>
+  <tr><td>Figure placeholder management</td><td><span class="status status-partial">◐ Partial</span></td><td>Figure placeholders in markdown export</td></tr>
+  <tr><td>Overleaf sync (optional)</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p2">P2</span></td><td>No Overleaf API integration</td></tr>
+  <tr><td>PDF export</td><td><span class="status status-done">✅ Done</span></td><td>Via server-side pdflatex</td></tr>
+</table>
+
+<h3>3.4 Multi-Format Export</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Markdown export</td><td><span class="status status-done">✅ Done</span></td><td>P2.2 — LaTeX→MD conversion</td></tr>
+  <tr><td>HTML export with styling</td><td><span class="status status-done">✅ Done</span></td><td>P2.2 — styled HTML with CSS</td></tr>
+  <tr><td>PDF export (via LaTeX)</td><td><span class="status status-done">✅ Done</span></td><td>pdflatex compilation</td></tr>
+  <tr><td>DOCX export</td><td><span class="status status-done">✅ Done</span></td><td>Via pandoc</td></tr>
+  <tr><td>JSON export (raw data)</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p2">P2</span></td><td>No raw JSON manuscript export</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>⚙️ 4. Core Infrastructure</h2>
+
+<h3>4.1 Cognitive Health Dashboard</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Cognitive entropy visualization</td><td><span class="status status-done">✅ Done</span></td><td>CognitiveEntropy component</td></tr>
+  <tr><td>Focus metric (depth vs breadth)</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p1">P1</span> Not computed — could be derived from entropy + mode</td></tr>
+  <tr><td>Idea evolution timeline</td><td><span class="status status-done">✅ Done</span></td><td>IdeaTimeline component</td></tr>
+  <tr><td>Skill utilization rate</td><td><span class="status status-done">✅ Done</span></td><td>SkillRate component</td></tr>
+  <tr><td>Conflict density indicator</td><td><span class="status status-done">✅ Done</span></td><td>ConflictDensity component</td></tr>
+  <tr><td>Novelty score distribution</td><td><span class="status status-done">✅ Done</span></td><td>NoveltyDistribution component</td></tr>
+</table>
+
+<h3>4.2 Real-time Observability</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>SSE for workflow updates</td><td><span class="status status-done">✅ Done</span></td><td>Event stream service</td></tr>
+  <tr><td>WebSocket for interactive sessions</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p2">P2</span> No WebSocket support</td></tr>
+  <tr><td>Live paper count updates</td><td><span class="status status-partial">◐ Partial</span></td><td>Sidebar polls every 5s; not real-time SSE</td></tr>
+  <tr><td>Thinking tree visualization (real-time)</td><td><span class="status status-missing">❌ Missing</span></td><td><span class="tag tag-p2">P2</span> Not built</td></tr>
+  <tr><td>Agent handoff notifications</td><td><span class="status status-partial">◐ Partial</span></td><td>SSE events exist; no frontend visualization</td></tr>
+</table>
+
+<h3>4.3 Approval Safety System</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Approval request model</td><td><span class="status status-done">✅ Done</span></td><td>ApprovalRequest model</td></tr>
+  <tr><td>DecisionGate component</td><td><span class="status status-done">✅ Done</span></td><td>Frontend DecisionGate</td></tr>
+  <tr><td>Spend threshold enforcement ($1.00+)</td><td><span class="status status-partial">◐ Partial</span></td><td>SafetyService tracks spend; gates check but don't enforce hard cap</td></tr>
+  <tr><td>External publish approval</td><td><span class="status status-partial">◐ Partial</span></td><td>ApprovalRequest model supports it; no publish-specific triggers</td></tr>
+  <tr><td>Major pivot approval</td><td><span class="status status-partial">◐ Partial</span></td><td>ApprovalGate concept exists</td></tr>
+  <tr><td>Approval history tracking</td><td><span class="status status-done">✅ Done</span></td><td>Audit log</td></tr>
+</table>
+
+<h3>4.4 Skill Memory System</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Skill schemas</td><td><span class="status status-done">✅ Done</span></td><td>Skill model + schemas</td></tr>
+  <tr><td>Skill creation</td><td><span class="status status-done">✅ Done</span></td><td>From workflow</td></tr>
+  <tr><td>Skill retrieval by context</td><td><span class="status status-done">✅ Done</span></td><td>P1.6 — wired into workflow</td></tr>
+  <tr><td>Skill performance tracking</td><td><span class="status status-partial">◐ Partial</span></td><td>times_used, success_rate exist; no automated feedback loop</td></tr>
+  <tr><td>Skill versioning system</td><td><span class="status status-done">✅ Done</span></td><td>Skill versions model</td></tr>
+  <tr><td>Skill deprecation workflow</td><td><span class="status status-done">✅ Done</span></td><td>Retire endpoint exists</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>🎨 5. Frontend</h2>
+
+<h3>5.1 Studio Layout</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Amber/Sage design system</td><td><span class="status status-done">✅ Done</span></td><td>Tailwind-based design</td></tr>
+  <tr><td>Glass morphism surfaces</td><td><span class="status status-done">✅ Done</span></td><td>glass/glass-panel classes</td></tr>
+  <tr><td>Responsive layout</td><td><span class="status status-done">✅ Done</span></td><td>Mobile sidebar drawer, responsive grid</td></tr>
+  <tr><td>Dark/light mode toggle</td><td><span class="status status-done">✅ Done</span></td><td>theme-toggle component + next-themes</td></tr>
+  <tr><td>Keyboard navigation</td><td><span class="status status-done">✅ Done</span></td><td>CommandPalette (⌘K)</td></tr>
+  <tr><td>Command palette</td><td><span class="status status-done">✅ Done</span></td><td>CommandPalette component</td></tr>
+</table>
+
+<h3>5.2 Research Studio</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Project dashboard</td><td><span class="status status-done">✅ Done</span></td><td>Project overview page</td></tr>
+  <tr><td>Idea ledger</td><td><span class="status status-done">✅ Done</span></td><td>Ideas page</td></tr>
+  <tr><td>Paper views</td><td><span class="status status-done">✅ Done</span></td><td>Papers page</td></tr>
+  <tr><td>Cluster visualization</td><td><span class="status status-done">✅ Done</span></td><td>KnowledgeGraph + clusters page</td></tr>
+  <tr><td>Conflict heatmap</td><td><span class="status status-done">✅ Done</span></td><td>P2 — ConflictHeatmap component in health dashboard</td></tr>
+  <tr><td>Question navigator</td><td><span class="status status-done">✅ Done</span></td><td>Questions page</td></tr>
+  <tr><td>Hypothesis workshop</td><td><span class="status status-done">✅ Done</span></td><td>Hypotheses page</td></tr>
+</table>
+
+<h3>5.3 Experiment Studio</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Dataset browser</td><td><span class="status status-done">✅ Done</span></td><td>DatasetBrowser component + upload UI</td></tr>
+  <tr><td>Validation plan editor</td><td><span class="status status-done">✅ Done</span></td><td>ValidationPlanEditor component</td></tr>
+  <tr><td>Sandbox code editor</td><td><span class="status status-done">✅ Done</span></td><td>SandboxEditor component</td></tr>
+  <tr><td>Results viewer</td><td><span class="status status-done">✅ Done</span></td><td>ResultsViewer component</td></tr>
+  <tr><td>Artifact gallery</td><td><span class="status status-done">✅ Done</span></td><td>ArtifactGallery component</td></tr>
+</table>
+
+<h3>5.4 Article Studio</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Manuscript editor</td><td><span class="status status-done">✅ Done</span></td><td>ManuscriptEditor + LaTeXPrism</td></tr>
+  <tr><td>Citation manager</td><td><span class="status status-done">✅ Done</span></td><td>BibTeX view in manuscript editor</td></tr>
+  <tr><td>LaTeX preview</td><td><span class="status status-done">✅ Done</span></td><td>ManuscriptPreview + LaTeXPrism</td></tr>
+  <tr><td>Export controls</td><td><span class="status status-done">✅ Done</span></td><td>tex/bib/zip/pdf/docx/md/html</td></tr>
+  <tr><td>Collaboration mode</td><td><span class="status status-partial">◐ Partial</span></td><td>Comments/reviews exist; no real-time collaborative editing</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>🔄 6. Integration</h2>
+
+<h3>6.1 Seamless Workflow</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Research → Experiment handoff</td><td><span class="status status-partial">◐ Partial</span></td><td>Experiment tab in Study Studio; still needs tighter data flow</td></tr>
+  <tr><td>Experiment → Article handoff</td><td><span class="status status-partial">◐ Partial</span></td><td>Generate Manuscript button in experiment tab; results flow into manuscript context</td></tr>
+  <tr><td>Article → Research (revision cycle)</td><td><span class="status status-missing">❌ Missing</span></td><td>No revision feedback loop from manuscripts to research</td></tr>
+  <tr><td>Cross-mode artifact linking</td><td><span class="status status-missing">❌ Missing</span></td><td>No explicit linking between experiment results and manuscript sections</td></tr>
+</table>
+
+<h3>6.2 Export Integration</h3>
+<table>
+  <tr><th>Requirement</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Report generation from any mode</td><td><span class="status status-done">✅ Done</span></td><td>ResearchRun → Report pipeline</td></tr>
+  <tr><td>Knowledge base update from all modes</td><td><span class="status status-done">✅ Done</span></td><td>KnowledgeService captures from all engines</td></tr>
+  <tr><td>Skill extraction from successful patterns</td><td><span class="status status-partial">◐ Partial</span></td><td>Skills are created in workflow but not extracted automatically from patterns</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>📋 Priority Action Items</h2>
+
+<table>
+  <tr><th>Priority</th><th>Item</th><th>Impact</th><th>Effort</th></tr>
+  <tr><td><span class="tag tag-p0">P0</span></td><td><strong>Research→Experiment→Article revision workflow</strong> — close the loop so article feedback feeds back into research questions</td><td>High</td><td>Medium</td></tr>
+  <tr><td><span class="tag tag-p0">P0</span></td><td><strong>Focus metric (depth vs breadth)</strong> — compute from entropy + mode + paper diversity</td><td>Medium</td><td>Small</td></tr>
+  <tr><td><span class="tag tag-p1">P1</span></td><td><strong>Spend threshold enforcement</strong> — hard cap at $1.00+ with safety gate rejection</td><td>High</td><td>Small</td></tr>
+  <tr><td><span class="tag tag-p1">P1</span></td><td><strong>Results-to-claims pipeline</strong> — formalize experiment output → structured claims</td><td>High</td><td>Medium</td></tr>
+  <tr><td><span class="tag tag-p1">P1</span></td><td><strong>Skill performance feedback loop</strong> — auto-retire low-performing skills</td><td>Medium</td><td>Medium</td></tr>
+  <tr><td><span class="tag tag-p2">P2</span></td><td><strong>Overleaf sync</strong> — API integration for LaTeX sync</td><td>Low</td><td>Large</td></tr>
+  <tr><td><span class="tag tag-p2">P2</span></td><td><strong>WebSocket support</strong> — for interactive sessions</td><td>Medium</td><td>Large</td></tr>
+  <tr><td><span class="tag tag-p2">P2</span></td><td><strong>Thinking tree visualization</strong> — real-time tree of workflow decisions</td><td>Medium</td><td>Large</td></tr>
+  <tr><td><span class="tag tag-p2">P2</span></td><td><strong>Effect size extraction</strong> — from experiment numeric outputs</td><td>Medium</td><td>Small</td></tr>
+  <tr><td><span class="tag tag-p2">P2</span></td><td><strong>Collaborative real-time editing</strong> — for article studio</td><td>Low</td><td>Very Large</td></tr>
+</table>
+
+<hr style="margin: 40px 0; border: none; border-top: 1px solid #e2e8f0;" />
+
+<p style="text-align: center; color: #94a3b8; font-size: 13px;">
+  Autoscience Gap Audit · 74 ✅ Complete · 18 ◐ Partial · 10 ❌ Missing · 73% Overall
+</p>
+
+</body>
+</html>

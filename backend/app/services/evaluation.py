@@ -1,14 +1,13 @@
 """Evaluation framework for measuring system performance."""
 
 from dataclasses import dataclass, field
-from typing import Any
-from uuid import uuid4
 from datetime import datetime
+from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -205,7 +204,7 @@ Evaluate this idea."""
     async def _evaluate_static_review(self, idea: EvaluationIdea) -> EvaluationResult:
         """Evaluate using static literature review (baseline)."""
         # Simple heuristic-based evaluation
-        text_length = len(idea.text)
+        len(idea.text)
         word_count = len(idea.text.split())
 
         # Basic scoring
@@ -245,6 +244,13 @@ Evaluate this idea."""
                 try:
                     result = await self.evaluate_idea(idea, method)
                     results_by_method[method].append(result)
+                except (ValueError, RuntimeError) as e:
+                    logger.error(
+                        "evaluation_content_error",
+                        idea_id=idea.id,
+                        method=method,
+                        error=str(e),
+                    )
                 except Exception as e:
                     logger.error(
                         "evaluation_failed",

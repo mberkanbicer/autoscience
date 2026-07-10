@@ -63,3 +63,18 @@ frontend/out/
 
 # Sandbox
 sandbox_workdir/
+
+# Vendored third-party projects (nested git repos)
+external/
+
+# Codegraph tooling runtime artifacts
+.codegraph/
+
+# Frontend build/test artifacts
+*.tsbuildinfo
+frontend/test-results/
+frontend/tmp/
+
+# TypeScript/editor
+*.tsbuildinfo
+

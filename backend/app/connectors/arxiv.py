@@ -1,11 +1,11 @@
 """arXiv academic source connector."""
 
-import httpx
-import structlog
-from typing import Any
 import xml.etree.ElementTree as ET
 
-from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult
+import httpx
+import structlog
+
+from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult, create_connector_client
 
 logger = structlog.get_logger()
 
@@ -17,7 +17,7 @@ class ArxivConnector(AcademicConnector):
 
     def __init__(self):
         """Initialize arXiv connector."""
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = create_connector_client()
 
     @property
     def connector_name(self) -> str:
@@ -55,8 +55,17 @@ class ArxivConnector(AcademicConnector):
                 has_more=len(papers) < total,
             )
 
-        except Exception as e:
-            logger.error("arxiv_search_failed", error=str(e), query=query.text)
+        except httpx.HTTPStatusError as e:
+            logger.error("arxiv_search_http_error", status_code=e.response.status_code, query=query.text)
+            raise
+        except httpx.TimeoutException:
+            logger.error("arxiv_search_timeout", query=query.text)
+            raise
+        except httpx.RequestError as e:
+            logger.error("arxiv_search_request_failed", error=str(e), query=query.text)
+            raise
+        except ET.ParseError as e:
+            logger.error("arxiv_search_parse_failed", error=str(e), query=query.text)
             raise
 
     async def get_paper(self, identifier: str) -> RawPaper | None:
@@ -64,7 +73,7 @@ class ArxivConnector(AcademicConnector):
         # Clean up arXiv ID
         if "arxiv.org" in identifier:
             # Extract ID from URL
-            identifier = identifier.split("/")[-1]
+            identifier = identifier.rsplit("/", maxsplit=1)[-1]
 
         # Remove version suffix if present
         if identifier.endswith("v1") or identifier.endswith("v2") or identifier.endswith("v3"):
@@ -82,8 +91,19 @@ class ArxivConnector(AcademicConnector):
             papers, _ = self._parse_response(response.text)
             return papers[0] if papers else None
 
-        except Exception as e:
-            logger.error("arxiv_get_paper_failed", error=str(e), identifier=identifier)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            logger.error("arxiv_get_paper_http_error", status_code=e.response.status_code, identifier=identifier)
+            raise
+        except httpx.TimeoutException:
+            logger.error("arxiv_get_paper_timeout", identifier=identifier)
+            raise
+        except httpx.RequestError as e:
+            logger.error("arxiv_get_paper_request_failed", error=str(e), identifier=identifier)
+            raise
+        except ET.ParseError as e:
+            logger.error("arxiv_get_paper_parse_failed", error=str(e), identifier=identifier)
             raise
 
     async def get_citations(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -126,8 +146,17 @@ class ArxivConnector(AcademicConnector):
             papers, _ = self._parse_response(response.text)
             return papers
 
-        except Exception as e:
-            logger.error("arxiv_recent_failed", error=str(e), category=category)
+        except httpx.HTTPStatusError as e:
+            logger.error("arxiv_recent_http_error", status_code=e.response.status_code, category=category)
+            return []
+        except httpx.TimeoutException:
+            logger.error("arxiv_recent_timeout", category=category)
+            return []
+        except httpx.RequestError as e:
+            logger.error("arxiv_recent_request_failed", error=str(e), category=category)
+            return []
+        except ET.ParseError as e:
+            logger.error("arxiv_recent_parse_failed", error=str(e), category=category)
             return []
 
     def _build_search_query(self, query: SearchQuery) -> str:
@@ -177,7 +206,7 @@ class ArxivConnector(AcademicConnector):
                 if paper:
                     papers.append(paper)
 
-        except Exception as e:
+        except ET.ParseError as e:
             logger.error("arxiv_parse_failed", error=str(e))
 
         return papers, total
@@ -250,7 +279,7 @@ class ArxivConnector(AcademicConnector):
                 },
             )
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
             logger.error("arxiv_parse_entry_failed", error=str(e))
             return None
 
@@ -263,5 +292,5 @@ class ArxivConnector(AcademicConnector):
             }
             response = await self.client.get(self.BASE_URL, params=params)
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False

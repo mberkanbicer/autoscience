@@ -10,11 +10,14 @@ import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { runsApi, ideasApi } from '@/lib/api';
+import { getAuthHeaders } from '@/lib/api';
+import { getLlmHeaders } from '@/lib/apiSettings';
 import { ResearchRun, Idea } from '@/lib/types';
-import { formatDate, formatDuration } from '@/lib/utils';
+import { AppEvent, ToolCall } from '@/lib/types';
+import { formatDate, formatDuration, cn } from '@/lib/utils';
 import { LivePreview } from '@/components/LivePreview';
 import {
-  Activity, Clock, DollarSign, Play, Loader2, CheckCircle2, XCircle,
+  Activity, Clock, DollarSign, Play, Loader2, CheckCircle, XCircle,
   AlertTriangle, ChevronDown, ChevronRight, RotateCw, X, Search,
   Brain, FileSearch, Network, MessageSquare, FlaskConical, Star,
   Wrench, CheckSquare, Trash2, ChevronUp,
@@ -34,7 +37,7 @@ const PHASE_ICONS: Record<string, any> = {
   make_decision: Brain,
   create_skills: Wrench,
   generate_report: FileSearch,
-  completed: CheckCircle2,
+  completed: CheckCircle,
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -192,17 +195,20 @@ export default function RunsPage() {
     setStarting(true);
     setStartResult(null);
     try {
-      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
       const response = await fetch(
-        `/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(newRun.idea)}&run_type=${newRun.run_type}`,
+        `/api/v1/research/run`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
-            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
-            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+            ...getAuthHeaders(),
+            ...getLlmHeaders(),
           },
+          body: JSON.stringify({
+            project_id: projectId,
+            idea: newRun.idea,
+            run_type: newRun.run_type,
+          }),
         }
       );
       if (response.ok) {
@@ -284,7 +290,7 @@ export default function RunsPage() {
                 }`}
               >
                 {isDone ? (
-                  <CheckCircle2 size={16} className="text-green-600 mb-1" />
+                  <CheckCircle size={16} className="text-green-600 mb-1" />
                 ) : isCurrent ? (
                   <Loader2 size={16} className="animate-spin text-blue-600 mb-1" />
                 ) : (
@@ -303,7 +309,7 @@ export default function RunsPage() {
               Recent Events ({status.event_count})
             </h5>
             <div className="max-h-48 overflow-y-auto space-y-1">
-              {[...status.recent_events].reverse().map((event: any, idx: number) => {
+              {[...status.recent_events].reverse().map((event: AppEvent, idx: number) => {
                 const eventId = event.id || `event-${idx}`;
                 const isExpanded = expandedEventIds.has(eventId);
                 return (
@@ -313,14 +319,14 @@ export default function RunsPage() {
                       onClick={() => toggleEventExpand(eventId)}
                     >
                       {event.event_type?.includes('completed') ? (
-                        <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                        <CheckCircle size={12} className="text-green-500 shrink-0" />
                       ) : event.event_type?.includes('failed') ? (
                         <XCircle size={12} className="text-red-500 shrink-0" />
                       ) : (
                         <ChevronRight size={12} className="text-blue-500 shrink-0" />
                       )}
                       <span className="text-gray-500 font-mono shrink-0">{event.event_type}</span>
-                      <span className="text-gray-700">{event.details?.phase_label || ''}</span>
+                      <span className="text-gray-700">{(event.details as any)?.phase_label ?? ''}</span>
                       <span className="text-gray-400 ml-auto">{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : ''}</span>
                       {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
                     </div>
@@ -343,7 +349,7 @@ export default function RunsPage() {
               Agent Activity ({status.tool_call_count})
             </h5>
             <div className="max-h-32 overflow-y-auto space-y-1">
-              {[...status.recent_tool_calls].reverse().map((tc: any, idx: number) => (
+              {[...status.recent_tool_calls].reverse().map((tc: ToolCall, idx: number) => (
                 <div key={tc.id || idx} className="flex items-center gap-2 text-xs p-2 bg-white rounded border">
                   <Wrench size={12} className={tc.success ? 'text-green-500' : 'text-red-500'} />
                   <Badge variant="default" size="sm">{tc.agent_role}</Badge>
@@ -404,111 +410,138 @@ export default function RunsPage() {
                 <div key={run.id} className="border rounded-lg overflow-hidden">
                   {/* Run Row */}
                   <div
-                    className={`flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isExpanded ? 'bg-blue-50/50' : 'bg-white'}`}
+                    className={cn(
+                      'flex items-center gap-6 p-5 cursor-pointer transition-all duration-500 rounded-xl border border-border/10 mb-2',
+                      isExpanded ? 'glass shadow-lg scale-[1.01] border-primary/20' : 'bg-white/60 hover:bg-white/80'
+                    )}
                     onClick={() => toggleExpand(run.id)}
                   >
-                    <div className="text-gray-400">
-                      {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                    <div className={cn('transition-transform duration-500', isExpanded && 'rotate-90')}>
+                      {isExpanded ? <ChevronDown size={20} className="text-primary" /> : <ChevronRight size={20} className="text-muted-foreground/40" />}
                     </div>
-                    <Badge variant="info">{run.run_type || 'user_directed'}</Badge>
-                    <StatusBadge status={run.state} />
+                    <div className="flex flex-col gap-1">
+                       <Badge variant="info" className="w-fit bg-primary/5 uppercase text-[9px] font-bold tracking-widest">{run.run_type || 'user_directed'}</Badge>
+                       <div className="flex items-center gap-3">
+                          <StatusBadge status={run.state} />
+                          {isRunning && status && (
+                            <span className="text-xs text-primary font-bold uppercase tracking-wider animate-pulse">
+                              {PHASE_LABELS[status.current_phase?.replace(' (done)', '')] || status.current_phase}
+                            </span>
+                          )}
+                       </div>
+                    </div>
+                    
                     <div className="flex-1" />
-                    {isRunning && status && (
-                      <span className="text-sm text-blue-600 font-medium">
-                        {PHASE_LABELS[status.current_phase?.replace(' (done)', '')] || status.current_phase}
-                      </span>
-                    )}
-                    {isRunning && !status && (
-                      <span className="flex items-center gap-1 text-blue-600">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span className="text-sm">Starting...</span>
-                      </span>
-                    )}
-                    <span className="text-sm text-gray-500">
-                      {run.started_at ? formatDate(run.started_at) : '—'}
-                    </span>
-                    {run.started_at && run.completed_at && (
-                      <span className="text-sm text-gray-500 flex items-center gap-1">
-                        <Clock size={14} />
-                        {formatDuration(run.started_at, run.completed_at)}
-                      </span>
-                    )}
-                    <span className="text-sm text-gray-500 flex items-center gap-1">
-                      <DollarSign size={14} />${run.max_cost_usd.toFixed(2)}
-                    </span>
-                    {isRunning && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleCancelRun(run.id); }}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-600"
-                        title="Cancel"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                    {!isRunning && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteRun(run.id); }}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-600"
-                        title="Delete run"
-                        disabled={deletingRunId === run.id}
-                      >
-                        {deletingRunId === run.id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={16} />
-                        )}
-                      </button>
-                    )}
+                    
+                    <div className="flex items-center gap-8">
+                       <div className="text-right">
+                          <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-0.5">Chronology</p>
+                          <p className="text-xs font-semibold text-foreground/70">{run.started_at ? formatDate(run.started_at) : '—'}</p>
+                       </div>
+                       {run.started_at && run.completed_at && (
+                         <div className="text-right hidden md:block">
+                            <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-0.5">Duration</p>
+                            <p className="text-xs font-semibold text-foreground/70 flex items-center justify-end gap-1">
+                               <Clock size={12} className="text-primary" />
+                               {formatDuration(run.started_at, run.completed_at)}
+                            </p>
+                         </div>
+                       )}
+                       <div className="text-right">
+                          <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-0.5">Resources</p>
+                          <p className="text-xs font-bold text-foreground/70 flex items-center justify-end gap-0.5">
+                             <DollarSign size={12} className="text-success" />{run.max_cost_usd.toFixed(2)}
+                          </p>
+                       </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 pl-4 border-l border-border/10">
+                      {isRunning ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelRun(run.id); }}
+                          className="p-2 rounded-lg hover:bg-error/10 text-error transition-all duration-300"
+                          title="Terminate Run"
+                        >
+                          <X size={18} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteRun(run.id); }}
+                          className="p-2 rounded-lg hover:bg-error/10 text-error transition-all duration-300 disabled:opacity-30"
+                          title="Purge Record"
+                          disabled={deletingRunId === run.id}
+                        >
+                          {deletingRunId === run.id ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={18} />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <div className="p-4 bg-gray-50 border-t">
+                    <div className="p-8 bg-muted/20 border-t border-border/10 animate-in slide-in-from-top-4 duration-500">
                       {isRunning ? (
-                        <div className="space-y-4">
+                        <div className="space-y-8">
                           {/* Live Search Preview */}
                           <LivePreview runId={run.id} isActive={isRunning} onComplete={loadRuns} />
-                          {renderProgressTrack(run.id)}
+                          <div className="glass p-8 rounded-2xl shadow-inner">
+                             <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                   <Activity size={20} className="text-primary animate-pulse" />
+                                </div>
+                                <h4 className="text-sm font-bold text-foreground uppercase tracking-[0.2em]">Cognitive Phase Analysis</h4>
+                             </div>
+                             {renderProgressTrack(run.id)}
+                          </div>
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-600">
+                        <div className="space-y-6">
+                          <div className="flex items-center gap-3">
+                             <div className="p-2 bg-muted rounded-lg border border-border/10">
+                                <Clock size={18} className="text-muted-foreground/60" />
+                             </div>
+                             <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">Archived Execution Log</h4>
+                          </div>
                           {status?.recent_events && status.recent_events.length > 0 ? (
-                            <div>
-                              <p className="mb-2 font-medium">Run Events:</p>
-                              <div className="space-y-1 max-h-48 overflow-y-auto">
+                            <div className="grid gap-2">
                                 {status.recent_events.map((event: any, idx: number) => {
                                   const eventId = event.id || `event-${idx}`;
                                   const isExpanded = expandedEventIds.has(eventId);
                                   return (
-                                    <div key={eventId} className="bg-white rounded border">
+                                    <div key={eventId} className="bg-white/40 backdrop-blur-sm rounded-xl border border-border/10 shadow-sm transition-all duration-300 overflow-hidden">
                                       <div
-                                        className="flex items-center gap-2 text-xs p-2 cursor-pointer hover:bg-gray-50"
+                                        className="flex items-center gap-4 text-[11px] p-4 cursor-pointer hover:bg-white/60 transition-colors"
                                         onClick={() => toggleEventExpand(eventId)}
                                       >
                                         {event.event_type?.includes('completed') ? (
-                                          <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                                          <CheckCircle size={14} className="text-success shrink-0" />
                                         ) : event.event_type?.includes('failed') ? (
-                                          <XCircle size={12} className="text-red-500 shrink-0" />
+                                          <XCircle size={14} className="text-error shrink-0" />
                                         ) : (
-                                          <ChevronRight size={12} className="text-blue-500 shrink-0" />
+                                          <ChevronRight size={14} className="text-primary shrink-0" />
                                         )}
-                                        <span className="text-gray-500 font-mono shrink-0">{event.event_type}</span>
-                                        <span className="text-gray-700">{event.details?.phase_label || ''}</span>
-                                        <span className="text-gray-400 ml-auto">{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : ''}</span>
-                                        {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
+                                        <span className="text-muted-foreground font-mono font-bold shrink-0 opacity-60">{event.event_type}</span>
+                                        <span className="text-foreground font-bold tracking-tight">{(event.details as any)?.phase_label ?? ''}</span>
+                                        <span className="text-muted-foreground/40 ml-auto font-mono">{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : ''}</span>
+                                        {isExpanded ? <ChevronUp size={14} className="text-muted-foreground/40" /> : <ChevronDown size={14} className="text-muted-foreground/40" />}
                                       </div>
                                       {isExpanded && (
-                                        <pre className="px-3 pb-2 text-xs text-gray-600 bg-gray-50 rounded-b border-t overflow-x-auto max-h-40 overflow-y-auto">
+                                        <pre className="p-5 text-xs text-foreground/60 bg-muted/30 border-t border-border/10 overflow-x-auto max-h-60 custom-scrollbar font-mono leading-relaxed">
                                           {JSON.stringify(event.details || {}, null, 2)}
                                         </pre>
                                       )}
                                     </div>
                                   );
                                 })}
-                              </div>
                             </div>
                           ) : (
-                            <p className="italic text-gray-500">No events recorded.</p>
+                            <div className="py-12 text-center glass rounded-xl border-dashed">
+                               <p className="text-sm font-bold text-muted-foreground/40 uppercase tracking-widest">No persistent event telemetry found</p>
+                            </div>
                           )}
                         </div>
                       )}
@@ -527,7 +560,7 @@ export default function RunsPage() {
           <div className="space-y-4">
             <div className={`rounded-lg p-4 text-sm ${startResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
               <div className="flex items-center gap-2 mb-2">
-                {startResult.success ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                {startResult.success ? <CheckCircle size={20} /> : <XCircle size={20} />}
                 <strong>{startResult.success ? 'Done!' : 'Failed'}</strong>
               </div>
               <p>{startResult.message}</p>

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoscience — Architecture Diagram</title>
+<style>
+  :root {
+    --amber: #d97706;
+    --amber-light: #fef3c7;
+    --amber-dark: #92400e;
+    --stone: #44403c;
+    --stone-light: #f5f5f4;
+    --stone-mid: #a8a29e;
+    --terracotta: #c2410c;
+    --forest: #15803d;
+    --crimson: #b91c1c;
+    --bg: #fdfaf6;
+    --fg: #1c1917;
+    --card-bg: #ffffffec;
+    --radius: 10px;
+    --shadow: 0 2px 8px rgba(68,64,60,0.08);
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--fg);
+    padding: 32px;
+    line-height: 1.5;
+  }
+  .container { max-width: 1300px; margin: 0 auto; }
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--amber-dark);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: var(--stone);
+    margin-bottom: 32px;
+    font-weight: 500;
+  }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--stone);
+    margin: 36px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--amber-light);
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--amber-dark);
+    margin-bottom: 10px;
+  }
+
+  /* ===== LAYERED ARCHITECTURE DIAGRAM ===== */
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 20px 0 32px;
+  }
+  .layer {
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    position: relative;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s;
+  }
+  .layer:hover { transform: translateX(4px); }
+  .layer .label {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .layer .components {
+    font-size: 13px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .layer .components .chip {
+    background: rgba(255,255,255,0.6);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .layer-frontend { background: #e8f4f8; border-left: 4px solid #0284c7; }
+  .layer-api { background: #f0fdf4; border-left: 4px solid var(--forest); }
+  .layer-orchestrator { background: var(--amber-light); border-left: 4px solid var(--amber); }
+  .layer-engine { background: #fef2f2; border-left: 4px solid var(--terracotta); }
+  .layer-services { background: #f5f3ff; border-left: 4px solid #7c3aed; }
+  .layer-models { background: #fefce8; border-left: 4px solid #eab308; }
+  .layer-llm { background: #ecfdf5; border-left: 4px solid #059669; }
+  .layer-connectors { background: #fdf2f8; border-left: 4px solid #db2777; }
+  .layer-sandbox { background: #f1f5f9; border-left: 4px solid #475569; }
+  .layer-infra { background: #1c1917; color: #fdfaf6; border-left: 4px solid #78716c; }
+  .layer-infra .label { color: var(--amber-light); }
+  .layer-infra .components .chip { background: rgba(255,255,255,0.1); }
+
+  /* Arrows between layers */
+  .arrow-down { text-align: center; font-size: 14px; color: var(--stone-mid); margin: -2px 0; }
+
+  /* ===== DATA FLOW DIAGRAM ===== */
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    box-shadow: var(--shadow);
+    font-size: 13px;
+  }
+  .flow-row .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--amber);
+    color: white;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .flow-row .step-name {
+    font-weight: 600;
+    color: var(--stone);
+    min-width: 140px;
+  }
+  .flow-row .step-desc {
+    color: #57534e;
+    flex: 1;
+    min-width: 200px;
+  }
+  .flow-arrow { font-size: 12px; color: var(--stone-mid); text-align: center; }
+
+  /* ===== TABLES ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 12px 0 20px;
+    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  th {
+    background: var(--stone);
+    color: white;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid #e7e5e4;
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #fafaf9; }
+  .tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-done { background: #dcfce7; color: #166534; }
+  .tag-partial { background: #fef9c3; color: #854d0e; }
+  .tag-missing { background: #fee2e2; color: #991b1b; }
+  .tag-stub { background: #f3e8ff; color: #6b21a8; }
+
+  /* ===== CARDS ===== */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin: 12px 0 20px;
+  }
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card h4 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .card p { font-size: 12px; color: #57534e; margin-bottom: 8px; }
+  .card .meta { font-size: 11px; color: var(--stone-mid); }
+
+  /* ===== FILTER / SECTION ===== */
+  .section-toggle {
+    display: none;
+  }
+  .section-content {
+    margin-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🧪 Autoscience Architecture</h1>
+<div class="subtitle">Background Scientific Cognition System — Layer &amp; Data Flow Diagram</div>
+
+<!-- ============================== -->
+<!-- LAYERED ARCHITECTURE STACK     -->
+<!-- ============================== -->
+<h2>① Layered Architecture</h2>
+<div class="stack">
+
+<div class="layer layer-frontend">
+  <div class="label">Frontend (Next.js 14 + React + Tailwind)</div>
+  <div class="components">
+    <span class="chip">App Router Pages</span>
+    <span class="chip">UI Components</span>
+    <span class="chip">Layout (Sidebar/Header)</span>
+    <span class="chip">API Client (api.ts)</span>
+    <span class="chip">TypeScript Types</span>
+    <span class="chip">React Query</span>
+    <span class="chip">Recharts / ReactFlow</span>
+    <span class="chip">SSE Stream Listener</span>
+  </div>
+</div>
+<div class="arrow-down">▼ HTTP API (JSON)</div>
+
+<div class="layer layer-api">
+  <div class="label">API Layer (FastAPI — 30+ endpoints)</div>
+  <div class="components">
+    <span class="chip">research.py</span>
+    <span class="chip">projects.py</span>
+    <span class="chip">ideas.py</span>
+    <span class="chip">papers.py</span>
+    <span class="chip">runs.py</span>
+    <span class="chip">skills.py</span>
+    <span class="chip">questions.py</span>
+    <span class="chip">manuscripts.py</span>
+    <span class="chip">datasets.py</span>
+    <span class="chip">approvals.py</span>
+    <span class="chip">router.py</span>
+  </div>
+</div>
+<div class="arrow-down">▼ Service / Orchestrator Call</div>
+
+<div class="layer layer-orchestrator">
+  <div class="label">Orchestration Layer</div>
+  <div class="components">
+    <span class="chip">ResearchOrchestrator (orchestrator.py)</span>
+    <span class="chip">ResearchWorkflow (research_workflow.py)</span>
+    <span class="chip">EventBroadcaster (event_stream.py)</span>
+    <span class="chip">SafetyGates (safety_gates.py)</span>
+    <span class="chip">SnapshotService (snapshot_service.py)</span>
+    <span class="chip">IdleScheduler (idle_scheduler.py)</span>
+  </div>
+</div>
+<div class="arrow-down">▼ Delegates to</div>
+
+<div class="layer layer-services">
+  <div class="label">Service Layer (40+ services)</div>
+  <div class="components">
+    <span class="chip">ProjectService</span>
+    <span class="chip">IdeaLedgerService</span>
+    <span class="chip">ResearchPersistenceService</span>
+    <span class="chip">ResearchRunService</span>
+    <span class="chip">PaperService</span>
+    <span class="chip">ClusterService</span>
+    <span class="chip">ConflictService</span>
+    <span class="chip">QuestionService</span>
+    <span class="chip">HypothesisService</span>
+    <span class="chip">ScoringService</span>
+    <span class="chip">SkillMemoryService</span>
+    <span class="chip">KnowledgeBaseService</span>
+    <span class="chip">ReportGenerator</span>
+    <span class="chip">ManuscriptService</span>
+    <span class="chip">AuditService</span>
+    <span class="chip">SafetyService</span>
+    <span class="chip">CacheService</span>
+    <span class="chip">EmbeddingService</span>
+    <span class="chip">OAuthService</span>
+  </div>
+</div>
+<div class="arrow-down">▼ Invokes</div>
+
+<div class="layer layer-engine">
+  <div class="label">Engine Layer (LLM-powered cognitive engines — 16 engines)</div>
+  <div class="components">
+    <span class="chip">KeywordExpansionEngine</span>
+    <span class="chip">LiteratureEngine</span>
+    <span class="chip">PaperAnalysisEngine</span>
+    <span class="chip">ClusteringEngine</span>
+    <span class="chip">ConflictDetectionEngine</span>
+    <span class="chip">QuestionGenerationEngine</span>
+    <span class="chip">HypothesisGenerationEngine</span>
+    <span class="chip">ValidationPlanningEngine</span>
+    <span class="chip">IdeaScoringEngine</span>
+    <span class="chip">IdleCognitionEngine</span>
+    <span class="chip">ManuscriptGenerator</span>
+    <span class="chip">DomainPacks</span>
+  </div>
+</div>
+<div class="arrow-down">▼ Uses</div>
+
+<div class="layer layer-llm">
+  <div class="label">LLM Layer (5 providers with auto-fallback)</div>
+  <div class="components">
+    <span class="chip">OpenAI (GPT-4o)</span>
+    <span class="chip">Anthropic (Claude Sonnet 4)</span>
+    <span class="chip">OpenRouter</span>
+    <span class="chip">Local (Ollama)</span>
+    <span class="chip">Llama.cpp</span>
+    <span class="chip">LLMRouter (fallback chain)</span>
+  </div>
+</div>
+<div class="arrow-down">▼</div>
+
+<div class="layer layer-connectors">
+  <div class="label">Connector Layer (Academic Sources + External APIs)</div>
+  <div class="components">
+    <span class="chip">Semantic Scholar</span>
+    <span class="chip">arXiv</span>
+    <span class="chip">OpenAlex</span>
+    <span class="chip">Crossref (stub)</span>
+    <span class="chip">PubMed (stub)</span>
+    <span class="chip">SearXNG (optional)</span>
+    <span class="chip">Firecrawl (optional)</span>
+    <span class="chip">ConnectorManager</span>
+    <span class="chip">DatasetConnectors (HF/Zenodo)</span>
+  </div>
+</div>
+<div class="arrow-down">▼</div>
+
+<div class="layer layer-sandbox">
+  <div class="label">Sandbox Layer (Docker-isolated code execution)</div>
+  <div class="components">
+    <span class="chip">SandboxExecutor (run_python)</span>
+    <span class="chip">PowerAnalysis</span>
+    <span class="chip">PlotlyVisualization</span>
+    <span class="chip">NotebookExport</span>
+    <span class="chip">ScriptGenerator</span>
+  </div>
+</div>
+<div class="arrow-down">▼</div>
+
+<div class="layer layer-models">
+  <div class="label">Data Layer (30+ SQLAlchemy models + Pydantic schemas)</div>
+  <div class="components">
+    <span class="chip">Project</span>
+    <span class="chip">Idea + IdeaVersion + IdeaScore + IdeaClassification + IdeaDecision</span>
+    <span class="chip">ResearchRun + ResearchRunEvent + ToolCall + IdleCycle</span>
+    <span class="chip">Paper + PaperSource + PaperFulltext + PaperEmbedding + PaperAnalysis</span>
+    <span class="chip">PaperCluster + ClusterLabel + ClusterConflict</span>
+    <span class="chip">ResearchQuestion + Hypothesis + ValidationPlan</span>
+    <span class="chip">Skill + SkillVersion + SkillUsage + SkillEvaluation</span>
+    <span class="chip">Report + KnowledgeNote + LiteratureSearch + Dataset + AnalysisRun</span>
+    <span class="chip">AuditLog + ApprovalRequest + SystemEvent</span>
+  </div>
+</div>
+<div class="arrow-down">▼</div>
+
+<div class="layer layer-infra">
+  <div class="label">Infrastructure Layer</div>
+  <div class="components">
+    <span class="chip">PostgreSQL 15+ (asyncpg)</span>
+    <span class="chip">Redis 7+ (cache + pub/sub + locks)</span>
+    <span class="chip">pgvector (embeddings)</span>
+    <span class="chip">Docker Compose</span>
+    <span class="chip">Alembic (18 migrations)</span>
+  </div>
+</div>
+
+</div><!-- /stack -->
+
+<!-- ============================== -->
+<!-- RESEARCH WORKFLOW              -->
+<!-- ============================== -->
+<h2>② Research Workflow (16 Steps)</h2>
+
+<div class="flow-row">
+  <span class="step-num">1</span>
+  <span class="step-name">Interpret Intent</span>
+  <span class="step-desc">UserIntentAgent analyzes prompt, determines flexibility level</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">2</span>
+  <span class="step-name">Plan Search</span>
+  <span class="step-desc">KeywordExpansionEngine generates multi-query search plan</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">3</span>
+  <span class="step-name">Retrieve Literature</span>
+  <span class="step-desc">LiteratureEngine searches 7+ sources, deduplicates, ranks</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">4</span>
+  <span class="step-name">Analyze Papers</span>
+  <span class="step-desc">PaperAnalysisEngine extracts claims, methods, limitations</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">5</span>
+  <span class="step-name">Cluster Papers</span>
+  <span class="step-desc">ClusteringEngine groups by theme, labels clusters, computes entropy</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">6</span>
+  <span class="step-name">Detect Conflicts</span>
+  <span class="step-desc">ConflictDetectionEngine finds tensions (8 types) across clusters</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">7</span>
+  <span class="step-name">Generate Questions</span>
+  <span class="step-desc">QuestionGenerationEngine derives research questions</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">8</span>
+  <span class="step-name">Form Hypotheses</span>
+  <span class="step-desc">HypothesisGenerationEngine creates testable hypotheses with variables</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">9</span>
+  <span class="step-name">Plan Validation</span>
+  <span class="step-desc">ValidationPlanningEngine designs experiments, identifies baselines</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">10</span>
+  <span class="step-name">Score Idea</span>
+  <span class="step-desc">IdeaScoringEngine evaluates 12 dimensions, classifies (high→reject)</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">11</span>
+  <span class="step-name">Make Decision</span>
+  <span class="step-desc">Decision records continue/pivot/archive/reject based on score</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">12</span>
+  <span class="step-name">Generate Experiment</span>
+  <span class="step-desc">DeveloperAgent writes Python validation code</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">13</span>
+  <span class="step-name">Run Experiment</span>
+  <span class="step-desc">SandboxExecutor runs code in isolated Docker container</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">14</span>
+  <span class="step-name">Create Skills</span>
+  <span class="step-desc">SkillCurator creates reusable patterns from successful workflow</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">15</span>
+  <span class="step-name">Generate Manuscript</span>
+  <span class="step-desc">ManuscriptGenerator produces IMRaD LaTeX with bibtex</span>
+</div>
+<div class="flow-arrow">▼</div>
+<div class="flow-row">
+  <span class="step-num">16</span>
+  <span class="step-name">Generate Report</span>
+  <span class="step-desc">ReportGenerator creates comprehensive markdown report</span>
+</div>
+
+<!-- ============================== -->
+<!-- 17 AGENTS                      -->
+<!-- ============================== -->
+<h2>③ Agent System (17 Specialized Agents)</h2>
+
+<table>
+<thead><tr><th>Agent</th><th>Role</th><th>Tools</th><th>System Prompt Highlights</th></tr></thead>
+<tbody>
+<tr><td><strong>Orchestrator</strong></td><td>Controls run flow, state tracking</td><td>State mgmt, task assignment, budget</td><td>Coordinate all agents, enforce budgets</td></tr>
+<tr><td><strong>User Intent</strong></td><td>Interpret prompts, flexibility</td><td>Prompt analysis</td><td>Extract core topic, determine strict/flexible</td></tr>
+<tr><td><strong>Idle Cognition</strong></td><td>Autonomous background research</td><td>Lit search, idea gen, conflict detection</td><td>Generate ideas during idle periods</td></tr>
+<tr><td><strong>Literature</strong></td><td>Search/retrieve papers</td><td>Academic search, paper retrieval, citations</td><td>Generate effective queries, rank results</td></tr>
+<tr><td><strong>Paper Analyst</strong></td><td>Extract structured info</td><td>Paper analysis, claim extraction</td><td>Read, understand, extract problem/method/findings</td></tr>
+<tr><td><strong>Cluster</strong></td><td>Group papers thematically</td><td>Clustering, embedding</td><td>Group by topic/method/findings</td></tr>
+<tr><td><strong>Conflict</strong></td><td>Detect scientific tensions</td><td>Conflict detection, contradiction analysis</td><td>Detect finding/method/dataset/assumption conflicts</td></tr>
+<tr><td><strong>Research Question</strong></td><td>Generate questions from conflicts</td><td>Question generation</td><td>Generate specific, testable questions</td></tr>
+<tr><td><strong>Hypothesis</strong></td><td>Form testable hypotheses</td><td>Hypothesis formation</td><td>Convert Q→H with variables, failure conditions</td></tr>
+<tr><td><strong>Validation Planner</strong></td><td>Design experiments</td><td>Experiment design, dataset search</td><td>Design experiments, identify datasets/baselines</td></tr>
+<tr><td><strong>Data Analyst</strong></td><td>Run sandbox analysis</td><td>Sandbox execution, analysis, visualization</td><td>Prepare data, write scripts, generate visuals</td></tr>
+<tr><td><strong>Skeptic</strong></td><td>Challenge & critique</td><td>Prior art search, critique</td><td>Challenge novelty, attack feasibility assumptions</td></tr>
+<tr><td><strong>Decision</strong></td><td>Choose next action</td><td>Decision making</td><td>Evaluate progress, choose continue/revise/pivot/archive/promote</td></tr>
+<tr><td><strong>Skill Curator</strong></td><td>Create/update skills</td><td>Skill management</td><td>Detect reusable patterns, create candidates</td></tr>
+<tr><td><strong>Archivist</strong></td><td>Document & audit</td><td>Logging, reporting, wiki</td><td>Maintain audit logs, generate reports, update wiki</td></tr>
+<tr><td><strong>Developer</strong></td><td>Write experiment code</td><td>Code generation, scripting</td><td>Translate validation plans to Python</td></tr>
+<tr><td><strong>Scientific Writer</strong></td><td>Draft LaTeX manuscripts</td><td>LaTeX generation, manuscript drafting</td><td>IMRaD structure, rigorous academic tone</td></tr>
+</tbody>
+</table>
+
+<!-- ============================== -->
+<!-- DATA FLOW PATTERNS             -->
+<!-- ============================== -->
+<h2>④ Data Flow Patterns</h2>
+
+<div class="card-grid">
+
+<div class="card">
+  <h4>🧵 Primary Research Flow</h4>
+  <p>User submits prompt → API creates idea + run → Orchestrator builds workflow → Workflow iterates 16 steps → Each step updates ResearchState in-memory → PersistenceService writes to DB → Report/Wiki generated → Events broadcast via Redis Pub/Sub → Frontend receives SSE updates</p>
+  <div class="meta">File: orchestrator.py → research_workflow.py → research_persistence_service.py</div>
+</div>
+
+<div class="card">
+  <h4>⏰ Idle Cognition Flow</h4>
+  <p>IdleScheduler (APScheduler, every 5 min) → checks user inactivity + budget → selects idle mode (frontier scan / citation-conflict / revisited rejected / cross-domain / skill improvement / dataset discovery) → IdleCognitionEngine runs → results stored → wiki updated</p>
+  <div class="meta">File: idle_scheduler.py → idle_cognition.py</div>
+</div>
+
+<div class="card">
+  <h4>🔄 State Persistence Flow</h4>
+  <p>ResearchState (Pydantic, in-memory) → ResearchPersistenceService.persist_run_results() → batch dedup papers → store papers/clusters/conflicts/questions/hypotheses → embed new papers → update run metrics → flush</p>
+  <div class="meta">File: research_persistence_service.py → deduplication.py → embedding_service.py</div>
+</div>
+
+<div class="card">
+  <h4>📡 Real-time Event Flow</h4>
+  <p>Workflow step executes → _broadcast_event() called → 1) persist to DB via run_service.add_run_event() → 2) publish to Redis channel run:{run_id}:events via EventBroadcaster → Frontend SSE endpoint subscribes → events sent as text/event-stream</p>
+  <div class="meta">File: research_workflow.py → event_stream.py → sse_stream.py</div>
+</div>
+
+<div class="card">
+  <h4>🔒 Safety Gate Flow</h4>
+  <p>Before each gated step → enforce_step_safety_gate() checks: 1) is action permitted? 2) will projected cost exceed $1 threshold? 3) budget remaining? → if blocked, creates ApprovalRequest in DB → raises ApprovalGateError → workflow pauses → frontend shows DecisionGate component</p>
+  <div class="meta">File: safety_gates.py → safety_service.py</div>
+</div>
+
+<div class="card">
+  <h4>🔄 Snapshot/Restore Flow</h4>
+  <p>Resume API called → SnapshotService.create_snapshot(run_id) → loads Run + Idea + Papers + Clusters + Conflicts + Questions + Hypotheses + Scores + Events + ToolCalls from DB → reconstructs full ResearchState → workflow.run_from_step(state, start_step)</p>
+  <div class="meta">File: snapshot_service.py</div>
+</div>
+
+</div>
+
+<!-- ============================== -->
+<!-- BACKEND DIRECTORY MAP          -->
+<!-- ============================== -->
+<h2>⑤ Backend Directory Map</h2>
+
+<table>
+<thead><tr><th>Layer</th><th>Directory</th><th>File Count</th><th>Key Files</th></tr></thead>
+<tbody>
+<tr><td>📡 API</td><td>backend/app/api/</td><td>18 files</td><td>router.py, research.py, projects.py, papers.py, manuscripts.py</td></tr>
+<tr><td>🧠 Services</td><td>backend/app/services/</td><td>42 files</td><td>orchestrator.py, research_persistence_service.py, knowledge_service.py</td></tr>
+<tr><td>⚙️ Engines</td><td>backend/app/engine/</td><td>17 files</td><td>scoring.py, clustering.py, conflict_detection.py, manuscript_engine.py</td></tr>
+<tr><td>🤖 Agents</td><td>backend/app/agents/</td><td>2 files</td><td>base.py (17 agents defined)</td></tr>
+<tr><td>🔌 LLM</td><td>backend/app/llm/</td><td>8 files</td><td>router.py, openai_provider.py, anthropic_provider.py</td></tr>
+<tr><td>🔗 Connectors</td><td>backend/app/connectors/</td><td>12 files</td><td>manager.py, arxiv.py, semantic_scholar.py, openalex.py</td></tr>
+<tr><td>🗄️ Models</td><td>backend/app/models/</td><td>11 files</td><td>project.py, idea.py, paper.py, research_run.py, report.py</td></tr>
+<tr><td>📋 Schemas</td><td>backend/app/schemas/</td><td>15 files</td><td>research_state.py, all Pydantic models</td></tr>
+<tr><td>🛡️ Middleware</td><td>backend/app/middleware/</td><td>4 files</td><td>auth.py, rate_limit.py, request_validation.py</td></tr>
+<tr><td>📦 Sandbox</td><td>backend/app/sandbox/</td><td>3 files</td><td>executor.py, artifacts.py</td></tr>
+<tr><td>🏗️ Workflows</td><td>backend/app/workflows/</td><td>3 files</td><td>research_workflow.py, safety_gates.py</td></tr>
+</tbody>
+</table>
+
+<!-- ============================== -->
+<!-- COMPLETION STATUS              -->
+<!-- ============================== -->
+<h2>⑥ Feature Completion Status</h2>
+
+<table>
+<thead><tr><th>Capability</th><th>Status</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>Multi-source Literature Search</td><td><span class="tag tag-done">✅ Done</span></td><td>arXiv, Semantic Scholar, OpenAlex fully implemented</td></tr>
+<tr><td>Full-text Paper Analysis</td><td><span class="tag tag-done">✅ Done</span></td><td>Claims, methods, limitations, assumptions extraction</td></tr>
+<tr><td>Conflict Detection (8 types)</td><td><span class="tag tag-done">✅ Done</span></td><td>Finding, method, dataset, assumption, scope, recency, theory-practice</td></tr>
+<tr><td>Question & Hypothesis Generation</td><td><span class="tag tag-done">✅ Done</span></td><td>From conflicts with ranking + testable hypothesis formation</td></tr>
+<tr><td>Idea Scoring (12-dimension)</td><td><span class="tag tag-done">✅ Done</span></td><td>Weighted utility with classification (high→reject)</td></tr>
+<tr><td>Manuscript Generation (IMRaD)</td><td><span class="tag tag-done">✅ Done</span></td><td>LaTeX with bibtex, citation manager</td></tr>
+<tr><td>Idle Cognition (6 modes)</td><td><span class="tag tag-done">✅ Done</span></td><td>Autonomous background research with scheduler</td></tr>
+<tr><td>Skill Memory System</td><td><span class="tag tag-done">✅ Done</span></td><td>Create, track, version, retire skills</td></tr>
+<tr><td>SSE Real-time Streaming</td><td><span class="tag tag-done">✅ Done</span></td><td>Redis Pub/Sub → SSE endpoint</td></tr>
+<tr><td>Docker Infrastructure</td><td><span class="tag tag-done">✅ Done</span></td><td>backend, frontend, pg, redis, sandbox</td></tr>
+<tr><td>Validation Planning</td><td><span class="tag tag-partial">⚠️ Partial</span></td><td>Plan generation works; baseline/cost/difficulty estimation need work</td></tr>
+<tr><td>PubMed, Crossref, DOAJ, CORE, Unpaywall</td><td><span class="tag tag-stub">🧩 Stub</span></td><td>Connector skeletons exist but not fully implemented</td></tr>
+<tr><td>Real Sandbox Code Execution</td><td><span class="tag tag-partial">⚠️ Partial</span></td><td>Docker infrastructure exists; returns mock results in some paths</td></tr>
+<tr><td>LaTeX → PDF Compilation</td><td><span class="tag tag-partial">⚠️ Partial</span></td><td>Basic pdflatex support, no full pipeline</td></tr>
+<tr><td>Frontend E2E Tests</td><td><span class="tag tag-partial">⚠️ Partial</span></td><td>Single Playwright smoke test exists</td></tr>
+<tr><td>Full Workflow Integration Test</td><td><span class="tag tag-missing">❌ Missing</span></td><td>No test exercising complete research pipeline</td></tr>
+</tbody>
+</table>
+
+<p style="margin-top: 32px; font-size: 13px; color: var(--stone-mid); text-align: center;">Autoscience Architecture — Generated 2026-07</p>
+</div><!-- /container -->
+</body>
+</html>

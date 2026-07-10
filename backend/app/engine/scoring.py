@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -153,7 +153,7 @@ class IdeaScoringEngine:
             prior_art_risk=prior_art,
             safety_risk=safety,
             cost_risk=cost,
-            rationale='Simple metadata-based scoring (no LLM available)',
+            rationale="Simple metadata-based scoring (no LLM available)",
         )
         score.overall_value = self._calculate_overall_value(score)
         score.classification = self._classify(score.overall_value)
@@ -172,6 +172,12 @@ class IdeaScoringEngine:
             try:
                 score = await self.score_idea(idea, papers, conflicts)
                 scores.append(score)
+            except (ValueError, RuntimeError) as e:
+                logger.error(
+                    "idea_scoring_error",
+                    idea_id=idea.get("id"),
+                    error=str(e),
+                )
             except Exception as e:
                 logger.error(
                     "idea_scoring_failed",
@@ -203,19 +209,19 @@ class IdeaScoringEngine:
 
         if papers:
             papers_summary = "\n".join(
-                [f"- {p.get('title', 'Unknown')}" for p in papers[:10]]
+                [f"- {p.get('title', 'Unknown')}" for p in papers[:10]],
             )
             context_parts.append(f"Relevant papers:\n{papers_summary}")
 
         if conflicts:
             conflicts_summary = "\n".join(
-                [f"- [{c.get('type')}] {c.get('description', '')[:100]}" for c in conflicts[:5]]
+                [f"- [{c.get('type')}] {c.get('description', '')[:100]}" for c in conflicts[:5]],
             )
             context_parts.append(f"Conflicts identified:\n{conflicts_summary}")
 
         if validation_plan:
             context_parts.append(
-                f"Validation feasibility: {validation_plan.get('feasibility_score', 'Unknown')}"
+                f"Validation feasibility: {validation_plan.get('feasibility_score', 'Unknown')}",
             )
 
         context = "\n\n".join(context_parts) if context_parts else "No additional context."
@@ -272,12 +278,13 @@ Score this idea on all dimensions as JSON."""
             + self.WEIGHTS["cost_risk"] * score.cost_risk
         )
 
-        # Normalize to 0-10 scale
-        # Max possible: 0.18*10 + 0.14*10 + 0.14*10 + 0.12*10 + 0.14*10 + 0.12*10 + 0.08*10 + 0.05*10 + 0.03*10 - 0.15*0 - 0.05*0 - 0.03*0 = 10
-        # Min possible: 0.18*0 + ... - 0.15*10 - 0.05*10 - 0.03*10 = -2.3
+        # Dynamically calculate min/max possible to normalize to 0-10 scale
+        # Max is when all positive-weight dimensions are 10 and all negative-weight are 0
+        # Min is when all positive-weight dimensions are 0 and all negative-weight are 10
+        max_possible = sum(w * 10 for w in self.WEIGHTS.values() if w > 0)
+        min_possible = sum(w * 10 for w in self.WEIGHTS.values() if w < 0)
+
         # Scale: (value - min) / (max - min) * 10
-        min_possible = -2.3
-        max_possible = 10.0
         normalized = ((overall - min_possible) / (max_possible - min_possible)) * 10
         return round(max(0, min(10, normalized)), 2)
 
@@ -285,14 +292,13 @@ Score this idea on all dimensions as JSON."""
         """Classify idea based on overall value."""
         if overall_value >= self.THRESHOLDS["high_value"]:
             return "high_value"
-        elif overall_value >= self.THRESHOLDS["promising"]:
+        if overall_value >= self.THRESHOLDS["promising"]:
             return "promising"
-        elif overall_value >= self.THRESHOLDS["incremental"]:
+        if overall_value >= self.THRESHOLDS["incremental"]:
             return "incremental"
-        elif overall_value >= self.THRESHOLDS["weak"]:
+        if overall_value >= self.THRESHOLDS["weak"]:
             return "weak"
-        else:
-            return "reject"
+        return "reject"
 
     async def _generate_notes(self, scores: list[IdeaScore]) -> str:
         """Generate notes about scoring results."""
@@ -304,7 +310,7 @@ Score this idea on all dimensions as JSON."""
             [
                 f"- {s.classification}: {s.overall_value:.2f} (novelty={s.novelty:.1f}, feasibility={s.feasibility:.1f})"
                 for s in top_ideas
-            ]
+            ],
         )
 
         # Count by classification

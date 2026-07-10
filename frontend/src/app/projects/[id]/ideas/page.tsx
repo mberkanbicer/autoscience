@@ -8,12 +8,13 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { Textarea } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonCard } from '@/components/ui/Skeleton';
-import { ideasApi } from '@/lib/api';
-import { Idea } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import { ideasApi, getAuthHeaders } from '@/lib/api';
+import { getLlmHeaders } from '@/lib/apiSettings';
+import { Idea, GeneratedIdea } from '@/lib/types';
+import { formatDate, cn } from '@/lib/utils';
 import {
   Lightbulb,
   Plus,
@@ -132,17 +133,21 @@ export default function IdeasPage() {
   const handleStartResearch = async (idea: Idea) => {
     setActionLoading(idea.id);
     try {
-      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
       const response = await fetch(
-        `/api/v1/research/run?project_id=${projectId}&idea=${encodeURIComponent(idea.current_text || idea.initial_text)}&run_type=user_directed`,
+        '/api/v1/research/run',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
-            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
-            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+            ...getAuthHeaders(),
+            ...getLlmHeaders(),
           },
+          body: JSON.stringify({
+            project_id: projectId,
+            idea: idea.current_text || idea.initial_text,
+            run_type: 'user_directed',
+            flexibility: idea.flexibility || 0.6,
+          }),
         }
       );
       if (response.ok) {
@@ -165,20 +170,14 @@ export default function IdeasPage() {
     setGenerating(true);
     setGenerateResult(null);
     try {
-      const apiSettings = JSON.parse(localStorage.getItem('autoscience_api_settings') || '{}');
       const response = await fetch(
         `/api/v1/ideas/generate?project_id=${projectId}&topic=${encodeURIComponent(generateTopic)}&num_ideas=5`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-OpenRouter-API-Key': apiSettings.openrouter_api_key || '',
-            'X-OpenRouter-Model': apiSettings.openrouter_model || 'openai/gpt-4o',
-            'X-OpenAI-API-Key': apiSettings.openai_api_key || '',
-            'X-OpenAI-Model': apiSettings.openai_model || 'gpt-4o',
-            'X-Anthropic-API-Key': apiSettings.anthropic_api_key || '',
-            'X-Anthropic-Model': apiSettings.anthropic_model || 'claude-sonnet-4-20250514',
-            'X-Default-Provider': apiSettings.default_provider || 'openrouter',
+            ...getAuthHeaders(),
+            ...getLlmHeaders(),
           },
         }
       );
@@ -247,30 +246,38 @@ export default function IdeasPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ideas.map((idea) => (
-              <Card key={idea.id} hover>
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Lightbulb size={18} className={isActive(idea) ? 'text-yellow-500' : 'text-gray-400'} />
-                      <Badge variant={getStatusColor(idea.status)}>
+              <Card key={idea.id} hover className="group">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        'w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-colors duration-500',
+                        isActive(idea) ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground/40'
+                      )}>
+                        <Lightbulb size={20} className={isActive(idea) ? 'animate-pulse' : ''} />
+                      </div>
+                      <Badge variant={getStatusColor(idea.status)} className={cn(
+                        'uppercase text-[10px] font-bold tracking-widest',
+                        idea.status === 'active' && 'bg-success/10'
+                      )}>
                         {idea.status}
                       </Badge>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-4px] group-hover:translate-y-0">
                       {/* Start Research — only for active ideas */}
                       {isActive(idea) && (
                         <button
                           onClick={() => handleStartResearch(idea)}
                           disabled={actionLoading === idea.id}
-                          className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
+                          className="p-2 rounded-lg hover:bg-success/10 text-success transition-all duration-300 hover:scale-110"
                           title="Start Research Run"
                         >
                           {actionLoading === idea.id ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
-                            <Play size={16} />
+                            <Play size={16} fill="currentColor" className="opacity-20" />
                           )}
                         </button>
                       )}
@@ -279,13 +286,13 @@ export default function IdeasPage() {
                         <button
                           onClick={() => handlePause(idea)}
                           disabled={actionLoading === idea.id}
-                          className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors"
-                          title="Pause (stops research, allows editing)"
+                          className="p-2 rounded-lg hover:bg-warning/10 text-warning transition-all duration-300 hover:scale-110"
+                          title="Pause"
                         >
                           {actionLoading === idea.id ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
-                            <Pause size={16} />
+                            <Pause size={16} fill="currentColor" className="opacity-20" />
                           )}
                         </button>
                       )}
@@ -293,13 +300,13 @@ export default function IdeasPage() {
                         <button
                           onClick={() => handleResume(idea)}
                           disabled={actionLoading === idea.id}
-                          className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
-                          title="Resume (restarting research)"
+                          className="p-2 rounded-lg hover:bg-success/10 text-success transition-all duration-300 hover:scale-110"
+                          title="Resume"
                         >
                           {actionLoading === idea.id ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
-                            <Play size={16} />
+                            <Play size={16} fill="currentColor" className="opacity-20" />
                           )}
                         </button>
                       )}
@@ -307,65 +314,56 @@ export default function IdeasPage() {
                       {isPaused(idea) && (
                         <button
                           onClick={() => setEditingIdea(idea)}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                          className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-all duration-300 hover:scale-110"
                           title="Edit"
                         >
                           <Edit2 size={16} />
                         </button>
                       )}
-                      {isActive(idea) && (
-                        <span className="p-1.5 text-gray-300" title="Pause the idea to edit">
-                          <Lock size={16} />
-                        </span>
-                      )}
                       {/* Delete — only when paused */}
                       {isPaused(idea) && (
                         <button
                           onClick={() => setDeletingIdea(idea)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                          className="p-2 rounded-lg hover:bg-error/10 text-error transition-all duration-300 hover:scale-110"
                           title="Delete"
                         >
                           <Trash2 size={16} />
                         </button>
                       )}
-                      {isActive(idea) && (
-                        <span className="p-1.5 text-gray-300" title="Pause the idea to delete">
-                          <Lock size={16} />
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  <p className="text-gray-800 text-sm mb-3 line-clamp-3">
+                  <p className="text-foreground/80 text-sm font-medium leading-relaxed mb-6 line-clamp-3 group-hover:line-clamp-none transition-all duration-500">
                     {idea.current_text || idea.initial_text}
                   </p>
 
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} />
-                      {formatDate(idea.created_at)}
-                    </span>
-                    {idea.overall_score != null && (
-                      <span className="flex items-center gap-1">
-                        <Sparkles size={12} className="text-yellow-500" />
-                        Score: {(idea.overall_score * 100).toFixed(0)}%
+                  <div className="flex items-center justify-between pt-4 border-t border-border/5">
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                        <Clock size={12} />
+                        {formatDate(idea.created_at)}
                       </span>
+                    </div>
+                    {idea.overall_score != null && (
+                      <div className="flex items-center gap-2 px-2 py-0.5 bg-primary/5 rounded-full border border-primary/10">
+                        <Sparkles size={12} className="text-primary animate-pulse" />
+                        <span className="text-[10px] font-bold text-primary">{(idea.overall_score * 100).toFixed(0)}%</span>
+                      </div>
                     )}
                   </div>
 
-                  {idea.classification && (
-                    <div className="mt-3">
-                      <Badge variant="info" size="sm">
-                        {idea.classification}
-                      </Badge>
-                    </div>
-                  )}
-
-                  {idea.parent_idea_id && (
-                    <div className="mt-2">
-                      <Badge variant="default" size="sm">
-                        sub-idea
-                      </Badge>
+                  {(idea.classification || idea.parent_idea_id) && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {idea.classification && (
+                        <Badge variant="info" size="sm" className="bg-primary/5 text-[9px] uppercase tracking-widest font-bold">
+                          {idea.classification}
+                        </Badge>
+                      )}
+                      {idea.parent_idea_id && (
+                        <Badge variant="default" size="sm" className="bg-muted text-[9px] uppercase tracking-widest font-bold">
+                          sub-idea
+                        </Badge>
+                      )}
                     </div>
                   )}
                 </div>
@@ -458,41 +456,46 @@ export default function IdeasPage() {
         size="lg"
       >
         {generateResult ? (
-          <div className="space-y-4">
-            <div className="bg-green-50 rounded-lg p-4 text-sm text-green-800">
-              <p className="font-medium">Generated {generateResult.ideas_generated} ideas from {generateResult.papers_analyzed} papers</p>
-              <p className="mt-1">Ideas have been added to your ideas list.</p>
+          <div className="space-y-6 animate-in fade-in duration-700">
+            <div className="bg-success/10 border border-success/20 rounded-xl p-5 text-sm text-success flex items-start gap-4 shadow-inner">
+               <Sparkles className="shrink-0 animate-pulse" size={20} />
+               <div>
+                  <p className="font-bold uppercase tracking-wider text-[10px]">Synthesis Complete</p>
+                  <p className="mt-1 font-medium">Generated {generateResult.ideas_generated} insights from {generateResult.papers_analyzed} research papers. They have been integrated into your laboratory.</p>
+               </div>
             </div>
-            <div className="space-y-3">
-              {generateResult.ideas.map((idea: any, i: number) => (
-                <div key={i} className="bg-gray-50 rounded-lg p-4">
-                  <p className="font-medium text-gray-900 text-sm">{idea.title}</p>
-                  <p className="text-gray-600 text-sm mt-1">{idea.description}</p>
-                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                    {idea.novelty && <Badge variant="info" size="sm">Novelty: {idea.novelty}</Badge>}
-                    {idea.importance && <span>{idea.importance}</span>}
+            <div className="grid gap-4">
+              {generateResult.ideas.map((idea: GeneratedIdea, i: number) => (
+                <div key={i} className="bg-white/40 backdrop-blur-sm border border-border/10 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+                  <p className="font-bold text-foreground tracking-tight">{idea.title}</p>
+                  <p className="text-muted-foreground text-sm mt-2 leading-relaxed">{idea.description}</p>
+                  <div className="flex items-center gap-3 mt-4">
+                    {idea.novelty && <Badge variant="info" size="sm" className="bg-primary/5 uppercase text-[9px] font-bold tracking-widest">Novelty: {idea.novelty}</Badge>}
+                    {idea.importance && <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">{idea.importance}</span>}
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ) : generating ? (
-          <div className="flex flex-col items-center py-8">
-            <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
-            <h3 className="text-lg font-medium">Searching Literature & Generating Ideas...</h3>
-            <p className="text-sm text-gray-600 mt-1">Analyzing recent papers for gaps and opportunities.</p>
+          <div className="flex flex-col items-center py-16 animate-pulse">
+            <div className="relative mb-8">
+               <Loader2 size={64} className="animate-spin text-primary opacity-20" />
+               <Sparkles size={32} className="absolute inset-0 m-auto text-primary animate-bounce" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground tracking-tight uppercase">Synthesizing Literature...</h3>
+            <p className="text-sm text-muted-foreground mt-2 font-medium">Identifying frontier opportunities and mapping cognitive gaps.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
-              Enter a research topic or field. The system will search recent literature, identify gaps and trends, and generate {5} research ideas.
+          <div className="space-y-6">
+            <div className="bg-primary/5 border border-primary/10 rounded-xl p-5 text-sm text-primary flex items-start gap-4 shadow-inner">
+               <Lightbulb className="shrink-0" size={20} />
+               <p className="font-medium">Enter a research vector. The system will ingest recent publications, detect scientific tensions, and propose high-novelty directions.</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Research Topic or Field</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., metasurface beam steering, CRISPR gene therapy, climate model uncertainty..."
+            <div className="space-y-2">
+              <Input
+                label="Research Vector / Field"
+                placeholder="e.g. quantum neural architectures, CRISPR efficiency in vivo..."
                 value={generateTopic}
                 onChange={(e) => setGenerateTopic(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleGenerateFromLiterature()}

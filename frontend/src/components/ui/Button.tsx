@@ -12,23 +12,23 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading, children, disabled, ...props }, ref) => {
     const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm',
-      secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 shadow-sm',
-      ghost: 'text-gray-600 hover:bg-gray-100',
-      danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+      primary: 'bg-primary text-white hover:bg-primary/90 shadow-2xl shadow-primary/40',
+      secondary: 'bg-white/40 backdrop-blur-md text-foreground border border-border/20 hover:bg-white/60 shadow-lg shadow-black/5',
+      ghost: 'text-muted-foreground hover:bg-primary/5 hover:text-primary',
+      danger: 'bg-error text-white hover:bg-error/90 shadow-2xl shadow-error/40',
     };
 
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-sm',
-      lg: 'px-6 py-3 text-base',
+      sm: 'px-3 py-1.5 text-xs font-bold uppercase tracking-widest',
+      md: 'px-6 py-2.5 text-sm font-bold tracking-tight',
+      lg: 'px-8 py-3.5 text-base font-black tracking-tight',
     };
 
     return (
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+          'inline-flex items-center justify-center rounded-xl transition-all duration-300 active:scale-95 hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-4 disabled:opacity-50 disabled:cursor-not-allowed',
           variants[variant],
           sizes[size],
           className

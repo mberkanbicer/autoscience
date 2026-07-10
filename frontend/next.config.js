@@ -1,23 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   images: {
     domains: ['localhost'],
   },
   async rewrites() {
+    // Use Docker service name when in container, localhost for local dev
+    const apiUrl = process.env.API_URL || (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : 'http://localhost:8000');
     return [
       {
         source: '/api/:path*',
-        destination: 'http://backend:8000/api/:path*',
+        destination: `${apiUrl}/api/:path*`,
       },
     ];
   },
-  // Increase timeout for long-running research requests
+  // Proxy timeout for long-running research requests
   experimental: {
     serverComponentsExternalPackages: [],
   },
-  // Proxy timeout (default is 30s, we need more for research)
-  httpTimeout: 300000, // 5 minutes
 };
 
 module.exports = nextConfig;

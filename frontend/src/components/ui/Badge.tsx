@@ -11,24 +11,25 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
   ({ className, variant = 'default', size = 'sm', children, ...props }, ref) => {
     const variants = {
-      default: 'bg-gray-100 text-gray-700',
-      success: 'bg-green-100 text-green-700',
-      warning: 'bg-yellow-100 text-yellow-700',
-      danger: 'bg-red-100 text-red-700',
-      info: 'bg-blue-100 text-blue-700',
-      purple: 'bg-purple-100 text-purple-700',
+      default: 'bg-muted text-muted-foreground/60 border border-border/10',
+      success: 'bg-success/20 text-success border border-success/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]',
+      warning: 'bg-warning/20 text-warning border border-warning/30 shadow-[0_0_10px_rgba(245,158,11,0.1)]',
+      danger: 'bg-error/20 text-error border border-error/30 shadow-[0_0_10px_rgba(244,63,94,0.1)]',
+      info: 'bg-primary/20 text-primary border border-primary/30 shadow-[0_0_10px_rgba(14,165,233,0.1)]',
+      purple: 'bg-tertiary/20 text-tertiary border border-tertiary/30 shadow-[0_0_10px_rgba(139,92,246,0.1)]',
     };
 
     const sizes = {
-      sm: 'px-2 py-0.5 text-xs',
-      md: 'px-2.5 py-1 text-sm',
+      sm: 'px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em]',
+      md: 'px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em]',
     };
 
     return (
       <span
         ref={ref}
         className={cn(
-          'inline-flex items-center font-medium rounded-full',
+          'inline-flex items-center rounded-lg transition-all duration-300',
+          (variant === 'success' || variant === 'warning') && 'animate-pulse',
           variants[variant],
           sizes[size],
           className

@@ -22,17 +22,18 @@ class Paper(BaseModel):
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
     citation_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     paper_type: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # research | review | survey | dataset | benchmark
     source_connector: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    references: Mapped[list | None] = mapped_column(JSON, default=list, nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="papers")
-    sources = relationship("PaperSource", back_populates="paper", lazy="selectin")
-    fulltext = relationship("PaperFulltext", back_populates="paper", uselist=False, lazy="selectin")
-    embedding = relationship("PaperEmbedding", back_populates="paper", uselist=False, lazy="selectin")
-    analysis = relationship("PaperAnalysis", back_populates="paper", uselist=False, lazy="selectin")
+    sources = relationship("PaperSource", back_populates="paper", lazy="selectin", cascade="all, delete-orphan")
+    fulltext = relationship("PaperFulltext", back_populates="paper", uselist=False, lazy="selectin", cascade="all, delete-orphan")
+    embedding = relationship("PaperEmbedding", back_populates="paper", uselist=False, lazy="selectin", cascade="all, delete-orphan")
+    analysis = relationship("PaperAnalysis", back_populates="paper", uselist=False, lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Paper {self.title[:50]}...>"
@@ -106,17 +107,18 @@ class PaperCluster(BaseModel):
     __tablename__ = "paper_clusters"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     cluster_type: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # topic | method | dataset | claim | application
     paper_ids: Mapped[list] = mapped_column(JSON, default=list)
     representative_paper_id: Mapped[str | None] = mapped_column(nullable=True)
 
     # Relationships
-    labels = relationship("ClusterLabel", back_populates="cluster", lazy="selectin")
-    conflicts = relationship("ClusterConflict", back_populates="cluster", lazy="selectin")
+    labels = relationship("ClusterLabel", back_populates="cluster", lazy="selectin", cascade="all, delete-orphan")
+    conflicts = relationship("ClusterConflict", back_populates="cluster", lazy="selectin", cascade="all, delete-orphan")
 
 
 class ClusterLabel(BaseModel):
@@ -138,9 +140,10 @@ class ClusterConflict(BaseModel):
     __tablename__ = "cluster_conflicts"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     cluster_id: Mapped[str | None] = mapped_column(ForeignKey("paper_clusters.id", ondelete="CASCADE"), nullable=True, index=True)
     conflict_type: Mapped[str] = mapped_column(
-        String(50), nullable=False
+        String(50), nullable=False,
     )  # finding | method | dataset | metric | assumption | scope | theory_practice | recency | replication
     description: Mapped[str] = mapped_column(Text, nullable=False)
     supporting_papers: Mapped[list] = mapped_column(JSON, default=list)

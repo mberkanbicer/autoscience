@@ -3,15 +3,13 @@
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
-from datetime import datetime
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
-from ..models.report import ResearchReport
-from ..schemas.research_state import ResearchState
 
 import structlog
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.report import ResearchReport
+from app.schemas.research_state import ResearchState
 
 logger = structlog.get_logger()
 
@@ -136,8 +134,10 @@ Write a concise executive summary (3-5 paragraphs) covering:
 5. Recommended next steps"""
                 response = await self.llm.generate(prompt, max_tokens=1000)
                 return f"# Executive Summary\n\n{response.strip()}\n\n## Key Metrics\n\n- Papers Analyzed: {len(state.papers)}\n- Clusters: {len(state.clusters)}\n- Conflicts: {len(state.conflicts)}\n- Questions: {len(state.questions)}\n- Hypotheses: {len(state.hypotheses)}"
-            except Exception as e:
+            except (ValueError, RuntimeError) as e:
                 logger.warning("llm_summary_failed", error=str(e))
+            except Exception as e:
+                logger.warning("llm_summary_unexpected", error=str(e))
         # Fallback: structured summary
         return f"""# Executive Summary
 
@@ -203,8 +203,10 @@ Write a literature review (2-4 paragraphs) covering:
 4. Gaps or under-explored areas"""
                 response = await self.llm.generate(prompt, max_tokens=800)
                 return f"# Literature Review\n\n{response.strip()}\n\n## Papers ({len(state.papers)} total)\n\n{papers_list}\n\n## Clusters\n\n{clusters_list or 'No clusters identified.'}"
-            except Exception as e:
+            except (ValueError, RuntimeError) as e:
                 logger.warning("llm_literature_review_failed", error=str(e))
+            except Exception as e:
+                logger.warning("llm_literature_review_unexpected", error=str(e))
 
         return f"""# Literature Review
 
@@ -233,14 +235,16 @@ Write a literature review (2-4 paragraphs) covering:
 Conflicts:\n{conflicts_data}\n
 Write a brief analysis (2 paragraphs) about what they mean and how to resolve them."""
                 response = await self.llm.generate(prompt, max_tokens=500)
-                return f"# Conflicts and Gaps\n\n{response.strip()}\n\n## Detected ({len(state.conflicts)})\n\n{conflicts_list if conflicts_list else 'No conflicts detected.'}"
-            except Exception as e:
+                return f"# Conflicts and Gaps\n\n{response.strip()}\n\n## Detected ({len(state.conflicts)})\n\n{conflicts_list or 'No conflicts detected.'}"
+            except (ValueError, RuntimeError) as e:
                 logger.warning("llm_conflict_analysis_failed", error=str(e))
+            except Exception as e:
+                logger.warning("llm_conflict_analysis_unexpected", error=str(e))
         return f"""# Conflicts and Gaps
 
 {len(state.conflicts)} conflicts identified.
 
-{conflicts_list if conflicts_list else 'No conflicts detected.'}"""
+{conflicts_list or 'No conflicts detected.'}"""
 
     def _generate_questions_section(self, state: ResearchState) -> str:
         """Generate research questions section."""
@@ -255,7 +259,7 @@ Write a brief analysis (2 paragraphs) about what they mean and how to resolve th
 
 {len(state.questions)} questions generated.
 
-{questions_list if questions_list else "No questions generated."}"""
+{questions_list or "No questions generated."}"""
 
     async def _generate_hypotheses_section(self, state: ResearchState) -> str:
         """Generate hypotheses section with LLM analysis."""
@@ -274,18 +278,20 @@ Write a brief analysis (2 paragraphs) about what they mean and how to resolve th
 Hypotheses:\n{hyp_data}\n
 Write a brief analysis about which are most promising and what evidence would validate them."""
                 response = await self.llm.generate(prompt, max_tokens=500)
-                return f"# Hypotheses\n\n{response.strip()}\n\n## All ({len(state.hypotheses)})\n\n{hypotheses_list if hypotheses_list else 'No hypotheses formed.'}"
-            except Exception as e:
+                return f"# Hypotheses\n\n{response.strip()}\n\n## All ({len(state.hypotheses)})\n\n{hypotheses_list or 'No hypotheses formed.'}"
+            except (ValueError, RuntimeError) as e:
                 logger.warning("llm_hypothesis_analysis_failed", error=str(e))
+            except Exception as e:
+                logger.warning("llm_hypothesis_analysis_unexpected", error=str(e))
         return f"""# Hypotheses
 
 {len(state.hypotheses)} hypotheses formed.
 
-{hypotheses_list if hypotheses_list else 'No hypotheses formed.'}"""
+{hypotheses_list or 'No hypotheses formed.'}"""
 
     def _generate_validation_section(self, state: ResearchState) -> str:
         """Generate validation plan section."""
-        return f"""# Validation Plan
+        return """# Validation Plan
 
 ## Plan Overview
 
@@ -358,11 +364,11 @@ The system has learned {skills_created} new research skills from this cycle."""
 
 ## Research Timeline
 
-{timeline if timeline else 'No timeline events recorded.'}
+{timeline or 'No timeline events recorded.'}
 
 ## Events ({len(state.events)} total)
 
-{events_list if events_list else 'No events recorded.'}
+{events_list or 'No events recorded.'}
 
 ## Tool Calls
 
@@ -396,7 +402,7 @@ The system has learned {skills_created} new research skills from this cycle."""
     ) -> list[ResearchReport]:
         """Get all reports for a project."""
         query = select(ResearchReport).where(
-            ResearchReport.project_id == project_id
+            ResearchReport.project_id == project_id,
         )
 
         if report_type:
@@ -410,7 +416,7 @@ The system has learned {skills_created} new research skills from this cycle."""
     async def get_report(self, report_id: str) -> ResearchReport | None:
         """Get a report by ID."""
         result = await self.db.execute(
-            select(ResearchReport).where(ResearchReport.id == report_id)
+            select(ResearchReport).where(ResearchReport.id == report_id),
         )
         return result.scalar_one_or_none()
 
@@ -436,13 +442,13 @@ class ReportExporter:
 
         # Bold
         import re
-        html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html)
+        html = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", html)
 
         # Lists
-        html = re.sub(r'^- (.*)$', r'<li>\1</li>', html, flags=re.MULTILINE)
+        html = re.sub(r"^- (.*)$", r"<li>\1</li>", html, flags=re.MULTILINE)
 
         # Paragraphs
-        html = re.sub(r'\n\n', '</p><p>', html)
+        html = re.sub(r"\n\n", "</p><p>", html)
         html = f"<p>{html}</p>"
 
         return f"""<!DOCTYPE html>

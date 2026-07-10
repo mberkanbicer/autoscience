@@ -12,10 +12,10 @@ class Skill(BaseModel):
 
     __tablename__ = "skills"
 
-    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     skill_type: Mapped[str] = mapped_column(
-        String(50), nullable=False
+        String(50), nullable=False,
     )  # planning | functional | atomic | domain | evaluation | data | reporting | safety
     purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
     trigger_conditions: Mapped[list] = mapped_column(JSON, default=list)
@@ -23,7 +23,7 @@ class Skill(BaseModel):
     procedure: Mapped[list] = mapped_column(JSON, default=list)
     outputs: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(
-        String(50), default="candidate", index=True
+        String(50), default="candidate", index=True,
     )  # candidate | tested | active | revised | deprecated | retired
     version: Mapped[str] = mapped_column(String(20), default="1.0")
 

@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -72,6 +72,12 @@ class HypothesisGenerationEngine:
                     idea_context=idea_context,
                 )
                 hypotheses.append(hypothesis)
+            except (ValueError, RuntimeError, KeyError) as e:
+                logger.error(
+                    "hypothesis_generation_error",
+                    question_id=question.get("id"),
+                    error=str(e),
+                )
             except Exception as e:
                 logger.error(
                     "hypothesis_generation_failed",
@@ -133,8 +139,8 @@ class HypothesisGenerationEngine:
         total_questions = len(questions) if questions else 1
 
         for i, q in enumerate(questions[:max_hypotheses]):
-            q_text = q.get('question', q.get('text', '')) if isinstance(q, dict) else str(q)
-            q_id = q.get('id', '') if isinstance(q, dict) else ''
+            q_text = q.get("question", q.get("text", "")) if isinstance(q, dict) else str(q)
+            q_id = q.get("id", "") if isinstance(q, dict) else ""
 
             # Build a specific, testable statement from the question
             statement = (
@@ -154,12 +160,12 @@ class HypothesisGenerationEngine:
                 independent_variable=iv,
                 dependent_variable=dv,
                 context=f"Derived from literature review: {q_text[:200]}",
-                expected_direction='positive',
-                baseline='Current state-of-the-art approach',
-                metric='Standardized benchmark score',
+                expected_direction="positive",
+                baseline="Current state-of-the-art approach",
+                metric="Standardized benchmark score",
                 confidence=confidence,
                 version=1,
-                status='draft',
+                status="draft",
                 rationale=f"Supported by research question: {q_text[:150]}",
             ))
 
@@ -168,32 +174,32 @@ class HypothesisGenerationEngine:
             hypotheses.append(Hypothesis(
                 id=str(uuid4()),
                 statement=(
-                    f"The proposed approach described in \"{idea_context[:100]}\" "
+                    f'The proposed approach described in "{idea_context[:100]}" '
                     f"produces a statistically significant improvement in {dv} "
                     f"compared to existing methods, as measured by at least one "
                     f"standard benchmark metric with p < 0.05."
                 ),
-                question_id='',
+                question_id="",
                 independent_variable=iv,
                 dependent_variable=dv,
                 context=idea_context[:300],
-                expected_direction='positive',
-                baseline='Existing approaches in the domain',
-                metric='Statistical significance (p < 0.05) and effect size',
+                expected_direction="positive",
+                baseline="Existing approaches in the domain",
+                metric="Statistical significance (p < 0.05) and effect size",
                 confidence=min(0.5, 0.2 + 0.05 * total_questions),
                 version=1,
-                status='draft',
-                rationale='General hypothesis derived from the research idea',
+                status="draft",
+                rationale="General hypothesis derived from the research idea",
             ))
 
         result_hypotheses = hypotheses[:max_hypotheses]
         return HypothesisGenerationResult(
             hypotheses=result_hypotheses,
             generation_notes=(
-                f'Generated {len(result_hypotheses)} testable hypotheses from '
-                f'{total_questions} questions using structured template approach. '
-                f'Confidence ranges from {min(h.confidence for h in result_hypotheses):.2f} '
-                f'to {max(h.confidence for h in result_hypotheses):.2f}.'
+                f"Generated {len(result_hypotheses)} testable hypotheses from "
+                f"{total_questions} questions using structured template approach. "
+                f"Confidence ranges from {min(h.confidence for h in result_hypotheses):.2f} "
+                f"to {max(h.confidence for h in result_hypotheses):.2f}."
             ),
             total_generated=len(result_hypotheses),
         )
@@ -278,7 +284,7 @@ Convert this into a testable hypothesis with all required fields as JSON."""
                 f"  DV: {h.dependent_variable}\n"
                 f"  Failure: {h.failure_condition}"
                 for i, h in enumerate(hypotheses)
-            ]
+            ],
         )
 
         system = """You are a hypothesis validation expert.
@@ -389,7 +395,7 @@ Refine this hypothesis based on the feedback."""
                 f"  {h.statement}\n"
                 f"  Confidence: {h.confidence:.2f}"
                 for i, h in enumerate(hypotheses)
-            ]
+            ],
         )
 
         system = """You are a hypothesis comparison expert.
@@ -434,7 +440,7 @@ Compare these hypotheses."""
             [
                 f"- {h.statement[:100]}... (confidence: {h.confidence:.2f})"
                 for h in hypotheses[:5]
-            ]
+            ],
         )
 
         system = """You are a research strategy documenter.

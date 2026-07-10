@@ -1,46 +1,54 @@
 """Research orchestrator that connects all modules."""
 
 from typing import Any
-from datetime import datetime
 
 import structlog
-
-from ..schemas.research_state import ResearchState, RunType, RunState, RunBudget
-from ..llm.router import LLMRouter
-from ..connectors.manager import ConnectorManager
-from ..engine.keyword_engine import KeywordExpansionEngine
-from ..engine.literature_engine import LiteratureEngine
-from ..engine.paper_analysis import PaperAnalysisEngine
-from ..engine.clustering import ClusteringEngine
-from ..engine.conflict_detection import ConflictDetectionEngine
-from ..engine.question_generation import QuestionGenerationEngine
-from ..engine.hypothesis_generation import HypothesisGenerationEngine
-from ..engine.validation_planning import ValidationPlanningEngine
-from ..engine.scoring import IdeaScoringEngine
-from ..engine.idle_cognition import IdleCognitionEngine
-from ..workflows.research_workflow import ResearchWorkflow, WorkflowConfig
-from ..agents.base import create_all_agents, AgentRole
-from ..services.project_service import ProjectService
-from ..services.idea_service import IdeaService
-from ..services.idea_ledger_service import IdeaLedgerService
-from ..services.research_run_service import ResearchRunService
-from ..schemas.research_run import ResearchRunCreate
-from ..services.paper_service import PaperService
-from ..services.literature_service import LiteratureService
-from ..services.paper_analysis_service import PaperAnalysisService
-from ..services.cluster_service import ClusterService
-from ..services.conflict_service import ConflictService
-from ..services.question_service import ResearchQuestionService
-from ..services.hypothesis_service import HypothesisService
-from ..services.validation_service import ValidationPlanService
-from ..services.scoring_service import IdeaScoringService
-from ..services.skill_memory_service import SkillMemoryService
-from ..services.knowledge_service import KnowledgeBaseService
-from ..services.report_generator import ReportGenerator
-from ..services.audit_service import AuditService
-from ..services.safety_service import SafetyService
-from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.agents.base import create_all_agents
+from app.connectors.manager import ConnectorManager
+from app.engine.clustering import ClusteringEngine
+from app.engine.conflict_detection import ConflictDetectionEngine
+from app.engine.hypothesis_generation import HypothesisGenerationEngine
+from app.engine.idle_cognition import IdleCognitionEngine
+from app.engine.keyword_engine import KeywordExpansionEngine
+from app.engine.literature_engine import LiteratureEngine
+from app.engine.paper_analysis import PaperAnalysisEngine
+from app.engine.question_generation import QuestionGenerationEngine
+from app.engine.scoring import IdeaScoringEngine
+from app.engine.validation_planning import ValidationPlanningEngine
+from app.llm.router import LLMRouter
+from app.schemas.research_run import ResearchRunCreate, ResearchRunUpdate
+from app.schemas.research_state import ResearchState, RunBudget, RunState, RunType
+from app.services.audit_service import AuditService
+from app.services.cluster_service import ClusterService
+from app.services.conflict_service import ConflictService
+from app.services.hypothesis_service import HypothesisService
+from app.services.idea_ledger_service import IdeaLedgerService
+from app.services.idea_service import IdeaService
+from app.services.knowledge_service import KnowledgeBaseService
+from app.services.literature_service import LiteratureService
+from app.services.paper_analysis_service import PaperAnalysisService
+from app.services.paper_service import PaperService
+from app.services.project_service import ProjectService
+from app.services.question_service import ResearchQuestionService
+from app.services.report_generator import ReportGenerator
+from app.services.research_persistence_service import ResearchPersistenceService
+from app.services.research_run_service import ResearchRunService
+from app.services.safety_service import SafetyService
+from app.services.scoring_service import IdeaScoringService
+from app.services.skill_memory_service import SkillMemoryService
+from app.services.skill_performance_service import SkillPerformanceService
+from app.services.snapshot_service import SnapshotService
+from app.services.validation_service import ValidationPlanService
+from app.workflows.research_workflow import (
+    ResearchWorkflow,
+    WorkflowConfig,
+    WorkflowStep,
+    deserialize_step_history,
+)
+from app.workflows.safety_gates import ApprovalGateError, ProjectSafetySettings
 
 logger = structlog.get_logger()
 
@@ -95,60 +103,16 @@ class ResearchOrchestrator:
         # Initialize agents
         self.agents = create_all_agents(llm_router)
 
-    async def run_research(
+    def _build_workflow(
         self,
-        project_id: str,
-        idea_text: str,
-        run_type: str = "user_directed",
-        flexibility: float = 0.6,
-        existing_run_id: str | None = None,
-    ) -> ResearchState:
-        """Run a complete research cycle."""
-        logger.info(
-            "research_started",
-            project_id=project_id,
-            run_type=run_type,
-        )
-
-        # Create or get idea
-        idea = await self.idea_ledger.create_idea(
-            project_id=project_id,
-            text=idea_text,
-            origin="user_prompt",
-            flexibility=flexibility,
-        )
-
-        # Use existing run or create new one
-        if existing_run_id:
-            run = await self.run_service.get_run(existing_run_id)
-            if not run:
-                raise ValueError(f"Run {existing_run_id} not found")
-        else:
-            run = await self.run_service.create_run(
-                project_id=project_id,
-                data=ResearchRunCreate(
-                    idea_id=idea.id,
-                    run_type=run_type,
-                ),
-            )
-
-        # Initialize state
-        state = ResearchState(
-            run_id=run.id,
-            project_id=project_id,
-            idea_id=idea.id,
-            run_type=RunType(run_type),
-            original_idea=idea_text,
-            current_idea=idea_text,
-            flexibility=flexibility,
-            budget=RunBudget(),
-        )
-
-        # Start run
-        await self.run_service.start_run(run.id)
-
-        # Create and run workflow
-        workflow = ResearchWorkflow(
+        run,
+        project,
+        run_type: str,
+        flexibility: float,
+    ) -> ResearchWorkflow:
+        """Create a workflow wired with project safety settings."""
+        self.safety_service.policy.max_cost_per_run = run.max_cost_usd or self.safety_service.policy.max_cost_per_run
+        return ResearchWorkflow(
             agents=self.agents,
             config=WorkflowConfig(run_type=run_type, flexibility=flexibility),
             run_id=run.id,
@@ -165,37 +129,35 @@ class ResearchOrchestrator:
             idea_ledger=self.idea_ledger,
             db=self.db,
             event_broadcaster=self.event_broadcaster,
+            safety_service=self.safety_service,
+            project_safety_settings=ProjectSafetySettings(
+                approval_required_for_external_actions=project.approval_required_for_external_actions,
+                max_cost_per_run_usd=run.max_cost_usd,
+            ),
+            knowledge_service=self.knowledge_service,
         )
 
-        state = await workflow.run(state)
-
-        # Store results
-        await self._store_results(state)
-
-        # Ensure run is marked as completed (prevents stuck runs)
-        try:
-            await self.run_service.complete_run(run.id)
-        except Exception as e:
-            logger.warning("complete_run_failed", run_id=run.id, error=str(e))
-
-        # Generate report
+    async def _finalize_run(
+        self,
+        project_id: str,
+        run_id: str,
+        idea_text: str,
+        state: ResearchState,
+    ) -> None:
+        """Generate report, update knowledge base, and log completion."""
         report_content = await self.report_generator.generate_report(state)
         await self.report_generator.save_report(
             project_id=project_id,
-            run_id=run.id,
+            run_id=run_id,
             title=f"Research Report: {idea_text[:100]}",
             content=report_content,
             report_type="cycle",
         )
-
-        # Update knowledge base
         await self.knowledge_service.generate_project_summary(project_id)
-
-        # Log completion
         await self.audit_service.log_event(
             event_type="research_completed",
             project_id=project_id,
-            run_id=run.id,
+            run_id=run_id,
             details={
                 "papers_found": len(state.papers),
                 "conflicts_found": len(state.conflicts),
@@ -203,6 +165,132 @@ class ResearchOrchestrator:
                 "hypotheses_formed": len(state.hypotheses),
             },
         )
+
+        # Run skill performance evaluation after each research cycle
+        try:
+            perf_service = SkillPerformanceService(self.db)
+            perf_result = await perf_service.evaluate_all_skills(project_id=project_id)
+            if perf_result.deprecated or perf_result.retired:
+                logger.info(
+                    "skill_performance_after_run",
+                    project_id=project_id,
+                    deprecated=len(perf_result.deprecated),
+                    retired=len(perf_result.retired),
+                    summary=perf_result.summary,
+                )
+                await self.audit_service.log_event(
+                    event_type="skill_performance_evaluation",
+                    project_id=project_id,
+                    run_id=run_id,
+                    details={
+                        "deprecated": [r.skill_name for r in perf_result.deprecated],
+                        "retired": [r.skill_name for r in perf_result.retired],
+                        "summary": perf_result.summary,
+                    },
+                )
+        except SQLAlchemyError as exc:
+            logger.warning("skill_performance_evaluation_failed", error=str(exc))
+        except Exception as exc:
+            logger.warning("skill_performance_evaluation_unexpected", error=str(exc))
+
+    async def run_research(
+        self,
+        project_id: str,
+        idea_text: str,
+        run_type: str = "user_directed",
+        flexibility: float = 0.6,
+        existing_run_id: str | None = None,
+    ) -> ResearchState:
+        """Run a complete research cycle."""
+        logger.info(
+            "research_started",
+            project_id=project_id,
+            run_type=run_type,
+        )
+
+        # Explicit transaction wrapper for atomic operations
+        async with self.db.begin():
+            if existing_run_id:
+                run = await self.run_service.get_run(existing_run_id)
+                if not run:
+                    raise ValueError(f"Run {existing_run_id} not found")
+                idea = await self.idea_ledger.get_idea(run.idea_id)
+                if not idea:
+                    raise ValueError(f"Idea {run.idea_id} not found for run {existing_run_id}")
+            else:
+                idea = await self.idea_ledger.create_idea(
+                    project_id=project_id,
+                    text=idea_text,
+                    origin="user_prompt",
+                    flexibility=flexibility,
+                )
+                run = await self.run_service.create_run(
+                    project_id=project_id,
+                    data=ResearchRunCreate(
+                        idea_id=idea.id,
+                        run_type=run_type,
+                    ),
+                )
+
+            # Initialize state
+            state = ResearchState(
+                run_id=run.id,
+                project_id=project_id,
+                idea_id=idea.id,
+                run_type=RunType(run_type),
+                original_idea=idea_text,
+                current_idea=idea_text,
+                flexibility=flexibility,
+                budget=RunBudget(),
+            )
+
+        project = await self.project_service.get_project(project_id)
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
+
+        workflow = self._build_workflow(run, project, run_type, flexibility)
+
+        # Execute research workflow
+        try:
+            await self.run_service.start_run(run.id)
+            state = await workflow.run(state)
+            await self._store_results(state)
+            await self.run_service.complete_run(run.id)
+            await self._safety_check(state)
+        except ApprovalGateError as gate_error:
+            logger.info(
+                "research_waiting_for_approval",
+                run_id=run.id,
+                approval_id=gate_error.approval_id,
+                step=gate_error.step,
+            )
+            state.state = RunState.WAITING_FOR_APPROVAL
+            try:
+                await self._store_results(state)
+            except (TypeError, ValueError, SQLAlchemyError) as store_error:
+                logger.warning("store_results_on_approval_failed", error=str(store_error))
+            except Exception as store_error:
+                logger.warning("store_results_on_approval_unexpected", error=str(store_error))
+            try:
+                await self.db.commit()
+            except SQLAlchemyError as commit_error:
+                logger.warning("commit_failed", error=str(commit_error))
+            return state
+        except asyncio.CancelledError:
+            raise
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            logger.error("research_run_failed", run_id=run.id, error=str(e))
+            try:
+                await self.run_service.fail_run(run.id, error=str(e))
+            except SQLAlchemyError as nested_e:
+                logger.error("fail_run_marking_failed", run_id=run.id, error=str(nested_e))
+            except Exception as nested_e:
+                logger.error("fail_run_marking_unexpected", run_id=run.id, error=str(nested_e))
+            raise e
+
+        await self._finalize_run(project_id, run.id, idea_text, state)
 
         logger.info(
             "research_completed",
@@ -212,194 +300,132 @@ class ResearchOrchestrator:
             hypotheses=len(state.hypotheses),
         )
 
-        # Commit all changes to DB
         try:
             await self.db.commit()
-        except Exception as e:
+        except SQLAlchemyError as e:
             logger.warning("commit_failed", error=str(e))
             await self.db.rollback()
 
         return state
 
+    async def resume_research(self, run_id: str) -> ResearchState:
+        """Resume a run that was paused for approval."""
+        run = await self.run_service.get_run(run_id)
+        if not run:
+            raise ValueError(f"Run {run_id} not found")
+        if run.state != "waiting_for_approval":
+            raise ValueError(f"Run {run_id} is not waiting for approval (state={run.state})")
+
+        project = await self.project_service.get_project(run.project_id)
+        if not project:
+            raise ValueError(f"Project {run.project_id} not found")
+
+        snapshot_service = SnapshotService(self.db)
+        state = await snapshot_service.create_snapshot(run_id)
+        if not state:
+            raise ValueError(f"Could not restore state for run {run_id}")
+
+        # If the run was paused because the budget was exhausted, mark the state
+        # so the budget hard-cap check in _execute_step is skipped on resume.
+        # (The user's explicit approval is the budget extension.)
+        if state.is_budget_exceeded():
+            state.budget_extension_approved = True
+            logger.info("budget_extension_approved_on_resume", run_id=run_id, cost=state.cost_usd)
+
+        try:
+            start_step = WorkflowStep(run.current_phase) if run.current_phase else WorkflowStep.RETRIEVE_LITERATURE
+        except ValueError:
+            start_step = WorkflowStep.RETRIEVE_LITERATURE
+
+        workflow = self._build_workflow(run, project, run.run_type, state.flexibility)
+        if run.step_history:
+            workflow.step_history = deserialize_step_history(run.step_history)
+        idea_text = state.current_idea or state.original_idea
+
+        try:
+            await self.run_service.update_run(run_id, ResearchRunUpdate(state="running"))
+            state = await workflow.run_from_step(state, start_step)
+            await self._store_results(state)
+            await self.run_service.complete_run(run_id)
+            await self._safety_check(state)
+        except ApprovalGateError as gate_error:
+            logger.info(
+                "research_waiting_for_approval",
+                run_id=run_id,
+                approval_id=gate_error.approval_id,
+                step=gate_error.step,
+            )
+            state.state = RunState.WAITING_FOR_APPROVAL
+            try:
+                await self._store_results(state)
+            except (TypeError, ValueError, SQLAlchemyError) as store_error:
+                logger.warning("store_results_on_approval_failed", error=str(store_error))
+            except Exception as store_error:
+                logger.warning("store_results_on_approval_unexpected", error=str(store_error))
+            await self.db.commit()
+            return state
+        except asyncio.CancelledError:
+            raise
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            logger.error("research_resume_failed", run_id=run_id, error=str(e))
+            try:
+                await self.run_service.fail_run(run_id, error=str(e))
+            except SQLAlchemyError as fail_e:
+                logger.error("fail_run_marking_failed", run_id=run_id, error=str(fail_e))
+            except Exception as fail_e:
+                logger.error("fail_run_marking_unexpected", run_id=run_id, error=str(fail_e))
+            raise
+
+        await self._finalize_run(run.project_id, run_id, idea_text, state)
+        await self.db.commit()
+        return state
+
+    async def _safety_check(self, state: ResearchState) -> None:
+        """Validate research state for safety, quality, and cost risks."""
+        # 1. Cost Safety
+        if state.cost_usd > 10.0:
+            logger.warning("safety_risk_detected", reason="high_cost", cost=state.cost_usd)
+            state.warnings.append("High research cost ($10+) detected.")
+
+        # 2. Quality / Hallucination check
+        if len(state.papers) > 5:
+            titles = [p.title.lower().strip() for p in state.papers]
+            # If more than 50% of papers have identical titles, it's a loop
+            unique_ratio = len(set(titles)) / len(titles)
+            if unique_ratio < 0.5:
+                logger.warning("quality_risk_detected", reason="potential_hallucination_loop", ratio=unique_ratio)
+                state.add_error("quality_risk", "High duplication in search results. Potential LLM loop detected.")
+
+        # 3. Cognitive Health check
+        if state.cognitive_entropy < 0.1 and len(state.papers) > 10:
+             state.warnings.append("Extremely narrow research focus (Exploitation mode). Consider increasing flexibility.")
+
     async def _store_results(self, state: ResearchState) -> None:
-        """Store research results in the database.
-
-        Writes directly to DB models to avoid service-layer interface mismatches.
-        All operations are wrapped in try/except so one failure doesn't block others.
-        """
-        from uuid import uuid4
-        from ..models.paper import Paper, PaperCluster, ClusterLabel, ClusterConflict
-        from ..models.research_question import ResearchQuestion, Hypothesis
-        from ..models.idea import IdeaScore
-
-        stored = {"papers": 0, "clusters": 0, "conflicts": 0, "questions": 0, "hypotheses": 0, "scores": 0}
-
-        def safe(obj, field, default=None):
-            """Safely get attribute from Pydantic model or dict."""
-            try:
-                if hasattr(obj, 'model_fields') and field in obj.model_fields:
-                    return getattr(obj, field, default)
-                elif hasattr(obj, field):
-                    return getattr(obj, field)
-                return default
-            except Exception:
-                return default
-
-        # --- Papers ---
-        # Deduplicate: fetch existing titles for this project
-        existing_titles_result = await self.db.execute(
-            select(Paper.title).where(Paper.project_id == state.project_id)
-        )
-        existing_paper_titles = set(t.strip().lower() for t in existing_titles_result.scalars().all())
-
-        for paper in state.papers:
-            try:
-                normalized_title = paper.title.strip().lower()
-                if normalized_title in existing_paper_titles:
-                    logger.info("skip_duplicate_paper", title=paper.title[:50])
-                    continue
-                db_paper = Paper(
-                    id=str(uuid4()),
-                    project_id=state.project_id,
-                    title=paper.title,
-                    authors=paper.authors if isinstance(paper.authors, list) else [str(paper.authors)],
-                    year=paper.year,
-                    doi=paper.doi,
-                    abstract=safe(paper, 'abstract'),
-                    venue=safe(paper, 'venue'),
-                    citation_count=paper.citation_count,
-                    paper_type=paper.paper_type,
-                )
-                self.db.add(db_paper)
-                existing_paper_titles.add(normalized_title)
-                stored["papers"] += 1
-            except Exception as e:
-                logger.warning("store_paper_failed", title=paper.title[:50], error=str(e))
-
-        # --- Clusters ---
-        for cluster in state.clusters:
-            try:
-                db_cluster = PaperCluster(
-                    id=cluster.id or str(uuid4()),
-                    project_id=state.project_id,
-                    name=cluster.name,
-                    description=cluster.description,
-                    cluster_type='topic',
-                    paper_ids=[],
-                )
-                self.db.add(db_cluster)
-                stored["clusters"] += 1
-            except Exception as e:
-                logger.warning("store_cluster_failed", error=str(e))
-
-        # --- Conflicts ---
-        for conflict in state.conflicts:
-            try:
-                db_conflict = ClusterConflict(
-                    id=conflict.id or str(uuid4()),
-                    project_id=state.project_id,
-                    conflict_type=conflict.conflict_type,
-                    description=conflict.description,
-                    severity=conflict.severity or 0.5,
-                    research_opportunity=f'Investigate {conflict.conflict_type} conflict',
-                )
-                self.db.add(db_conflict)
-                stored["conflicts"] += 1
-            except Exception as e:
-                logger.warning("store_conflict_failed", error=str(e))
-
-        # --- Questions ---
-        # Deduplicate: fetch existing question texts for this project
-        existing_q_result = await self.db.execute(
-            select(ResearchQuestion.question).where(ResearchQuestion.project_id == state.project_id)
-        )
-        existing_question_texts = set(q.strip().lower() for q in existing_q_result.scalars().all())
-
-        for question in state.questions:
-            try:
-                normalized_q = question.question.strip().lower()
-                if normalized_q in existing_question_texts:
-                    logger.info("skip_duplicate_question", question=question.question[:50])
-                    continue
-                db_question = ResearchQuestion(
-                    id=question.id or str(uuid4()),
-                    project_id=state.project_id,
-                    run_id=state.run_id,
-                    idea_id=state.idea_id,
-                    question=question.question,
-                    rank=question.rank,
-                    status="generated",
-                )
-                self.db.add(db_question)
-                existing_question_texts.add(normalized_q)
-                stored["questions"] += 1
-            except Exception as e:
-                logger.warning("store_question_failed", error=str(e))
-
-        # --- Hypotheses ---
-        # Deduplicate: fetch existing hypothesis statements for this project
-        existing_h_result = await self.db.execute(
-            select(Hypothesis.statement).where(Hypothesis.project_id == state.project_id)
-        )
-        existing_hypothesis_stmts = set(s.strip().lower() for s in existing_h_result.scalars().all())
-
-        for hypothesis in state.hypotheses:
-            try:
-                normalized_stmt = hypothesis.statement.strip().lower()
-                if normalized_stmt in existing_hypothesis_stmts:
-                    logger.info("skip_duplicate_hypothesis", statement=hypothesis.statement[:50])
-                    continue
-                db_hypothesis = Hypothesis(
-                    id=hypothesis.id or str(uuid4()),
-                    project_id=state.project_id,
-                    idea_id=state.idea_id,
-                    statement=hypothesis.statement,
-                    confidence=hypothesis.confidence,
-                    version=1,
-                    status="draft",
-                )
-                self.db.add(db_hypothesis)
-                existing_hypothesis_stmts.add(normalized_stmt)
-                stored["hypotheses"] += 1
-            except Exception as e:
-                logger.warning("store_hypothesis_failed", error=str(e))
-
-        # --- Score ---
-        if state.scores and state.idea_id:
-            try:
-                score = state.scores[0]
-                db_score = IdeaScore(
-                    id=str(uuid4()),
-                    idea_id=state.idea_id,
-                    overall_value=safe(score, 'overall_value'),
-                    scoring_rationale='Auto-scored during research workflow',
-                )
-                self.db.add(db_score)
-                stored["scores"] += 1
-            except Exception as e:
-                logger.warning("store_score_failed", error=str(e))
-
-        # Commit all stored records
-        await self.db.flush()
-        logger.info("store_results_done", stored=stored)
+        """Store research results via the unified persistence service."""
+        persistence = ResearchPersistenceService(self.db, self.llm)
+        await persistence.persist_run_results(state)
 
     async def run_idle_cycle(
         self,
         project_id: str,
     ) -> dict[str, Any]:
         """Run an idle cognition cycle."""
-        # Get project
+        from .idle_cycle_service import IdleCycleService
+
         project = await self.project_service.get_project(project_id)
         if not project:
             return {"error": "Project not found"}
 
-        # Run idle cycle
         result = await self.idle_engine.run_idle_cycle(
             project_id=project_id,
             project_domain=project.domain,
         )
 
-        # Log cycle
+        cycle_service = IdleCycleService(self.db)
+        await cycle_service.store_cycle(project_id, result)
+
         await self.audit_service.log_event(
             event_type="idle_cycle_completed",
             project_id=project_id,
@@ -410,6 +436,11 @@ class ResearchOrchestrator:
                 "questions_generated": result.questions_generated,
             },
         )
+
+        try:
+            await self.db.commit()
+        except SQLAlchemyError as exc:
+            logger.warning("idle_cycle_commit_failed", error=str(exc))
 
         return {
             "cycle_id": result.cycle_id,

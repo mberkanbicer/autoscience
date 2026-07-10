@@ -3,8 +3,11 @@
 from typing import Any
 
 import httpx
+import structlog
 
-from .base import LLMProvider, Message, CompletionResult, StructuredOutput
+from .base import CompletionResult, LLMProvider, Message, StructuredOutput
+
+logger = structlog.get_logger()
 
 
 class LocalProvider(LLMProvider):
@@ -38,8 +41,7 @@ class LocalProvider(LLMProvider):
 
         if self.api_format == "ollama":
             return await self._complete_ollama(messages, model, temperature, max_tokens)
-        else:
-            return await self._complete_openai_compat(messages, model, temperature, max_tokens)
+        return await self._complete_openai_compat(messages, model, temperature, max_tokens)
 
     async def _complete_ollama(
         self,
@@ -151,7 +153,7 @@ class LocalProvider(LLMProvider):
             )
 
         completion = await self.complete(
-            modified_messages, model=model, temperature=temperature, **kwargs
+            modified_messages, model=model, temperature=temperature, **kwargs,
         )
 
         import json
@@ -177,7 +179,10 @@ class LocalProvider(LLMProvider):
             response.raise_for_status()
             data = response.json()
             return [model["name"] for model in data.get("models", [])]
-        except Exception:
+        except httpx.RequestError:
+            return [self.model]
+        except Exception as exc:
+            logger.warning("list_models_failed", error=str(exc))
             return [self.model]
 
     async def health_check(self) -> bool:
@@ -188,5 +193,8 @@ class LocalProvider(LLMProvider):
             else:
                 response = await self.client.get("/v1/models")
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
+            return False
+        except Exception as exc:
+            logger.warning("health_check_failed", error=str(exc))
             return False

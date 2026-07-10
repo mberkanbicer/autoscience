@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -103,9 +103,9 @@ class ConflictDetectionEngine:
         """Simple conflict detection when no LLM is available."""
         conflicts = []
         gaps = []
-        
+
         # Detect year-based conflicts (papers from different eras might contradict)
-        years = [(p.get('year'), p.get('id', p.get('title', ''))) for p in papers if p.get('year')]
+        years = [(p.get("year"), p.get("id", p.get("title", ""))) for p in papers if p.get("year")]
         if len(years) >= 2:
             years.sort(key=lambda x: x[0])
             old = years[:len(years)//2]
@@ -113,30 +113,30 @@ class ConflictDetectionEngine:
             if old and new:
                 conflicts.append(Conflict(
                     id=str(uuid4()),
-                    conflict_type='recency',
-                    description=f'Knowledge may have evolved: {len(old)} older papers vs {len(new)} newer papers',
+                    conflict_type="recency",
+                    description=f"Knowledge may have evolved: {len(old)} older papers vs {len(new)} newer papers",
                     supporting_papers=[y[1] for y in new[:5]],
                     opposing_papers=[y[1] for y in old[:5]],
                     severity=0.4,
                     cluster_id=cluster_id,
                 ))
-        
+
         # Detect citation gaps
-        cited = [p for p in papers if p.get('citation_count', 0) and p['citation_count'] > 100]
-        uncited = [p for p in papers if not p.get('citation_count') or p['citation_count'] <= 10]
+        cited = [p for p in papers if p.get("citation_count", 0) and p["citation_count"] > 100]
+        uncited = [p for p in papers if not p.get("citation_count") or p["citation_count"] <= 10]
         if cited and uncited:
             gaps.append(Gap(
                 id=str(uuid4()),
-                description=f'{len(uncited)} low-citation papers may indicate under-validated research',
-                gap_type='limited_validation',
-                related_papers=[p.get('id', p.get('title', '')) for p in uncited[:5]],
+                description=f"{len(uncited)} low-citation papers may indicate under-validated research",
+                gap_type="limited_validation",
+                related_papers=[p.get("id", p.get("title", "")) for p in uncited[:5]],
                 severity=0.3,
             ))
-        
+
         return ConflictDetectionResult(
             conflicts=conflicts,
             gaps=gaps,
-            analysis_notes=f'Simple conflict analysis of {len(papers)} papers',
+            analysis_notes=f"Simple conflict analysis of {len(papers)} papers",
             total_conflicts=len(conflicts),
             total_gaps=len(gaps),
         )
@@ -185,7 +185,7 @@ Detect conflicts in findings between these papers."""
                     opposing_papers=c.get("opposing_papers", []),
                     research_opportunity=c.get("research_opportunity", ""),
                     severity=c.get("severity", 0.5),
-                )
+                ),
             )
 
         return conflicts
@@ -234,7 +234,7 @@ Detect methodological conflicts between these papers."""
                     opposing_papers=c.get("opposing_papers", []),
                     research_opportunity=c.get("research_opportunity", ""),
                     severity=c.get("severity", 0.5),
-                )
+                ),
             )
 
         return conflicts
@@ -283,7 +283,7 @@ Detect assumption conflicts between these papers."""
                     opposing_papers=c.get("opposing_papers", []),
                     research_opportunity=c.get("research_opportunity", ""),
                     severity=c.get("severity", 0.5),
-                )
+                ),
             )
 
         return conflicts
@@ -294,7 +294,7 @@ Detect assumption conflicts between these papers."""
     ) -> list[Gap]:
         """Detect research gaps from papers."""
         papers_summary = self._prepare_papers_summary(
-            papers, include_limitations=True, include_future_work=True
+            papers, include_limitations=True, include_future_work=True,
         )
 
         system = """You are a research gap analyst.
@@ -333,7 +333,7 @@ Detect research gaps and opportunities from these papers."""
                     related_papers=g.get("related_papers", []),
                     opportunity=g.get("opportunity", ""),
                     severity=g.get("severity", 0.5),
-                )
+                ),
             )
 
         return gaps
@@ -379,10 +379,10 @@ Detect research gaps and opportunities from these papers."""
             return "No significant conflicts or gaps detected."
 
         conflicts_summary = "\n".join(
-            [f"- [{c.conflict_type}] {c.description[:100]}..." for c in conflicts[:5]]
+            [f"- [{c.conflict_type}] {c.description[:100]}..." for c in conflicts[:5]],
         )
         gaps_summary = "\n".join(
-            [f"- [{g.gap_type}] {g.description[:100]}..." for g in gaps[:5]]
+            [f"- [{g.gap_type}] {g.description[:100]}..." for g in gaps[:5]],
         )
 
         system = """You are a research analysis expert.

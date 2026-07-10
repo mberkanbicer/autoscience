@@ -1,9 +1,8 @@
 """Redis-based cache service with TTL and force-refresh support."""
 
-import json
 import hashlib
+import json
 from typing import Any
-from datetime import datetime, timedelta
 
 import structlog
 
@@ -50,6 +49,8 @@ class CacheService:
                 data = json.loads(raw)
                 logger.debug("cache_hit", key=key, namespace=namespace)
                 return data, True
+        except json.JSONDecodeError as e:
+            logger.warning("cache_get_parse_failed", error=str(e), key=key)
         except Exception as e:
             logger.warning("cache_get_failed", error=str(e), key=key)
 
@@ -69,6 +70,8 @@ class CacheService:
             serialized = json.dumps(value, default=str)
             await self.redis.setex(key, ttl, serialized)
             logger.debug("cache_set", key=key, namespace=namespace, ttl=ttl)
+        except (TypeError, ValueError) as e:
+            logger.warning("cache_set_serialize_failed", error=str(e), key=key)
         except Exception as e:
             logger.warning("cache_set_failed", error=str(e), key=key)
 
@@ -85,8 +88,7 @@ class CacheService:
     async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         try:
-            info = await self.redis.info("keyspace")
-            # Count keys with our prefix
+            await self.redis.info("keyspace")
             keys = await self.redis.keys(f"{self.prefix}:*")
             total_size = sum(
                 await self.redis.memory_usage(k) or 0
@@ -98,6 +100,9 @@ class CacheService:
                 "total_size_kb": round(total_size / 1024, 1),
                 "prefix": self.prefix,
             }
+        except (AttributeError, TypeError) as e:
+            logger.warning("cache_stats_missing_method", error=str(e))
+            return {"total_entries": 0, "error": str(e)}
         except Exception as e:
             logger.warning("cache_stats_failed", error=str(e))
             return {"total_entries": 0, "error": str(e)}

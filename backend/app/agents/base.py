@@ -1,14 +1,13 @@
 """Base agent class and agent definitions."""
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
 from enum import Enum
-from uuid import uuid4
+from typing import Any
 
 import structlog
 
-from ..llm.base import Message, LLMProvider
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -31,6 +30,8 @@ class AgentRole(str, Enum):
     DECISION = "decision"
     SKILL_CURATOR = "skill_curator"
     ARCHIVIST = "archivist"
+    DEVELOPER = "developer"
+    SCIENTIFIC_WRITER = "scientific_writer"
 
 
 @dataclass
@@ -66,6 +67,11 @@ class AgentOutput:
     next_action: str | None = None
     artifacts: list[dict[str, Any]] = field(default_factory=list)
     reasoning: str = ""
+
+    @property
+    def content(self) -> str:
+        """Get the main response content."""
+        return self.result.get("response", "")
 
 
 class BaseAgent:
@@ -392,6 +398,43 @@ Be thorough and precise in documentation.""",
     tools=["logging", "reporting", "wiki_management"],
 )
 
+DEVELOPER_CONFIG = AgentConfig(
+    role=AgentRole.DEVELOPER,
+    name="Developer",
+    description="Writes executable code and scripts for empirical validation",
+    system_prompt="""You are the research developer. Your role is to:
+1. Translate scientific validation plans into executable Python or R code
+2. Generate synthetic data or mock APIs for testing when real data is unavailable
+3. Implement statistical analysis scripts to verify hypotheses
+4. Ensure code is safe for sandbox execution
+
+Focus on precision, scientific accuracy, and code safety.""",
+    tools=["code_generation", "scripting"],
+)
+
+SCIENTIFIC_WRITER_CONFIG = AgentConfig(
+    role=AgentRole.SCIENTIFIC_WRITER,
+    name="Scientific Writer",
+    description="Drafts peer-review-ready scientific manuscripts in LaTeX",
+    system_prompt="""You are the scientific writing agent. Your role is to draft a comprehensive research paper in LaTeX format.
+
+Structure:
+1. \\title{...}
+2. \\author{...}
+3. \\begin{abstract} ... \\end{abstract}
+4. \\section{Introduction} - Background, problem statement, and novelty.
+5. \\section{Thematic Literature Review} - Synthesize the knowledge graph and identified clusters.
+6. \\section{Empirical Methodology} - Detail the validation plan and sandbox execution environment.
+7. \\section{Results & Discussion} - Analyze empirical outcomes and resolve scientific tensions.
+8. \\section{Conclusion} - Summarize contributions and future cognitive paths.
+
+Academic Tone: Use rigorous, objective language. Ensure all claims are backed by the provided corpus context.
+Format: Return ONLY valid LaTeX code. Do not include preamble like \\documentclass unless specifically asked, just the body content.
+
+Always prioritize clarity, evidence-based reasoning, and formal scientific standards.""",
+    tools=["latex_generation", "manuscript_drafting"],
+)
+
 
 # Agent Registry
 AGENT_CONFIGS: dict[AgentRole, AgentConfig] = {
@@ -410,6 +453,8 @@ AGENT_CONFIGS: dict[AgentRole, AgentConfig] = {
     AgentRole.DECISION: DECISION_CONFIG,
     AgentRole.SKILL_CURATOR: SKILL_CURATOR_CONFIG,
     AgentRole.ARCHIVIST: ARCHIVIST_CONFIG,
+    AgentRole.DEVELOPER: DEVELOPER_CONFIG,
+    AgentRole.SCIENTIFIC_WRITER: SCIENTIFIC_WRITER_CONFIG,
 }
 
 

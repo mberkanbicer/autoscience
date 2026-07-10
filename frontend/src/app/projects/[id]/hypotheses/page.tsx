@@ -8,10 +8,23 @@ import { Card } from '@/components/ui/Card';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ValidationPlanEditor } from '@/components/ui/ValidationPlanEditor';
 import { hypothesesApi } from '@/lib/api';
-import { Hypothesis } from '@/lib/types';
+import { Hypothesis, ValidationPlan } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { FlaskConical, Target, AlertTriangle, CheckCircle, TrendingUp, Trash2, FileSearch } from 'lucide-react';
+import {
+  FlaskConical,
+  Target,
+  AlertTriangle,
+  CheckCircle,
+  TrendingUp,
+  Trash2,
+  FileSearch,
+  DollarSign,
+  Activity,
+  Loader2,
+  Beaker,
+} from 'lucide-react';
 
 export default function HypothesesPage() {
   const params = useParams();
@@ -19,8 +32,9 @@ export default function HypothesesPage() {
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [validationPlan, setValidationPlan] = useState<any>(null);
+  const [validationPlan, setValidationPlan] = useState<ValidationPlan | null>(null);
   const [viewingValidation, setViewingValidation] = useState<string | null>(null);
+  const [showValidationEditor, setShowValidationEditor] = useState<string | null>(null);
 
   useEffect(() => {
     loadHypotheses();
@@ -42,7 +56,7 @@ export default function HypothesesPage() {
     setDeletingId(id);
     try {
       await hypothesesApi.update(id, { status: 'rejected' });
-      setHypotheses(hypotheses.filter(h => h.id !== id));
+      setHypotheses(hypotheses.filter((h) => h.id !== id));
     } catch (error) {
       console.error('Failed to delete hypothesis:', error);
     } finally {
@@ -60,197 +74,314 @@ export default function HypothesesPage() {
     }
   };
 
+  const renderValidationPlanView = (hypothesis: Hypothesis) => {
+    if (viewingValidation !== hypothesis.id) return null;
+
+    return (
+      <div className="mt-6 animate-in slide-in-from-top-4 duration-500">
+        {validationPlan ? (
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowValidationEditor(hypothesis.id)}
+                className="text-xs font-bold text-primary hover:text-primary/70 transition-colors flex items-center gap-1"
+              >
+                <Beaker size={14} />
+                Open in Editor
+              </button>
+            </div>
+
+            <div className="glass p-6 rounded-2xl border-primary/20 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-5">
+                <FileSearch size={120} className="text-primary" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <FileSearch size={18} className="text-primary" />
+                  </div>
+                  <h4 className="text-sm font-bold text-foreground uppercase tracking-[0.2em]">
+                    Scientific Validation Plan
+                  </h4>
+                  <div className="ml-auto px-3 py-1 bg-success/10 rounded-full border border-success/20">
+                    <span className="text-[10px] font-bold text-success uppercase">
+                      Feasibility:{' '}
+                      {validationPlan.feasibility_score != null
+                        ? (validationPlan.feasibility_score * 100).toFixed(0) + '%'
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {validationPlan.experimental_design && (
+                    <div className="bg-white/40 p-4 rounded-xl border border-border/5">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                        Experimental Methodology
+                      </p>
+                      <p className="text-sm font-medium text-foreground/80 leading-relaxed">
+                        {validationPlan.experimental_design}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest px-1">
+                        Evidence Repositories
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {(validationPlan.dataset_candidates || []).map((d: any, i: number) => (
+                          <span
+                            key={i}
+                            className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 px-3 py-1 rounded-lg"
+                          >
+                            {(d.name || d).toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest px-1">
+                        Control Benchmarks
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {(validationPlan.baselines || []).map((b: string, i: number) => (
+                          <span
+                            key={i}
+                            className="text-[10px] font-bold bg-muted text-muted-foreground/60 border border-border/10 px-3 py-1 rounded-lg"
+                          >
+                            {b.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest px-1">
+                        Unit of Measurement
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {(validationPlan.metrics || []).map((m: string, i: number) => (
+                          <span
+                            key={i}
+                            className="text-[10px] font-bold bg-tertiary/5 text-tertiary border border-tertiary/10 px-3 py-1 rounded-lg"
+                          >
+                            {m.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-border/10 flex items-center gap-8">
+                    <div className="flex items-center gap-2">
+                      <DollarSign size={14} className="text-success" />
+                      <span className="text-[11px] font-bold text-foreground/60 uppercase">
+                        Cost:{' '}
+                        {validationPlan.cost_estimate != null
+                          ? '$' + validationPlan.cost_estimate.toFixed(0)
+                          : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Activity size={14} className="text-warning" />
+                      <span className="text-[11px] font-bold text-foreground/60 uppercase">
+                        Complexity:{' '}
+                        {validationPlan.difficulty_estimate != null
+                          ? (validationPlan.difficulty_estimate * 100).toFixed(0) + '%'
+                          : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-8 text-center glass border-dashed rounded-2xl animate-pulse">
+            <Loader2 size={24} className="mx-auto mb-3 text-primary/40 animate-spin" />
+            <p className="text-xs font-bold text-muted-foreground/40 uppercase tracking-[0.2em]">
+              Assembling Validation Matrix...
+            </p>
+          </div>
+        )}
+
+        {showValidationEditor === hypothesis.id && validationPlan && (
+          <div className="mt-6 animate-in slide-in-from-top-4 duration-500 border-t border-border/10 pt-6">
+            <ValidationPlanEditor
+              hypothesisId={hypothesis.id}
+              hypothesisStatement={hypothesis.statement}
+              plan={{
+                hypothesis_id: hypothesis.id,
+                hypothesis_statement: hypothesis.statement,
+                steps: [],
+                metrics: validationPlan.metrics || [],
+                baselines: validationPlan.baselines || [],
+                datasets: (validationPlan.dataset_candidates || []).map((d: any) =>
+                  typeof d === 'string' ? d : d.name
+                ),
+                experimental_design: validationPlan.experimental_design || '',
+                statistical_tests: validationPlan.statistical_tests || [],
+                feasibility_score: validationPlan.feasibility_score,
+                cost_estimate: validationPlan.cost_estimate,
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderDetailGrid = (detail: { label: string; value: string | null | undefined }, i: number) => {
+    if (!detail.value) return null;
+    return (
+      <div key={i} className="space-y-1">
+        <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.2em]">
+          {detail.label}
+        </p>
+        <p className="text-xs font-bold text-foreground/60">{detail.value}</p>
+      </div>
+    );
+  };
+
+  const renderHypothesisCard = (hypothesis: Hypothesis) => (
+    <Card key={hypothesis.id} className="p-8 group overflow-hidden">
+      <div className="flex items-start justify-between gap-6 mb-6">
+        <div className="flex-1 min-w-0">
+          <p className="text-lg font-bold text-foreground tracking-tight leading-relaxed">
+            {hypothesis.statement}
+          </p>
+          {hypothesis.context && (
+            <p className="text-sm text-muted-foreground mt-3 font-medium leading-relaxed italic border-l-2 border-primary/20 pl-4">
+              {hypothesis.context}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {hypothesis.confidence !== null && hypothesis.confidence !== undefined && (
+            <Badge
+              variant="info"
+              className="bg-primary/5 uppercase text-[10px] font-bold tracking-[0.2em] px-3 py-1"
+            >
+              <TrendingUp size={12} className="mr-2 animate-pulse" />
+              {Math.round(hypothesis.confidence * 100)}% Confidence
+            </Badge>
+          )}
+          <StatusBadge status={hypothesis.status} />
+          <div className="flex items-center gap-1 ml-2">
+            <button
+              onClick={() => handleViewValidation(hypothesis.id)}
+              className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-all duration-300 hover:scale-110"
+              title="Cognitive Validation Plan"
+            >
+              <FileSearch size={18} />
+            </button>
+            <button
+              onClick={() => handleDelete(hypothesis.id)}
+              disabled={deletingId === hypothesis.id}
+              className="p-2 rounded-lg hover:bg-error/10 text-error transition-all duration-300 hover:scale-110 disabled:opacity-30"
+              title="Archive Hypothesis"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {hypothesis.independent_variable && (
+          <div className="bg-primary/5 backdrop-blur-sm rounded-xl p-4 border border-primary/10 shadow-inner group-hover:bg-primary/10 transition-colors">
+            <div className="flex items-center gap-2 mb-3">
+              <Target size={14} className="text-primary" />
+              <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">
+                Independent Variable
+              </span>
+            </div>
+            <p className="text-sm font-bold text-foreground/70">{hypothesis.independent_variable}</p>
+          </div>
+        )}
+        {hypothesis.dependent_variable && (
+          <div className="bg-success/5 backdrop-blur-sm rounded-xl p-4 border border-success/10 shadow-inner group-hover:bg-success/10 transition-colors">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle size={14} className="text-success" />
+              <span className="text-[10px] font-bold text-success uppercase tracking-[0.2em]">
+                Dependent Variable
+              </span>
+            </div>
+            <p className="text-sm font-bold text-foreground/70">{hypothesis.dependent_variable}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 px-4 py-6 bg-muted/20 rounded-2xl border border-border/5">
+        {[
+          { label: 'Direction', value: hypothesis.expected_direction },
+          { label: 'Baseline', value: hypothesis.baseline },
+          { label: 'Metric', value: hypothesis.metric },
+          { label: 'Target Dataset', value: hypothesis.dataset_requirement },
+        ].map((detail, i) => renderDetailGrid(detail, i))}
+      </div>
+
+      {hypothesis.failure_condition && (
+        <div className="mt-6 p-4 bg-error/5 border border-error/10 rounded-xl flex items-start gap-4">
+          <div className="p-2 bg-error/10 rounded-lg">
+            <AlertTriangle size={16} className="text-error" />
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-error uppercase tracking-[0.2em]">
+              Falsification Condition
+            </span>
+            <p className="text-xs font-medium text-error/80 mt-1">{hypothesis.failure_condition}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8 flex items-center justify-between pt-4 border-t border-border/5">
+        <span className="text-[10px] font-mono font-bold text-muted-foreground/30 uppercase tracking-[0.3em]">
+          H_VERSION {hypothesis.version}.0
+        </span>
+        <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+          {formatDate(hypothesis.created_at)}
+        </span>
+      </div>
+
+      {renderValidationPlanView(hypothesis)}
+    </Card>
+  );
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      );
+    }
+
+    if (hypotheses.length === 0) {
+      return (
+        <EmptyState
+          icon={<FlaskConical className="w-8 h-8 text-gray-400" />}
+          title="No hypotheses yet"
+          description="Hypotheses are generated from research questions during research runs."
+        />
+      );
+    }
+
+    return <div className="grid gap-6">{hypotheses.map((h) => renderHypothesisCard(h))}</div>;
+  };
+
   return (
     <Layout projectId={projectId}>
       <Header
         title="Hypotheses"
         subtitle={`${hypotheses.length} hypotheses formulated`}
       />
-
-      <div className="p-6">
-        {loading ? (
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        ) : hypotheses.length === 0 ? (
-          <EmptyState
-            icon={<FlaskConical className="w-8 h-8 text-gray-400" />}
-            title="No hypotheses yet"
-            description="Hypotheses are generated from research questions during research runs."
-          />
-        ) : (
-          <div className="space-y-4">
-            {hypotheses.map((hypothesis) => (
-              <Card key={hypothesis.id} className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <p className="text-gray-900 font-medium mb-2">{hypothesis.statement}</p>
-                    {hypothesis.context && (
-                      <p className="text-sm text-gray-600 mb-3">{hypothesis.context}</p>
-                    )}
-                  </div>
-                  <div className="ml-4 flex-shrink-0 flex items-center gap-2">
-                    {hypothesis.confidence !== null && hypothesis.confidence !== undefined && (
-                      <Badge variant="info">
-                        <TrendingUp size={12} className="mr-1" />
-                        {(hypothesis.confidence * 100).toFixed(0)}%
-                      </Badge>
-                    )}
-                    <StatusBadge status={hypothesis.status} />
-                    <button
-                      onClick={() => handleViewValidation(hypothesis.id)}
-                      className="text-blue-500 hover:text-blue-700"
-                      title="View validation plan"
-                    >
-                      <FileSearch size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(hypothesis.id)}
-                      disabled={deletingId === hypothesis.id}
-                      className="text-red-500 hover:text-red-700 disabled:opacity-50"
-                      title="Delete hypothesis"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Independent Variable */}
-                  {hypothesis.independent_variable && (
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Target size={14} className="text-blue-600" />
-                        <span className="text-xs font-medium text-blue-600 uppercase">Independent Variable</span>
-                      </div>
-                      <p className="text-sm text-blue-800">{hypothesis.independent_variable}</p>
-                    </div>
-                  )}
-
-                  {/* Dependent Variable */}
-                  {hypothesis.dependent_variable && (
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle size={14} className="text-green-600" />
-                        <span className="text-xs font-medium text-green-600 uppercase">Dependent Variable</span>
-                      </div>
-                      <p className="text-sm text-green-800">{hypothesis.dependent_variable}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Additional Details */}
-                <div className="space-y-2 text-sm">
-                  {hypothesis.expected_direction && (
-                    <div>
-                      <span className="font-medium text-gray-700">Expected Direction:</span>{' '}
-                      <span className="text-gray-600">{hypothesis.expected_direction}</span>
-                    </div>
-                  )}
-                  {hypothesis.baseline && (
-                    <div>
-                      <span className="font-medium text-gray-700">Baseline:</span>{' '}
-                      <span className="text-gray-600">{hypothesis.baseline}</span>
-                    </div>
-                  )}
-                  {hypothesis.metric && (
-                    <div>
-                      <span className="font-medium text-gray-700">Metric:</span>{' '}
-                      <span className="text-gray-600">{hypothesis.metric}</span>
-                    </div>
-                  )}
-                  {hypothesis.dataset_requirement && (
-                    <div>
-                      <span className="font-medium text-gray-700">Dataset:</span>{' '}
-                      <span className="text-gray-600">{hypothesis.dataset_requirement}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Failure Condition */}
-                {hypothesis.failure_condition && (
-                  <div className="mt-4 bg-red-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle size={14} className="text-red-600" />
-                      <span className="text-xs font-medium text-red-600 uppercase">Failure Condition</span>
-                    </div>
-                    <p className="text-sm text-red-700">{hypothesis.failure_condition}</p>
-                  </div>
-                )}
-
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
-                  <span>Version {hypothesis.version}</span>
-                  <span>Created {formatDate(hypothesis.created_at)}</span>
-                </div>
-
-                {/* Validation Plan Display */}
-                {viewingValidation === hypothesis.id && validationPlan && (
-                  <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-100">
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileSearch size={14} className="text-blue-600" />
-                      <span className="text-sm font-medium text-blue-800">Validation Plan</span>
-                      <span className="text-xs text-blue-500 ml-auto">
-                        Feasibility: {validationPlan.feasibility_score != null ? (validationPlan.feasibility_score * 100).toFixed(0) + '%' : 'N/A'}
-                      </span>
-                    </div>
-                    {validationPlan.experimental_design && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium text-blue-700 mb-1">Experimental Design</p>
-                        <p className="text-sm text-blue-700">{validationPlan.experimental_design}</p>
-                      </div>
-                    )}
-                    {validationPlan.dataset_candidates && validationPlan.dataset_candidates.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium text-blue-700 mb-1">Datasets</p>
-                        <div className="flex flex-wrap gap-1">
-                          {validationPlan.dataset_candidates.map((d: any, i: number) => (
-                            <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{d.name || d}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {validationPlan.baselines && validationPlan.baselines.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium text-blue-700 mb-1">Baselines</p>
-                        <div className="flex flex-wrap gap-1">
-                          {validationPlan.baselines.map((b: string, i: number) => (
-                            <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{b}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {validationPlan.metrics && validationPlan.metrics.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium text-blue-700 mb-1">Metrics</p>
-                        <div className="flex flex-wrap gap-1">
-                          {validationPlan.metrics.map((m: string, i: number) => (
-                            <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{m}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {validationPlan.feasibility_score != null && (
-                      <div className="mt-2 pt-2 border-t border-blue-200">
-                        <div className="flex items-center gap-4 text-xs text-blue-600">
-                          <span>Cost estimate: {validationPlan.cost_estimate != null ? '$' + validationPlan.cost_estimate.toFixed(0) : 'N/A'}</span>
-                          <span>Difficulty: {validationPlan.difficulty_estimate != null ? (validationPlan.difficulty_estimate * 100).toFixed(0) + '%' : 'N/A'}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {viewingValidation === hypothesis.id && !validationPlan && (
-                  <div className="mt-4 bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-500">No validation plan available for this hypothesis.</p>
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      <div className="p-6">{renderContent()}</div>
     </Layout>
   );
 }

@@ -17,7 +17,7 @@ class PaperCreate(BaseSchema):
     url: str | None = None
     citation_count: int | None = Field(None, ge=0)
     paper_type: str | None = Field(
-        None, pattern="^(research|review|survey|dataset|benchmark)$"
+        None, pattern="^(research|review|survey|dataset|benchmark)$",
     )
     source_connector: str | None = None
     source_id: str | None = None
@@ -35,7 +35,7 @@ class PaperUpdate(BaseSchema):
     url: str | None = None
     citation_count: int | None = Field(None, ge=0)
     paper_type: str | None = Field(
-        None, pattern="^(research|review|survey|dataset|benchmark)$"
+        None, pattern="^(research|review|survey|dataset|benchmark)$",
     )
 
 
@@ -54,6 +54,7 @@ class PaperResponse(TimestampSchema):
     paper_type: str | None = None
     source_connector: str | None = None
     source_id: str | None = None
+    references: list[str] = Field(default_factory=list)
 
 
 class PaperAnalysisResponse(TimestampSchema):
@@ -82,22 +83,31 @@ class PaperSearchRequest(BaseSchema):
     limit: int = Field(default=50, ge=1, le=200)
 
 
+class ClusterLabelResponse(BaseSchema):
+    """Schema for cluster label response."""
+
+    label: str
+    rationale: str | None = None
+
+
 class PaperClusterResponse(TimestampSchema):
     """Schema for paper cluster response."""
 
     project_id: str
+    run_id: str | None = None
     name: str | None = None
     description: str | None = None
     cluster_type: str | None = None
     paper_ids: list[str] = Field(default_factory=list)
     representative_paper_id: str | None = None
-    labels: list[dict] = Field(default_factory=list)
+    labels: list[ClusterLabelResponse] = Field(default_factory=list)
 
 
 class ClusterConflictResponse(TimestampSchema):
     """Schema for cluster conflict response."""
 
     project_id: str
+    run_id: str | None = None
     cluster_id: str | None = None
     conflict_type: str
     description: str

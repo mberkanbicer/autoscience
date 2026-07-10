@@ -1,13 +1,13 @@
 """Hypothesis service for storing and managing hypotheses."""
 
-from uuid import uuid4
 from typing import Any
+from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.research_question import Hypothesis as HypothesisModel
-from ..engine.hypothesis_generation import Hypothesis, HypothesisGenerationResult
+from app.engine.hypothesis_generation import HypothesisGenerationResult
+from app.models.research_question import Hypothesis as HypothesisModel
 
 
 class HypothesisService:
@@ -58,7 +58,7 @@ class HypothesisService:
     ) -> list[HypothesisModel]:
         """Get all hypotheses for a project."""
         query = select(HypothesisModel).where(
-            HypothesisModel.project_id == project_id
+            HypothesisModel.project_id == project_id,
         )
 
         if status:
@@ -74,7 +74,7 @@ class HypothesisService:
     async def get_hypothesis(self, hypothesis_id: str) -> HypothesisModel | None:
         """Get a hypothesis by ID."""
         result = await self.db.execute(
-            select(HypothesisModel).where(HypothesisModel.id == hypothesis_id)
+            select(HypothesisModel).where(HypothesisModel.id == hypothesis_id),
         )
         return result.scalar_one_or_none()
 
@@ -151,8 +151,8 @@ class HypothesisService:
         # Total hypotheses
         total_result = await self.db.execute(
             select(func.count(HypothesisModel.id)).where(
-                HypothesisModel.project_id == project_id
-            )
+                HypothesisModel.project_id == project_id,
+            ),
         )
         total = total_result.scalar() or 0
 
@@ -160,7 +160,7 @@ class HypothesisService:
         status_result = await self.db.execute(
             select(HypothesisModel.status, func.count(HypothesisModel.id))
             .where(HypothesisModel.project_id == project_id)
-            .group_by(HypothesisModel.status)
+            .group_by(HypothesisModel.status),
         )
         by_status = {row[0] or "unknown": row[1] for row in status_result.all()}
 
@@ -169,7 +169,7 @@ class HypothesisService:
             select(func.avg(HypothesisModel.confidence)).where(
                 HypothesisModel.project_id == project_id,
                 HypothesisModel.status == "validated",
-            )
+            ),
         )
         avg_confidence = avg_conf_result.scalar() or 0
 
@@ -191,6 +191,6 @@ class HypothesisService:
             select(HypothesisModel).where(
                 HypothesisModel.project_id == project_id,
                 HypothesisModel.statement.ilike(search_pattern),
-            )
+            ),
         )
         return list(result.scalars().all())

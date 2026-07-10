@@ -1,10 +1,12 @@
 """OpenAlex academic source connector."""
 
-import httpx
-import structlog
+import json
 from typing import Any
 
-from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult
+import httpx
+import structlog
+
+from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult, create_connector_client
 
 logger = structlog.get_logger()
 
@@ -15,16 +17,15 @@ class OpenAlexConnector(AcademicConnector):
     BASE_URL = "https://api.openalex.org"
 
     def __init__(self, email: str | None = None):
-        """
-        Initialize OpenAlex connector.
+        """Initialize OpenAlex connector.
 
         Args:
             email: Optional email for polite API access (faster rate limits).
+
         """
         self.email = email
-        self.client = httpx.AsyncClient(
+        self.client = create_connector_client(
             base_url=self.BASE_URL,
-            timeout=30.0,
             headers={"User-Agent": f"autoscience/0.1 ({email})" if email else "autoscience/0.1"},
         )
 
@@ -95,8 +96,17 @@ class OpenAlexConnector(AcademicConnector):
                 has_more=len(papers) < data.get("meta", {}).get("count", 0),
             )
 
-        except Exception as e:
-            logger.error("openalex_search_failed", error=str(e), query=query.text)
+        except httpx.HTTPStatusError as e:
+            logger.error("openalex_search_http_error", status_code=e.response.status_code, query=query.text)
+            raise
+        except httpx.TimeoutException:
+            logger.error("openalex_search_timeout", query=query.text)
+            raise
+        except httpx.RequestError as e:
+            logger.error("openalex_search_request_failed", error=str(e), query=query.text)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("openalex_search_json_failed", error=str(e), query=query.text)
             raise
 
     async def get_paper(self, identifier: str) -> RawPaper | None:
@@ -115,8 +125,17 @@ class OpenAlexConnector(AcademicConnector):
             response.raise_for_status()
             return self._parse_work(response.json())
 
-        except Exception as e:
-            logger.error("openalex_get_paper_failed", error=str(e), identifier=identifier)
+        except httpx.HTTPStatusError as e:
+            logger.error("openalex_get_paper_http_error", status_code=e.response.status_code, identifier=identifier)
+            raise
+        except httpx.TimeoutException:
+            logger.error("openalex_get_paper_timeout", identifier=identifier)
+            raise
+        except httpx.RequestError as e:
+            logger.error("openalex_get_paper_request_failed", error=str(e), identifier=identifier)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("openalex_get_paper_json_failed", error=str(e), identifier=identifier)
             raise
 
     async def get_citations(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -140,8 +159,17 @@ class OpenAlexConnector(AcademicConnector):
 
             return papers
 
-        except Exception as e:
-            logger.error("openalex_citations_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("openalex_citations_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            raise
+        except httpx.TimeoutException:
+            logger.error("openalex_citations_timeout", paper_id=paper_id)
+            raise
+        except httpx.RequestError as e:
+            logger.error("openalex_citations_request_failed", error=str(e), paper_id=paper_id)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("openalex_citations_json_failed", error=str(e), paper_id=paper_id)
             raise
 
     async def get_references(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -165,8 +193,17 @@ class OpenAlexConnector(AcademicConnector):
 
             return papers
 
-        except Exception as e:
-            logger.error("openalex_references_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("openalex_references_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            raise
+        except httpx.TimeoutException:
+            logger.error("openalex_references_timeout", paper_id=paper_id)
+            raise
+        except httpx.RequestError as e:
+            logger.error("openalex_references_request_failed", error=str(e), paper_id=paper_id)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("openalex_references_json_failed", error=str(e), paper_id=paper_id)
             raise
 
     def _parse_work(self, work: dict[str, Any]) -> RawPaper | None:
@@ -219,7 +256,7 @@ class OpenAlexConnector(AcademicConnector):
                 raw_metadata=work,
             )
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError) as e:
             logger.error("openalex_parse_failed", error=str(e))
             return None
 
@@ -241,7 +278,7 @@ class OpenAlexConnector(AcademicConnector):
             # Join words
             return " ".join(word for word, _ in word_positions)
 
-        except Exception:
+        except (KeyError, TypeError, ValueError):
             return None
 
     async def health_check(self) -> bool:
@@ -249,5 +286,5 @@ class OpenAlexConnector(AcademicConnector):
         try:
             response = await self.client.get("/works?per_page=1")
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False

@@ -1,28 +1,43 @@
 """Search API — SSE streaming + cached search endpoints."""
 
-import json
-import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
+import httpx
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response, StreamingResponse
 
-from ..dependencies import get_db
-from ..config import get_settings
-from ..services.cache_service import CacheService
-from ..services.event_stream import EventBroadcaster
-from ..connectors.searxng import SearXNGConnector
-from ..connectors.base import SearchQuery
+from app.config import get_settings
+from app.connectors.base import SearchQuery
+from app.connectors.searxng import SearXNGConnector
+from app.services.cache_service import CacheService
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
-settings = get_settings()
+# CORS headers for SSE
+SSE_CORS_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+}
+
+
+def _cors_response(content=None, media_type="text/event-stream"):
+    """Create response with CORS headers."""
+    response = Response(content=content, media_type=media_type)
+    for key, value in SSE_CORS_HEADERS.items():
+        response.headers[key] = value
+    return response
 
 
 def _get_redis():
     """Get async Redis client."""
+    settings = get_settings()
     return aioredis.from_url(
         settings.redis_url,
         decode_responses=True,
@@ -34,11 +49,13 @@ def _get_redis():
 def _get_cache_service(redis_client=None) -> CacheService:
     """Get cache service with Redis."""
     client = redis_client or _get_redis()
+    settings = get_settings()
     return CacheService(client, default_ttl_seconds=settings.cache_ttl_seconds, prefix="search")
 
 
 def _get_searxng_connector(cache_service: CacheService | None = None) -> SearXNGConnector:
     """Get SearXNG connector with optional caching."""
+    settings = get_settings()
     return SearXNGConnector(
         base_url=settings.searxng_url,
         cache_service=cache_service,
@@ -48,13 +65,13 @@ def _get_searxng_connector(cache_service: CacheService | None = None) -> SearXNG
 
 @router.get("")
 async def search(
-    q: str = Query(..., description="Search query"),
-    fresh: bool = Query(False, description="Bypass cache for fresh results"),
-    categories: str = Query(None, description="Comma-separated SearXNG categories"),
-    engines: str = Query(None, description="Comma-separated SearXNG engines"),
-    limit: int = Query(20, ge=1, le=100),
-    year_from: int | None = Query(None),
-    year_to: int | None = Query(None),
+    q: Annotated[str, Query(description="Search query")],
+    fresh: Annotated[bool, Query(description="Bypass cache for fresh results")] = False,
+    categories: Annotated[str, Query(description="Comma-separated SearXNG categories")] = None,
+    engines: Annotated[str, Query(description="Comma-separated SearXNG engines")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    year_from: Annotated[int | None, Query()] = None,
+    year_to: Annotated[int | None, Query()] = None,
 ):
     """Search via SearXNG with caching.
 
@@ -117,8 +134,13 @@ async def search(
         response.headers["X-Cache"] = cache_status
         return response
 
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Search network error: {e!s}")
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=502, detail=f"Search response error: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Search failed: {str(e)}")
+        logger.error("search_unexpected", error=str(e))
+        raise HTTPException(status_code=502, detail="Search failed")
     finally:
         await redis_client.close()
 
@@ -136,7 +158,7 @@ async def cache_stats():
 
 
 @router.delete("/cache")
-async def clear_cache(namespace: str | None = Query(None)):
+async def clear_cache(namespace: Annotated[str | None, Query()] = None):
     """Clear search cache entries."""
     redis_client = _get_redis()
     cache = _get_cache_service(redis_client)
@@ -148,99 +170,25 @@ async def clear_cache(namespace: str | None = Query(None)):
 
 
 async def _event_generator(run_id: str) -> AsyncGenerator[str, None]:
-    """Generate SSE events from Redis Pub/Sub."""
+    """Generate SSE events from DB replay, Redis live feed, and DB poll fallback."""
+    from app.services.sse_stream import generate_run_events
+
     redis_client = _get_redis()
-    broadcaster = EventBroadcaster(redis_client)
-    pubsub = await broadcaster.subscribe(run_id)
+    async for frame in generate_run_events(run_id, redis_client):
+        yield frame
 
-    if not pubsub:
-        yield f"data: {json.dumps({'type': 'error', 'data': {'message': 'Failed to subscribe'}})}\n\n"
-        await redis_client.close()
-        return
 
-    # Check if run is already completed/failed (events may have been already sent)
-    from ..database import async_session_factory
-    from ..services.research_run_service import ResearchRunService
-    run_completed = False
-    try:
-        async with async_session_factory() as check_db:
-            check_svc = ResearchRunService(check_db)
-            run = await check_svc.get_run(run_id)
-            if run and run.state in ("completed", "failed"):
-                # Send stored events from DB
-                from sqlalchemy import select
-                from ..models.research_run import ResearchRunEvent
-                stmt = select(ResearchRunEvent).where(
-                    ResearchRunEvent.run_id == run_id
-                ).order_by(ResearchRunEvent.created_at)
-                result = await check_db.execute(stmt)
-                for evt in result.scalars().all():
-                    sse_data = {
-                        "type": evt.event_type,
-                        "timestamp": evt.created_at.isoformat() if evt.created_at else "",
-                        "data": evt.details or {},
-                    }
-                    yield f"data: {json.dumps(sse_data, default=str)}\n\n"
-                run_completed = True
-    except Exception:
-        pass
-
-    if run_completed:
-        await broadcaster.unsubscribe(pubsub)
-        await redis_client.close()
-        return
-
-    # Send initial connection event
-    yield f"data: {json.dumps({'type': 'connected', 'timestamp': __import__('datetime').datetime.utcnow().isoformat()})}\n\n"
-
-    try:
-        # Use listen() which blocks properly — not get_message() which polls
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                data = message["data"]
-                if isinstance(data, bytes):
-                    data = data.decode()
-                yield f"data: {data}\n\n"
-
-                # Check if run completed
-                try:
-                    event = json.loads(data)
-                    if event.get("type") in ("run_completed", "run_failed"):
-                        break
-                except json.JSONDecodeError:
-                    pass
-
-    except asyncio.CancelledError:
-        pass
-    except Exception as e:
-        # Only send error event if connection is still alive
-        try:
-            yield f"data: {json.dumps({'type': 'error', 'data': {'message': str(e)}})}\n\n"
-        except Exception:
-            pass
-    finally:
-        await broadcaster.unsubscribe(pubsub)
-        await redis_client.close()
+@router.options("/stream/{run_id}")
+async def stream_options(run_id: str):
+    """Handle CORS preflight."""
+    return _cors_response()
 
 
 @router.get("/stream/{run_id}")
 async def stream_run_events(run_id: str):
-    """SSE endpoint for live research run events.
-
-    Connect via EventSource:
-        const es = new EventSource('/api/v1/search/stream/{run_id}');
-        es.onmessage = (e) => {
-            const event = JSON.parse(e.data);
-            // event.type: "keywords" | "search_started" | "search_results" | "paper_found" | ...
-            // event.data: { ... }
-        };
-    """
+    """SSE endpoint for live research run events."""
     return StreamingResponse(
         _event_generator(run_id),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        headers=SSE_CORS_HEADERS,
     )

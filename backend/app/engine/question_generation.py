@@ -1,14 +1,13 @@
 """Research question generation engine."""
 
 from dataclasses import dataclass, field
-from typing import Any
 from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
-from ..engine.conflict_detection import Conflict, Gap
+from app.engine.conflict_detection import Conflict, Gap
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -74,7 +73,7 @@ class QuestionGenerationEngine:
 
         # Generate cross-domain questions
         cross_domain_questions = await self._generate_cross_domain_questions(
-            conflicts, gaps, idea_context
+            conflicts, gaps, idea_context,
         )
         all_questions.extend(cross_domain_questions)
 
@@ -108,12 +107,12 @@ class QuestionGenerationEngine:
     ) -> QuestionGenerationResult:
         """Generate simple template questions when no LLM is available."""
         questions = []
-        
+
         # Generate questions from conflicts
         for i, conflict in enumerate(conflicts[:5]):
             questions.append(ResearchQuestion(
                 id=str(uuid4()),
-                question=f'How do we reconcile the {conflict.conflict_type} conflict: {conflict.description[:100]}?',
+                question=f"How do we reconcile the {conflict.conflict_type} conflict: {conflict.description[:100]}?",
                 source_conflicts=[conflict.id],
                 source_gaps=[],
                 novelty_score=0.5,
@@ -121,12 +120,12 @@ class QuestionGenerationEngine:
                 evidence_score=0.5,
                 overall_score=0.5,
             ))
-        
+
         # Generate questions from gaps
         for gap in gaps[:3]:
             questions.append(ResearchQuestion(
                 id=str(uuid4()),
-                question=f'What {gap.gap_type} gap exists: {gap.description[:100]}?',
+                question=f"What {gap.gap_type} gap exists: {gap.description[:100]}?",
                 source_conflicts=[],
                 source_gaps=[gap.id],
                 novelty_score=0.6,
@@ -134,12 +133,12 @@ class QuestionGenerationEngine:
                 evidence_score=0.4,
                 overall_score=0.5,
             ))
-        
+
         # Add general question about the idea
         if idea_context:
             questions.append(ResearchQuestion(
                 id=str(uuid4()),
-                question=f'What are the key open challenges in: {idea_context[:100]}?',
+                question=f"What are the key open challenges in: {idea_context[:100]}?",
                 source_conflicts=[],
                 source_gaps=[],
                 novelty_score=0.5,
@@ -147,10 +146,10 @@ class QuestionGenerationEngine:
                 evidence_score=0.5,
                 overall_score=0.6,
             ))
-        
+
         return QuestionGenerationResult(
             questions=questions[:max_questions],
-            generation_notes=f'Simple template-based question generation from {len(conflicts)} conflicts and {len(gaps)} gaps',
+            generation_notes=f"Simple template-based question generation from {len(conflicts)} conflicts and {len(gaps)} gaps",
             total_generated=len(questions),
             total_selected=len(questions[:max_questions]),
         )
@@ -167,7 +166,7 @@ class QuestionGenerationEngine:
                 f"  {c.description}\n"
                 f"  Research opportunity: {c.research_opportunity}"
                 for i, c in enumerate(conflicts[:10])
-            ]
+            ],
         )
 
         system = """You are a research question generator.
@@ -213,7 +212,7 @@ Generate research questions that could resolve these conflicts."""
                     question=q.get("question", ""),
                     source_conflicts=source_ids,
                     rationale=q.get("rationale", ""),
-                )
+                ),
             )
 
         return questions
@@ -230,7 +229,7 @@ Generate research questions that could resolve these conflicts."""
                 f"  {g.description}\n"
                 f"  Opportunity: {g.opportunity}"
                 for i, g in enumerate(gaps[:10])
-            ]
+            ],
         )
 
         system = """You are a research question generator.
@@ -275,7 +274,7 @@ Generate research questions that address these gaps."""
                     question=q.get("question", ""),
                     source_gaps=source_ids,
                     rationale=q.get("rationale", ""),
-                )
+                ),
             )
 
         return questions
@@ -319,7 +318,7 @@ Generate cross-domain research questions that could lead to novel insights."""
                     id=str(uuid4()),
                     question=q.get("question", ""),
                     rationale=q.get("rationale", ""),
-                )
+                ),
             )
 
         return questions
@@ -359,7 +358,7 @@ Generate cross-domain research questions that could lead to novel insights."""
             [
                 f"{i+1}. {q.question}"
                 for i, q in enumerate(questions[:15])
-            ]
+            ],
         )
 
         system = """You are a research question evaluator.
@@ -446,7 +445,7 @@ Score each question as JSON."""
     ) -> str:
         """Generate notes about question generation."""
         selected_summary = "\n".join(
-            [f"- {q.question[:100]}..." for q in selected[:5]]
+            [f"- {q.question[:100]}..." for q in selected[:5]],
         )
 
         system = """You are a research strategy documenter.

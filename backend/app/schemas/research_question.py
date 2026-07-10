@@ -58,7 +58,7 @@ class HypothesisUpdate(BaseSchema):
     failure_condition: str | None = None
     confidence: float | None = Field(None, ge=0.0, le=1.0)
     status: str | None = Field(
-        None, pattern="^(draft|validated|rejected|promoted)$"
+        None, pattern="^(draft|validated|rejected|promoted)$",
     )
 
 

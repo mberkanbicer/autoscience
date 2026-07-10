@@ -5,11 +5,11 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.research_question import ResearchQuestion, Hypothesis, ValidationPlan
-from ..schemas.research_question import (
-    ResearchQuestionCreate,
+from app.models.research_question import Hypothesis, ResearchQuestion, ValidationPlan
+from app.schemas.research_question import (
     HypothesisCreate,
     HypothesisUpdate,
+    ResearchQuestionCreate,
     ValidationPlanCreate,
 )
 
@@ -63,7 +63,7 @@ class ResearchQuestionService:
     async def get_question(self, question_id: str) -> ResearchQuestion | None:
         """Get a research question by ID."""
         result = await self.db.execute(
-            select(ResearchQuestion).where(ResearchQuestion.id == question_id)
+            select(ResearchQuestion).where(ResearchQuestion.id == question_id),
         )
         return result.scalar_one_or_none()
 
@@ -136,7 +136,7 @@ class HypothesisService:
         # Update question status if linked
         if data.question_id:
             question = await self.db.execute(
-                select(ResearchQuestion).where(ResearchQuestion.id == data.question_id)
+                select(ResearchQuestion).where(ResearchQuestion.id == data.question_id),
             )
             q = question.scalar_one_or_none()
             if q:
@@ -148,7 +148,7 @@ class HypothesisService:
     async def get_hypothesis(self, hypothesis_id: str) -> Hypothesis | None:
         """Get a hypothesis by ID."""
         result = await self.db.execute(
-            select(Hypothesis).where(Hypothesis.id == hypothesis_id)
+            select(Hypothesis).where(Hypothesis.id == hypothesis_id),
         )
         return result.scalar_one_or_none()
 
@@ -172,7 +172,7 @@ class HypothesisService:
     async def get_validation_plan(self, hypothesis_id: str) -> ValidationPlan | None:
         """Get validation plan for a hypothesis."""
         result = await self.db.execute(
-            select(ValidationPlan).where(ValidationPlan.hypothesis_id == hypothesis_id)
+            select(ValidationPlan).where(ValidationPlan.hypothesis_id == hypothesis_id),
         )
         return result.scalar_one_or_none()
 

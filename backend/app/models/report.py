@@ -1,6 +1,6 @@
 """Report and knowledge note models."""
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,7 +19,7 @@ class ResearchReport(BaseModel):
     content_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     report_type: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # cycle | idle | validation | summary
 
 
@@ -29,8 +29,9 @@ class KnowledgeNote(BaseModel):
     __tablename__ = "knowledge_notes"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     note_type: Mapped[str] = mapped_column(
-        String(50), nullable=False
+        String(50), nullable=False,
     )  # paper | cluster | conflict | hypothesis | skill | project
     entity_id: Mapped[str | None] = mapped_column(nullable=True)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -61,7 +62,7 @@ class SearchQuery(BaseModel):
     search_id: Mapped[str] = mapped_column(ForeignKey("literature_searches.id", ondelete="CASCADE"), nullable=False, index=True)
     query_text: Mapped[str] = mapped_column(Text, nullable=False)
     query_type: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # high_impact | frontier | review | contradiction | dataset | adjacent
     sources: Mapped[list] = mapped_column(JSON, default=list)
     year_range: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -82,6 +83,10 @@ class Dataset(BaseModel):
     row_count: Mapped[int | None] = mapped_column(nullable=True)
     column_count: Mapped[int | None] = mapped_column(nullable=True)
     schema_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Provenance fields
+    uploaded_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    original_filename: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    provenance: Mapped[str | None] = mapped_column(String(50), nullable=True)  # upload | huggingface | zenodo | kaggle
 
 
 class AnalysisRun(BaseModel):
@@ -89,6 +94,7 @@ class AnalysisRun(BaseModel):
 
     __tablename__ = "analysis_runs"
 
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     hypothesis_id: Mapped[str | None] = mapped_column(ForeignKey("hypotheses.id", ondelete="SET NULL"), nullable=True, index=True)
     dataset_id: Mapped[str | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True, index=True)
     script: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -103,7 +109,59 @@ class AnalysisArtifact(BaseModel):
 
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False, index=True)
     artifact_type: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # figure | table | json | csv | script
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ArtifactSectionLink(BaseModel):
+    """Cross-mode link between an experiment artifact and a manuscript section.
+
+    Persists the mapping so users can trace which experiment outputs (figures,
+    tables, stdout, claims, effect sizes) informed each manuscript section.
+    This enables bidirectional navigation: "which artifacts support this section?"
+    and "which sections reference this artifact?".
+    """
+
+    __tablename__ = "artifact_section_links"
+
+    manuscript_id: Mapped[str] = mapped_column(
+        ForeignKey("manuscripts.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    analysis_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    analysis_artifact_id: Mapped[str | None] = mapped_column(
+        ForeignKey("analysis_artifacts.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    artifact_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="claim",
+    )  # figure | table | stdout | script | claim | effect_size
+    artifact_id: Mapped[str | None] = mapped_column(nullable=True, index=True)
+    section: Mapped[str] = mapped_column(
+        String(50), nullable=False,
+    )  # introduction | methods | results | discussion | abstract
+    link_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="reference",
+    )  # figure | table | statistic | finding | code | evidence
+    reference_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Manuscript(BaseModel):
+    """A scientific manuscript generated from project results."""
+
+    __tablename__ = "manuscripts"
+
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    parent_manuscript_id: Mapped[str | None] = mapped_column(ForeignKey("manuscripts.id", ondelete="SET NULL"), nullable=True, index=True)
+    revision_run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_latex: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(50), default="draft")  # draft | reviewing | finalized
+    compiled_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bibtex: Mapped[str | None] = mapped_column(Text, nullable=True)
+

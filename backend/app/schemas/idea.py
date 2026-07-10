@@ -37,6 +37,7 @@ class IdeaScoreResponse(BaseSchema):
     cost_risk: float | None = None
     overall_value: float | None = None
     scoring_rationale: str | None = None
+    cost_usd: float | None = None
 
 
 class IdeaResponse(TimestampSchema):

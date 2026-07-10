@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -88,7 +88,7 @@ class ValidationPlanningEngine:
 
         # Estimate cost and feasibility
         estimates = await self._estimate_cost_feasibility(
-            hypothesis, datasets, experiment_design
+            hypothesis, datasets, experiment_design,
         )
 
         # Identify risks
@@ -122,6 +122,12 @@ class ValidationPlanningEngine:
             try:
                 plan = await self.create_validation_plan(hypothesis, idea_context)
                 plans.append(plan)
+            except (ValueError, RuntimeError, KeyError) as e:
+                logger.error(
+                    "validation_plan_error",
+                    hypothesis_id=hypothesis.get("id"),
+                    error=str(e),
+                )
             except Exception as e:
                 logger.error(
                     "validation_plan_failed",
@@ -187,7 +193,7 @@ Find datasets to test this hypothesis."""
                     size=d.get("size", ""),
                     format=d.get("format", ""),
                     relevance_score=d.get("relevance", 0.5),
-                )
+                ),
             )
 
         return datasets
@@ -425,7 +431,7 @@ Identify risks."""
                 f"- Hypothesis {i+1}: Feasibility={p.feasibility_score:.2f}, "
                 f"Cost={p.cost_estimate:.2f}, Datasets={len(p.dataset_candidates)}"
                 for i, p in enumerate(plans[:5])
-            ]
+            ],
         )
 
         system = """You are a research strategy documenter.

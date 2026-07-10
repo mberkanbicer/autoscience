@@ -1,13 +1,12 @@
 """Skill memory system for learning reusable research methods."""
 
-from uuid import uuid4
 from typing import Any
-from datetime import datetime
+from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
-from ..models.skill import Skill, SkillVersion, SkillUsage, SkillEvaluation
+from app.models.skill import Skill, SkillEvaluation, SkillUsage, SkillVersion
 
 
 class SkillMemoryService:
@@ -234,7 +233,7 @@ class SkillMemoryService:
 
         query = select(Skill).where(
             (Skill.name.ilike(search_pattern)) |
-            (Skill.purpose.ilike(search_pattern))
+            (Skill.purpose.ilike(search_pattern)),
         )
 
         if project_id:
@@ -283,7 +282,7 @@ class SkillMemoryService:
         result = await self.db.execute(
             select(SkillUsage)
             .where(SkillUsage.skill_id == skill_id)
-            .order_by(SkillUsage.used_at.desc())
+            .order_by(SkillUsage.used_at.desc()),
         )
         return list(result.scalars().all())
 
@@ -295,7 +294,7 @@ class SkillMemoryService:
         result = await self.db.execute(
             select(SkillEvaluation)
             .where(SkillEvaluation.skill_id == skill_id)
-            .order_by(SkillEvaluation.created_at.desc())
+            .order_by(SkillEvaluation.created_at.desc()),
         )
         return list(result.scalars().all())
 
@@ -359,6 +358,6 @@ class SkillMemoryService:
         result = await self.db.execute(
             select(SkillVersion)
             .where(SkillVersion.skill_id == skill_id)
-            .order_by(SkillVersion.created_at)
+            .order_by(SkillVersion.created_at),
         )
         return list(result.scalars().all())

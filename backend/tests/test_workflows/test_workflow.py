@@ -9,7 +9,13 @@ from app.workflows.research_workflow import (
     WorkflowConfig,
     WorkflowStep,
     WorkflowStatus,
+    WorkflowStepResult,
+    _extract_python_code,
+    _fallback_experiment_code,
+    serialize_step_history,
+    deserialize_step_history,
 )
+from app.sandbox.executor import SandboxResult  # noqa: F401 — direct import avoids package __init__ side effects
 from app.schemas.research_state import ResearchState, RunState, RunType, RunBudget
 from app.schemas.research_state import ConflictSummary, QuestionSummary, HypothesisSummary, ClusterSummary, ScoreSummary, PaperSummary
 
@@ -111,6 +117,54 @@ async def test_user_directed_execution(workflow, state):
     pytest.skip("Full execution test needs engines wired")
 
 
+def test_extract_python_code_from_fence():
+    text = "Here is the script:\n```python\nprint('ok')\n```"
+    assert _extract_python_code(text) == "print('ok')"
+
+
+def test_fallback_experiment_code_is_stdlib_only():
+    code = _fallback_experiment_code("Graph neural networks improve link prediction")
+    assert "import json" in code
+    assert "numpy" not in code
+
+
+@pytest.mark.asyncio
+async def test_generate_experiment_stores_code(workflow, state):
+    state.hypotheses.append(HypothesisSummary(
+        id="h1", statement="Attention sparsity improves efficiency", confidence=0.7, status="draft",
+    ))
+    result = await workflow._generate_experiment(state)
+    assert result.experiment_code
+    assert len(result.experiment_code) > 0
+
+
+@pytest.mark.asyncio
+async def test_run_experiment_uses_generated_code(workflow, state):
+    from unittest.mock import AsyncMock, patch
+
+    state.experiment_code = "print('unit-test-stdout')"
+    mock_result = SandboxResult(
+        success=True,
+        stdout="unit-test-stdout\n",
+        stderr="",
+        exit_code=0,
+        duration_ms=12,
+    )
+
+    mock_executor = AsyncMock()
+    mock_executor.run_python = AsyncMock(return_value=mock_result)
+
+    with patch(
+        "app.sandbox.executor.SandboxExecutor",
+        return_value=mock_executor,
+    ):
+        result = await workflow._run_experiment(state)
+
+    assert result.experiment_result is not None
+    assert result.experiment_result["success"] is True
+    assert "unit-test-stdout" in result.experiment_result["stdout"]
+
+
 def test_step_mapping():
     """Verify all steps have agent mappings."""
     wf = ResearchWorkflow(agents={})
@@ -119,3 +173,57 @@ def test_step_mapping():
             continue
         agent = wf._step_to_agent(step)
         assert agent is not None, f"No agent mapping for {step}"
+
+
+def test_serialize_step_history():
+    history = [
+        WorkflowStepResult(step=WorkflowStep.PLAN_SEARCH, status="completed", duration_seconds=1.5),
+        WorkflowStepResult(step=WorkflowStep.SCORE_IDEA, status="failed", duration_seconds=0.2, error="boom"),
+    ]
+    serialized = serialize_step_history(history)
+    assert serialized[0]["step"] == "plan_search"
+    assert serialized[0]["status"] == "completed"
+    assert serialized[1]["error"] == "boom"
+
+
+def test_deserialize_step_history_round_trip():
+    history = [
+        WorkflowStepResult(
+            step=WorkflowStep.PLAN_SEARCH,
+            status="completed",
+            duration_seconds=1.5,
+            output={"keywords": 3},
+        ),
+        WorkflowStepResult(
+            step=WorkflowStep.SCORE_IDEA,
+            status="failed",
+            duration_seconds=0.2,
+            error="boom",
+        ),
+    ]
+    restored = deserialize_step_history(serialize_step_history(history))
+    assert len(restored) == 2
+    assert restored[0].step == WorkflowStep.PLAN_SEARCH
+    assert restored[0].output == {"keywords": 3}
+    assert restored[1].error == "boom"
+
+
+@pytest.mark.asyncio
+async def test_persist_step_history_calls_run_service():
+    run_service = AsyncMock()
+    workflow = ResearchWorkflow(
+        agents={},
+        config=WorkflowConfig(run_type="user_directed"),
+        run_id="run-123",
+        run_service=run_service,
+    )
+    workflow.step_history.append(
+        WorkflowStepResult(step=WorkflowStep.PLAN_SEARCH, status="completed", duration_seconds=2.0)
+    )
+
+    await workflow._persist_step_history()
+
+    run_service.update_step_history.assert_awaited_once()
+    args = run_service.update_step_history.await_args[0]
+    assert args[0] == "run-123"
+    assert args[1][0]["step"] == "plan_search"

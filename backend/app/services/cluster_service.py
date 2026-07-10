@@ -1,13 +1,13 @@
 """Cluster service for storing and managing paper clusters."""
 
-from uuid import uuid4
 from typing import Any
+from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.paper import PaperCluster, ClusterLabel
-from ..engine.clustering import PaperCluster as ClusteringPaperCluster
+from app.engine.clustering import PaperCluster as ClusteringPaperCluster
+from app.models.paper import ClusterLabel, PaperCluster
 
 
 class ClusterService:
@@ -69,14 +69,14 @@ class ClusterService:
     async def get_cluster(self, cluster_id: str) -> PaperCluster | None:
         """Get a cluster by ID."""
         result = await self.db.execute(
-            select(PaperCluster).where(PaperCluster.id == cluster_id)
+            select(PaperCluster).where(PaperCluster.id == cluster_id),
         )
         return result.scalar_one_or_none()
 
     async def get_cluster_with_labels(self, cluster_id: str) -> PaperCluster | None:
         """Get a cluster with its labels."""
         result = await self.db.execute(
-            select(PaperCluster).where(PaperCluster.id == cluster_id)
+            select(PaperCluster).where(PaperCluster.id == cluster_id),
         )
         cluster = result.scalar_one_or_none()
 
@@ -116,7 +116,7 @@ class ClusterService:
 
         # Delete labels first
         labels_result = await self.db.execute(
-            select(ClusterLabel).where(ClusterLabel.cluster_id == cluster_id)
+            select(ClusterLabel).where(ClusterLabel.cluster_id == cluster_id),
         )
         for label in labels_result.scalars().all():
             await self.db.delete(label)
@@ -131,8 +131,8 @@ class ClusterService:
         # Total clusters
         total_result = await self.db.execute(
             select(func.count(PaperCluster.id)).where(
-                PaperCluster.project_id == project_id
-            )
+                PaperCluster.project_id == project_id,
+            ),
         )
         total = total_result.scalar() or 0
 
@@ -140,15 +140,15 @@ class ClusterService:
         type_result = await self.db.execute(
             select(PaperCluster.cluster_type, func.count(PaperCluster.id))
             .where(PaperCluster.project_id == project_id)
-            .group_by(PaperCluster.cluster_type)
+            .group_by(PaperCluster.cluster_type),
         )
         by_type = {row[0] or "unknown": row[1] for row in type_result.all()}
 
         # Average papers per cluster
         avg_result = await self.db.execute(
             select(func.avg(func.array_length(PaperCluster.paper_ids, 1))).where(
-                PaperCluster.project_id == project_id
-            )
+                PaperCluster.project_id == project_id,
+            ),
         )
         avg_papers = avg_result.scalar() or 0
 
@@ -170,8 +170,8 @@ class ClusterService:
             select(PaperCluster).where(
                 PaperCluster.project_id == project_id,
                 (PaperCluster.name.ilike(search_pattern)) |
-                (PaperCluster.description.ilike(search_pattern))
-            )
+                (PaperCluster.description.ilike(search_pattern)),
+            ),
         )
         return list(result.scalars().all())
 

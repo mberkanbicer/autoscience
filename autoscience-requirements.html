@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoscience — Complete Requirements & Compliance Report</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #1c1917;
+  color: #fdfaf6;
+  padding: 0;
+  line-height: 1.6;
+}
+header {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  padding: 28px 40px;
+  position: sticky; top: 0; z-index: 100;
+  border-bottom: 1px solid rgba(253,250,246,0.1);
+}
+header h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+header .summary { display: flex; gap: 24px; margin-top: 14px; flex-wrap: wrap; }
+.stat { text-align: center; }
+.stat .num { font-size: 28px; font-weight: 800; }
+.stat .label { font-size: 12px; color: rgba(253,250,246,0.6); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat .num.green { color: #22c55e; }
+.stat .num.amber { color: #d97706; }
+.stat .num.red { color: #ef4444; }
+.stat .num.gray { color: #a8a29e; }
+.filters { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.filters button {
+  background: rgba(253,250,246,0.08); border: 1px solid rgba(253,250,246,0.15);
+  color: #fdfaf6; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 500; transition: all 0.2s;
+}
+.filters button:hover { background: rgba(253,250,246,0.15); }
+.filters button.active { background: #d97706; border-color: #d97706; }
+main { padding: 32px 40px; max-width: 1000px; margin: 0 auto; }
+.category { margin-bottom: 32px; }
+.category h2 {
+  font-size: 18px; font-weight: 700; color: #d97706;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(253,250,246,0.1);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.category h2 .count { font-size: 13px; font-weight: 500; color: #a8a29e; }
+.subsection { margin-bottom: 20px; }
+.subsection h3 { font-size: 14px; font-weight: 600; color: #fdfaf6; margin-bottom: 8px; }
+.requirement {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 12px; border-radius: 6px;
+  transition: background 0.2s; cursor: default;
+}
+.requirement:hover { background: rgba(253,250,246,0.03); }
+.requirement.check { color: #a8a29e; text-decoration: line-through; opacity: 0.7; }
+.requirement.uncheck { color: #fdfaf6; }
+.requirement.partial { color: #d97706; }
+.checkbox {
+  width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; margin-top: 3px;
+}
+.checkbox.done { background: #22c55e; color: #fff; }
+.checkbox.partial { background: #d97706; color: #fff; }
+.checkbox.todo { background: rgba(253,250,246,0.1); border: 1px solid rgba(253,250,246,0.2); color: #a8a29e; }
+.checkbox.missing { background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; }
+.requirement .label { font-size: 14px; }
+.requirement .tag {
+  display: inline-block; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 600; margin-left: 6px;
+}
+.tag.p0 { background: rgba(239,68,68,0.2); color: #ef4444; }
+.tag.p1 { background: rgba(217,119,6,0.2); color: #d97706; }
+.tag.p2 { background: rgba(168,85,247,0.2); color: #a855f7; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Autoscience — Complete Requirements & Compliance Report</h1>
+  <div class="summary" id="summary"></div>
+  <div class="filters" id="filters">
+    <button class="active" data-filter="all">All</button>
+    <button data-filter="done">✅ Complete</button>
+    <button data-filter="partial">🔄 Partial</button>
+    <button data-filter="todo">📝 TODO</button>
+    <button data-filter="missing">❌ Missing</button>
+  </div>
+</header>
+<main id="main"></main>
+<script>
+const data = [
+  {
+    name: "1. Research Mode",
+    icon: "🔍",
+    subsections: [
+      {
+        name: "1.1 Multi-Source Literature Search",
+        items: [
+          { label: "arXiv connector", status: "done", priority: "p0" },
+          { label: "Semantic Scholar connector", status: "done", priority: "p0" },
+          { label: "OpenAlex connector", status: "done", priority: "p0" },
+          { label: "PubMed connector (functional stub)", status: "partial", priority: "p1" },
+          { label: "Crossref connector (functional stub)", status: "partial", priority: "p1" },
+          { label: "SearXNG federated search", status: "done", priority: "p1" },
+          { label: "Firecrawl web scraping", status: "done", priority: "p1" },
+          { label: "DOAJ connector (stub exists)", status: "todo", priority: "p2" },
+          { label: "CORE connector (requires API key)", status: "partial", priority: "p2" },
+          { label: "Unpaywall connector (requires email)", status: "partial", priority: "p2" },
+        ]
+      },
+      {
+        name: "1.2 Paper Analysis Engine",
+        items: [
+          { label: "Abstract analysis pipeline", status: "done", priority: "p0" },
+          { label: "Fulltext extraction (when available)", status: "done", priority: "p0" },
+          { label: "Structured extraction (problem, method, findings, limitations)", status: "done", priority: "p0" },
+          { label: "Claim extraction with evidence linking", status: "done", priority: "p0" },
+          { label: "Method comparison engine", status: "done", priority: "p1" },
+          { label: "Future work extraction", status: "done", priority: "p1" },
+          { label: "Assumption detection", status: "done", priority: "p1" },
+        ]
+      },
+      {
+        name: "1.3 Conflict Detection",
+        items: [
+          { label: "Finding conflicts", status: "done", priority: "p0" },
+          { label: "Method conflicts", status: "done", priority: "p0" },
+          { label: "Dataset conflicts", status: "done", priority: "p0" },
+          { label: "Assumption conflicts", status: "done", priority: "p0" },
+          { label: "Scope conflicts", status: "done", priority: "p1" },
+          { label: "Recency conflicts", status: "done", priority: "p1" },
+          { label: "Theory-practice conflicts", status: "done", priority: "p1" },
+          { label: "Replication conflicts", status: "done", priority: "p1" },
+        ]
+      },
+      {
+        name: "1.4 Research Question Generator",
+        items: [
+          { label: "Gap-to-question transformation", status: "done", priority: "p0" },
+          { label: "Adjacent-field collisions", status: "done", priority: "p1" },
+          { label: "Dataset discovery triggers", status: "done", priority: "p1" },
+          { label: "Cross-domain question generation", status: "done", priority: "p1" },
+        ]
+      },
+    ]
+  },
+  {
+    name: "2. Experiment Mode",
+    icon: "🧪",
+    subsections: [
+      {
+        name: "2.1 Dataset Discovery & Management",
+        items: [
+          { label: "Dataset search across repositories (HuggingFace, Zenodo)", status: "done", priority: "p0" },
+          { label: "Dataset metadata extraction", status: "done", priority: "p0" },
+          { label: "Dataset preview generation (head, schema)", status: "done", priority: "p1" },
+          { label: "Dataset upload with validation", status: "todo", priority: "p1" },
+          { label: "Dataset provenance tracking", status: "todo", priority: "p2" },
+        ]
+      },
+      {
+        name: "2.2 Validation Experiment Designer",
+        items: [
+          { label: "Validation plan generation", status: "done", priority: "p0" },
+          { label: "Baseline identification", status: "partial", priority: "p1" },
+          { label: "Cost estimation", status: "partial", priority: "p1" },
+          { label: "Difficulty assessment", status: "partial", priority: "p1" },
+          { label: "Statistical power analysis", status: "done", priority: "p1" },
+          { label: "Simulation design", status: "todo", priority: "p2" },
+        ]
+      },
+      {
+        name: "2.3 Data Analysis Sandbox",
+        items: [
+          { label: "Docker sandbox infrastructure", status: "done", priority: "p0" },
+          { label: "Python script generation from plans", status: "partial", priority: "p0" },
+          { label: "Safe execution with resource limits", status: "done", priority: "p0" },
+          { label: "Artifact capture (figures, tables, stdout)", status: "done", priority: "p1" },
+          { label: "Statistical test library", status: "done", priority: "p1" },
+          { label: "Reproducibility guarantees", status: "partial", priority: "p2" },
+        ]
+      },
+      {
+        name: "2.4 Results Synthesis",
+        items: [
+          { label: "Experimental results extraction", status: "todo", priority: "p1" },
+          { label: "Hypothesis validation/refutation", status: "todo", priority: "p0" },
+          { label: "Effect size calculation", status: "todo", priority: "p1" },
+          { label: "Statistical significance reporting", status: "todo", priority: "p1" },
+          { label: "Results-to-claims pipeline", status: "todo", priority: "p2" },
+        ]
+      },
+    ]
+  },
+  {
+    name: "3. Article Mode",
+    icon: "📄",
+    subsections: [
+      {
+        name: "3.1 Manuscript Generator",
+        items: [
+          { label: "IMRaD structure (Intro, Methods, Results, Discussion)", status: "done", priority: "p0" },
+          { label: "Title generation", status: "done", priority: "p0" },
+          { label: "Abstract composition", status: "done", priority: "p0" },
+          { label: "Introduction drafting (context, gap, contribution)", status: "done", priority: "p0" },
+          { label: "Methods section (from validation plans)", status: "done", priority: "p0" },
+          { label: "Results section (from experimental data)", status: "done", priority: "p0" },
+          { label: "Discussion section (interpretation, limitations, future work)", status: "done", priority: "p0" },
+          { label: "References management", status: "done", priority: "p0" },
+        ]
+      },
+      {
+        name: "3.2 Citation System",
+        items: [
+          { label: "BibTeX export", status: "done", priority: "p0" },
+          { label: "Bibliography generation", status: "done", priority: "p0" },
+          { label: "Citation DOI resolution", status: "done", priority: "p1" },
+          { label: "Reference formatting (APA, MLA, Chicago, IEEE)", status: "done", priority: "p0" },
+        ]
+      },
+      {
+        name: "3.3 LaTeX Integration",
+        items: [
+          { label: "LaTeX template system", status: "partial", priority: "p0" },
+          { label: "Equation rendering (KaTeX)", status: "done", priority: "p1" },
+          { label: "Figure placeholder management", status: "partial", priority: "p1" },
+          { label: "Server-side LaTeX → PDF compile", status: "done", priority: "p1" },
+          { label: "Figure/table auto-numbering", status: "done", priority: "p1" },
+        ]
+      },
+      {
+        name: "3.4 Multi-Format Export",
+        items: [
+          { label: "LaTeX (.tex) export", status: "done", priority: "p0" },
+          { label: "BibTeX (.bib) export", status: "done", priority: "p0" },
+          { label: "PDF export (via server-side pdflatex)", status: "done", priority: "p0" },
+          { label: "ZIP archive (tex + bib + figures)", status: "done", priority: "p1" },
+          { label: "DOCX export (via pandoc)", status: "done", priority: "p1" },
+          { label: "HTML export with styling", status: "todo", priority: "p2" },
+          { label: "Markdown export", status: "todo", priority: "p2" },
+          { label: "Jupyter notebook export", status: "done", priority: "p1" },
+        ]
+      },
+    ]
+  },
+  {
+    name: "4. Core Infrastructure",
+    icon: "⚙️",
+    subsections: [
+      {
+        name: "4.1 Cognitive Health Dashboard",
+        items: [
+          { label: "Cognitive entropy visualization", status: "done", priority: "p1" },
+          { label: "Focus metric (depth vs breadth)", status: "partial", priority: "p2" },
+          { label: "Idea evolution timeline", status: "partial", priority: "p2" },
+          { label: "Skill utilization rate", status: "partial", priority: "p2" },
+          { label: "Conflict density indicator", status: "partial", priority: "p2" },
+          { label: "Novelty score distribution", status: "partial", priority: "p2" },
+        ]
+      },
+      {
+        name: "4.2 Real-time Observability",
+        items: [
+          { label: "SSE streaming for workflow updates", status: "done", priority: "p0" },
+          { label: "Live paper count updates during search", status: "done", priority: "p1" },
+          { label: "Agent handoff notifications", status: "done", priority: "p1" },
+          { label: "Thinking tree visualization (real-time)", status: "todo", priority: "p1" },
+          { label: "WebSocket for interactive sessions", status: "todo", priority: "p2" },
+        ]
+      },
+      {
+        name: "4.3 Approval Safety System",
+        items: [
+          { label: "Approval request model + API", status: "done", priority: "p0" },
+          { label: "Safety gates in workflow (pre-step checks)", status: "done", priority: "p0" },
+          { label: "Cost safety: halt at $10+", status: "done", priority: "p0" },
+          { label: "Quality/hallucination loop detection", status: "done", priority: "p0" },
+          { label: "Project-level safety settings", status: "done", priority: "p0" },
+          { label: "Spend threshold enforcement ($1.00+)", status: "partial", priority: "p1" },
+          { label: "Approval history tracking", status: "done", priority: "p2" },
+        ]
+      },
+      {
+        name: "4.4 Skill Memory System",
+        items: [
+          { label: "Skill schemas (8 types)", status: "done", priority: "p1" },
+          { label: "Skill creation from successful patterns", status: "done", priority: "p1" },
+          { label: "Skill retrieval by context", status: "partial", priority: "p1" },
+          { label: "Skill performance tracking", status: "partial", priority: "p2" },
+          { label: "Skill versioning system", status: "partial", priority: "p2" },
+          { label: "Skill deprecation workflow", status: "partial", priority: "p2" },
+        ]
+      },
+      {
+        name: "4.5 Idle Cognition",
+        items: [
+          { label: "Idle scheduler with distributed locking", status: "done", priority: "p0" },
+          { label: "6 weighted idle modes", status: "done", priority: "p0" },
+          { label: "Frontier literature scan (35%)", status: "done", priority: "p0" },
+          { label: "Citation-conflict question gen (25%)", status: "done", priority: "p0" },
+          { label: "Revisit rejected ideas (15%)", status: "done", priority: "p1" },
+          { label: "Cross-domain collision (10%)", status: "done", priority: "p1" },
+          { label: "Skill improvement (10%)", status: "done", priority: "p1" },
+          { label: "Dataset discovery (5%)", status: "done", priority: "p1" },
+          { label: "Idle cycle logging + reporting", status: "done", priority: "p1" },
+        ]
+      },
+      {
+        name: "4.6 Multi-Tenancy",
+        items: [
+          { label: "Organization model + CRUD API", status: "done", priority: "p1" },
+          { label: "Organization member roles (viewer/member/admin/owner)", status: "done", priority: "p1" },
+          { label: "Org-scoped project access control", status: "done", priority: "p1" },
+          { label: "Organization project limits", status: "done", priority: "p2" },
+          { label: "Alembic migration for org tables", status: "done", priority: "p1" },
+        ]
+      },
+    ]
+  },
+  {
+    name: "5. Frontend Requirements",
+    icon: "🎨",
+    subsections: [
+      {
+        name: "5.1 Studio Layout",
+        items: [
+          { label: "Amber/Sage design system", status: "done", priority: "p0" },
+          { label: "Glass morphism surfaces", status: "done", priority: "p1" },
+          { label: "Responsive layout", status: "done", priority: "p0" },
+          { label: "Dark/light mode toggle", status: "done", priority: "p1" },
+          { label: "Keyboard shortcut overlay", status: "done", priority: "p2" },
+          { label: "Mobile sidebar drawer + top bar", status: "done", priority: "p1" },
+        ]
+      },
+      {
+        name: "5.2 Research Studio",
+        items: [
+          { label: "Project dashboard", status: "done", priority: "p0" },
+          { label: "Idea ledger with scores", status: "done", priority: "p0" },
+          { label: "Paper table with sorting/filtering", status: "done", priority: "p0" },
+          { label: "Cluster visualization", status: "done", priority: "p0" },
+          { label: "Research run timeline with SSE events", status: "done", priority: "p0" },
+          { label: "Conflict heatmap", status: "partial", priority: "p1" },
+          { label: "Question navigator", status: "partial", priority: "p2" },
+          { label: "Hypothesis workshop", status: "partial", priority: "p2" },
+        ]
+      },
+      {
+        name: "5.3 Experiment Studio",
+        items: [
+          { label: "Dataset browser with preview", status: "done", priority: "p1" },
+          { label: "Sandbox code editor", status: "done", priority: "p1" },
+          { label: "Plotly visualization sandbox", status: "done", priority: "p1" },
+          { label: "Results viewer", status: "partial", priority: "p1" },
+          { label: "Artifact gallery", status: "partial", priority: "p2" },
+          { label: "Validation plan editor", status: "todo", priority: "p2" },
+        ]
+      },
+      {
+        name: "5.4 Article Studio",
+        items: [
+          { label: "Manuscript editor (LaTeX)", status: "done", priority: "p0" },
+          { label: "Live LaTeX preview (KaTeX)", status: "done", priority: "p0" },
+          { label: "Citation manager", status: "done", priority: "p0" },
+          { label: "Multi-format export controls", status: "done", priority: "p0" },
+          { label: "Journal template selector", status: "done", priority: "p1" },
+          { label: "Peer review simulation UI", status: "done", priority: "p2" },
+        ]
+      },
+      {
+        name: "5.5 Knowledge & Reports",
+        items: [
+          { label: "Research wiki view", status: "done", priority: "p0" },
+          { label: "Report viewer (markdown/html)", status: "done", priority: "p0" },
+          { label: "Skill browser with performance metrics", status: "done", priority: "p1" },
+          { label: "Notification bell with toast alerts", status: "done", priority: "p1" },
+          { label: "Team/members management page", status: "done", priority: "p1" },
+          { label: "Settings page with API key vault", status: "done", priority: "p1" },
+        ]
+      },
+    ]
+  },
+];
+
+function render(filter) {
+  let total = 0, done = 0, partial = 0, todo = 0, missing_hmm = 0;
+  data.forEach(cat => cat.subsections.forEach(sec => sec.items.forEach(item => {
+    total++;
+    if (item.status === 'done') done++;
+    else if (item.status === 'partial') partial++;
+    else if (item.status === 'todo') todo++;
+    else if (item.status === 'missing') missing_hmm++;
+  })));
+
+  document.getElementById("summary").innerHTML = `
+    <div class="stat"><div class="num green">${done}</div><div class="label">Complete</div></div>
+    <div class="stat"><div class="num amber">${partial}</div><div class="label">Partial</div></div>
+    <div class="stat"><div class="num" style="color:#a8a29e">${todo}</div><div class="label">TODO</div></div>
+    <div class="stat"><div class="num red">${missing_hmm}</div><div class="label">Missing</div></div>
+    <div class="stat"><div class="num gray">${total}</div><div class="label">Total</div></div>
+    <div class="stat"><div class="num" style="color:${done/total > 0.7 ? '#22c55e' : '#d97706'}">${Math.round(done/total*100)}%</div><div class="label">Completion</div></div>
+  `;
+
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  data.forEach((cat, ci) => {
+    const div = document.createElement("div");
+    div.className = "category";
+    let totalCat = 0, doneCat = 0;
+    cat.subsections.forEach(sec => sec.items.forEach(item => { totalCat++; if (item.status === 'done') doneCat++; }));
+    div.innerHTML = `<h2>${cat.icon} ${cat.name} <span class="count">(${doneCat}/${totalCat})</span></h2>`;
+    cat.subsections.forEach(sec => {
+      const sdiv = document.createElement("div");
+      sdiv.className = "subsection";
+      sdiv.innerHTML = `<h3>${sec.name}</h3>`;
+      sec.items.forEach(item => {
+        const statusClasses = { done: "done", partial: "partial", todo: "todo", missing: "missing" };
+        const checkChars = { done: "✓", partial: "◐", todo: "○", missing: "✗" };
+        const hide = filter === "all" ? "" : filter === "done" && item.status !== "done" ? "hidden" : filter === "partial" && item.status !== "partial" ? "hidden" : filter === "todo" && item.status !== "todo" ? "hidden" : filter === "missing" && item.status !== "missing" ? "hidden" : "";
+        const row = document.createElement("div");
+        row.className = `requirement ${item.status === 'done' ? 'check' : item.status === 'partial' ? 'partial' : 'uncheck'} ${hide}`;
+        row.innerHTML = `
+          <div class="checkbox ${statusClasses[item.status]}">${checkChars[item.status]}</div>
+          <div><span class="label">${item.label}</span>${item.priority ? `<span class="tag ${item.priority}">${item.priority.toUpperCase()}</span>` : ""}</div>
+        `;
+        sdiv.appendChild(row);
+      });
+      div.appendChild(sdiv);
+    });
+    main.appendChild(div);
+  });
+}
+
+document.getElementById("filters").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll(".filters button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  render(e.target.dataset.filter);
+});
+
+render("all");
+</script>
+</body>
+</html>

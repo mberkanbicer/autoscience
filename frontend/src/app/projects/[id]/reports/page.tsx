@@ -14,11 +14,14 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { reportsApi, exportReportUrl } from '@/lib/api';
 import { ResearchReport } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { FileText, ArrowLeft, Download, Copy, Check, Trash2 } from 'lucide-react';
+import { useArtifact } from '@/lib/ArtifactContext';
+import { FileText, ArrowLeft, Download, Copy, Check, Trash2, Box, ArrowRight, DollarSign, Activity } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function ReportsPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const { openArtifact } = useArtifact();
   const [reports, setReports] = useState<ResearchReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<ResearchReport | null>(null);
@@ -77,47 +80,60 @@ export default function ReportsPage() {
             ))}
           </div>
         ) : selectedReport ? (
-          <div>
-            <div className="flex items-center gap-4 mb-6">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex flex-col md:flex-row md:items-center gap-6 mb-8 bg-white/40 backdrop-blur-md p-6 rounded-2xl border border-border/10 shadow-sm">
               <Button
-                variant="ghost"
+                variant="secondary"
+                size="sm"
                 onClick={() => setSelectedReport(null)}
+                className="w-fit"
               >
-                <ArrowLeft size={18} className="mr-2" />
-                Back to reports
+                <ArrowLeft size={16} className="mr-2" />
+                Back to Archive
               </Button>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-900">{selectedReport.title || 'Untitled Report'}</h2>
-                <p className="text-sm text-gray-500">{formatDate(selectedReport.created_at)} • {selectedReport.report_type}</p>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-2xl font-bold text-foreground tracking-tight truncate">{selectedReport.title || 'Synthetic Report'}</h2>
+                <div className="flex items-center gap-3 mt-1">
+                   <Badge variant="info" className="bg-primary/5 uppercase text-[9px] font-bold tracking-widest">{selectedReport.report_type}</Badge>
+                   <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">{formatDate(selectedReport.created_at)}</span>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={copyToClipboard}>
-                  {copied ? <Check size={16} className="mr-2" /> : <Copy size={16} className="mr-2" />}
-                  {copied ? 'Copied!' : 'Copy'}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" onClick={() => openArtifact({
+                  id: selectedReport.id,
+                  type: 'latex',
+                  title: selectedReport.title || 'Report LaTeX',
+                  content: selectedReport.content_markdown || ''
+                })} className="rounded-xl hover:bg-primary/5">
+                  <Box size={16} className="mr-2 text-primary" />
+                  Artifact
                 </Button>
-                <a href={exportReportUrl(selectedReport.id, 'markdown')} download
-                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                  <Download size={14} />
-                  .md
-                </a>
-                <a href={exportReportUrl(selectedReport.id, 'html')} download
-                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                  <Download size={14} />
-                  .html
-                </a>
-                <a href={exportReportUrl(selectedReport.id, 'json')} download
-                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                  <Download size={14} />
-                  .json
-                </a>
-                <Button variant="danger" size="sm" onClick={() => handleDeleteReport(selectedReport.id)}>
+                <Button variant="secondary" size="sm" onClick={copyToClipboard} className="rounded-xl">
+                  {copied ? <Check size={16} className="mr-2 text-success" /> : <Copy size={16} className="mr-2 text-primary" />}
+                  {copied ? 'Copied' : 'Copy MD'}
+                </Button>
+                <div className="flex gap-1 p-1 bg-muted/30 rounded-xl border border-border/5">
+                  <a href={exportReportUrl(selectedReport.id, 'markdown')} download
+                     className="p-2 rounded-lg text-primary hover:bg-white/60 transition-all" title="Download Markdown">
+                    <Download size={14} />
+                  </a>
+                  <a href={exportReportUrl(selectedReport.id, 'html')} download
+                     className="p-2 rounded-lg text-primary hover:bg-white/60 transition-all" title="Download HTML">
+                    <div className="text-[10px] font-bold">HTML</div>
+                  </a>
+                  <a href={exportReportUrl(selectedReport.id, 'json')} download
+                     className="p-2 rounded-lg text-primary hover:bg-white/60 transition-all" title="Download JSON">
+                    <div className="text-[10px] font-bold">JSON</div>
+                  </a>
+                </div>
+                <Button variant="danger" size="sm" onClick={() => handleDeleteReport(selectedReport.id)} className="rounded-xl">
                   <Trash2 size={16} className="mr-2" />
-                  Delete
+                  Purge
                 </Button>
               </div>
             </div>
-            <Card className="p-8">
-              <div className="prose prose-gray max-w-none">
+            <Card className="glass overflow-hidden border-border/5">
+              <div className="p-12 prose prose-slate max-w-none prose-headings:tracking-tight prose-headings:font-bold prose-p:leading-relaxed prose-p:font-medium prose-p:text-foreground/80">
                 <ReactMarkdown>{selectedReport.content_markdown || ''}</ReactMarkdown>
               </div>
             </Card>
@@ -141,37 +157,41 @@ export default function ReportsPage() {
             </TabsList>
 
             <TabsContent value="all">
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {reports.map((report) => (
                   <Card
                     key={report.id}
                     hover
-                    className="p-6 cursor-pointer"
+                    className="p-8 cursor-pointer group transition-all duration-500 hover:scale-[1.02]"
                     onClick={() => setSelectedReport(report)}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          {report.title || 'Untitled Report'}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-3">
+                           <Badge variant="info" className="bg-primary/5 uppercase text-[9px] font-bold tracking-widest">{report.report_type}</Badge>
+                           <span className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-widest">{formatDate(report.created_at)}</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-foreground tracking-tight group-hover:text-primary transition-colors mb-3">
+                          {report.title || 'Synthetic Research Report'}
                         </h3>
-                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                        <p className="text-muted-foreground text-sm font-medium line-clamp-2 leading-relaxed mb-6">
                           {report.content_markdown}
                         </p>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="info">{report.report_type}</Badge>
-                          <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                        <div className="pt-4 border-t border-border/5 flex items-center justify-between">
+                           <span className="text-[10px] font-bold text-primary/60 uppercase tracking-[0.2em] group-hover:text-primary transition-colors">Analyze Full Report</span>
+                           <ArrowRight size={14} className="text-primary/0 group-hover:text-primary/40 transition-all group-hover:translate-x-1" />
                         </div>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
-                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-4"
+                        className="p-2 rounded-lg hover:bg-error/10 text-error shrink-0 ml-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-4px] group-hover:translate-y-0"
                         title="Delete report"
                         disabled={deletingId === report.id}
                       >
                         {deletingId === report.id ? (
-                          <span className="block w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          <span className="block w-4 h-4 border-2 border-error/40 border-t-error rounded-full animate-spin" />
                         ) : (
-                          <Trash2 size={16} />
+                          <Trash2 size={18} />
                         )}
                       </button>
                     </div>
@@ -181,31 +201,36 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="cycle">
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {reports.filter(r => r.report_type === 'cycle').map((report) => (
                   <Card
                     key={report.id}
                     hover
-                    className="p-6 cursor-pointer"
+                    className="p-8 cursor-pointer group transition-all duration-500 hover:scale-[1.02]"
                     onClick={() => setSelectedReport(report)}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          {report.title || 'Untitled Report'}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-bold text-foreground tracking-tight group-hover:text-primary transition-colors mb-3">
+                          {report.title || 'Synthetic Cycle Report'}
                         </h3>
-                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                        <p className="text-muted-foreground text-sm font-medium line-clamp-2 leading-relaxed mb-6">
                           {report.content_markdown}
                         </p>
-                        <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                        <div className="flex items-center justify-between pt-4 border-t border-border/5">
+                           <span className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-widest">{formatDate(report.created_at)}</span>
+                           <div className="p-1.5 bg-primary/5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:translate-x-1">
+                              <ArrowRight size={14} className="text-primary/60" />
+                           </div>
+                        </div>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
-                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-4"
+                        className="p-2 rounded-lg hover:bg-error/10 text-error shrink-0 ml-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-4px] group-hover:translate-y-0"
                         title="Delete report"
                         disabled={deletingId === report.id}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </Card>
@@ -214,31 +239,36 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="milestone">
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {reports.filter(r => r.report_type === 'milestone').map((report) => (
                   <Card
                     key={report.id}
                     hover
-                    className="p-6 cursor-pointer"
+                    className="p-8 cursor-pointer group transition-all duration-500 hover:scale-[1.02]"
                     onClick={() => setSelectedReport(report)}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          {report.title || 'Untitled Report'}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-bold text-foreground tracking-tight group-hover:text-primary transition-colors mb-3">
+                          {report.title || 'Synthetic Milestone Report'}
                         </h3>
-                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                        <p className="text-muted-foreground text-sm font-medium line-clamp-2 leading-relaxed mb-6">
                           {report.content_markdown}
                         </p>
-                        <span className="text-sm text-gray-500">{formatDate(report.created_at)}</span>
+                        <div className="flex items-center justify-between pt-4 border-t border-border/5">
+                           <span className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-widest">{formatDate(report.created_at)}</span>
+                           <div className="p-1.5 bg-primary/5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:translate-x-1">
+                              <ArrowRight size={14} className="text-primary/60" />
+                           </div>
+                        </div>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
-                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 shrink-0 ml-4"
+                        className="p-2 rounded-lg hover:bg-error/10 text-error shrink-0 ml-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-4px] group-hover:translate-y-0"
                         title="Delete report"
                         disabled={deletingId === report.id}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </Card>

@@ -1,16 +1,19 @@
 """SQLAlchemy base model with UUID primary keys and timestamps."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
 
-    pass
 
 
 class UUIDMixin:
@@ -28,12 +31,13 @@ class TimestampMixin:
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        default=utcnow,
         nullable=False,
     )
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
-        onupdate=func.now(),
+        default=utcnow,
+        onupdate=utcnow,
         nullable=True,
     )
 

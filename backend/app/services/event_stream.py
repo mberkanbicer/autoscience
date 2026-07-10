@@ -1,11 +1,13 @@
 """Redis Pub/Sub event broadcaster for live research preview."""
 
-import json
 import asyncio
+import json
+from datetime import UTC, datetime, timezone
 from typing import Any
-from datetime import datetime
 
 import structlog
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 logger = structlog.get_logger()
 
@@ -25,25 +27,29 @@ class EventBroadcaster:
     def _channel(self, run_id: str) -> str:
         return f"{self.CHANNEL_PREFIX}:{run_id}:events"
 
-    async def publish(self, run_id: str, event_type: str, data: dict[str, Any] | None = None) -> None:
+    async def publish(self, run_id: str, event_type: str, data: dict[str, Any] | None = None, event_id: str | None = None) -> None:
         """Publish an event to the run's channel.
 
         Event format:
         {
-            "type": "keyword_expansion" | "search_started" | "search_results" | "paper_found" | ...,
+            "id": "uuid",
+            "type": "keyword_expansion" | ...,
             "timestamp": "ISO8601",
             "data": { ... }
         }
         """
         event = {
+            "id": event_id,
             "type": event_type,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "data": data or {},
         }
         channel = self._channel(run_id)
         try:
             await self.redis.publish(channel, json.dumps(event, default=str))
             logger.debug("event_published", run_id=run_id, event_type=event_type)
+        except (RedisConnectionError, RedisTimeoutError, OSError) as e:
+            logger.warning("event_publish_connection_error", error=str(e), run_id=run_id, event_type=event_type)
         except Exception as e:
             logger.warning("event_publish_failed", error=str(e), run_id=run_id, event_type=event_type)
 
@@ -58,6 +64,9 @@ class EventBroadcaster:
         try:
             await pubsub.subscribe(channel)
             return pubsub
+        except (RedisConnectionError, RedisTimeoutError, OSError) as e:
+            logger.warning("subscribe_connection_error", error=str(e), run_id=run_id)
+            return None
         except Exception as e:
             logger.warning("subscribe_failed", error=str(e), run_id=run_id)
             return None
@@ -67,5 +76,7 @@ class EventBroadcaster:
         try:
             await pubsub.unsubscribe()
             await pubsub.close()
-        except Exception:
+        except (RedisConnectionError, OSError):
             pass
+        except Exception as exc:
+            logger.debug("event_unsubscribe_cleanup_failed", error=str(exc), exc_info=True)

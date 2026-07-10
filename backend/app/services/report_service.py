@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.report import ResearchReport, KnowledgeNote
+from app.models.report import KnowledgeNote, ResearchReport
 
 
 class ReportService:
@@ -61,7 +61,7 @@ class ReportService:
     async def get_report(self, report_id: str) -> ResearchReport | None:
         """Get a report by ID."""
         result = await self.db.execute(
-            select(ResearchReport).where(ResearchReport.id == report_id)
+            select(ResearchReport).where(ResearchReport.id == report_id),
         )
         return result.scalar_one_or_none()
 
@@ -85,6 +85,7 @@ class KnowledgeService:
         self,
         project_id: str,
         note_type: str | None = None,
+        run_id: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> list[KnowledgeNote]:
@@ -93,10 +94,32 @@ class KnowledgeService:
 
         if note_type:
             query = query.where(KnowledgeNote.note_type == note_type)
+        if run_id:
+            query = query.where(KnowledgeNote.run_id == run_id)
 
         offset = (page - 1) * per_page
         query = query.order_by(KnowledgeNote.created_at.desc()).offset(offset).limit(per_page)
 
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def search_notes(
+        self,
+        project_id: str,
+        search_text: str,
+        *,
+        run_id: str | None = None,
+        limit: int = 50,
+    ) -> list[KnowledgeNote]:
+        """Search wiki notes by title or content."""
+        pattern = f"%{search_text}%"
+        query = select(KnowledgeNote).where(
+            KnowledgeNote.project_id == project_id,
+            (KnowledgeNote.title.ilike(pattern)) | (KnowledgeNote.content.ilike(pattern)),
+        )
+        if run_id:
+            query = query.where(KnowledgeNote.run_id == run_id)
+        query = query.order_by(KnowledgeNote.updated_at.desc(), KnowledgeNote.created_at.desc()).limit(limit)
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
@@ -108,11 +131,13 @@ class KnowledgeService:
         content: str | None = None,
         entity_id: str | None = None,
         linked_notes: list[str] | None = None,
+        run_id: str | None = None,
     ) -> KnowledgeNote:
         """Create a new knowledge note."""
         note = KnowledgeNote(
             id=str(uuid4()),
             project_id=project_id,
+            run_id=run_id,
             note_type=note_type,
             entity_id=entity_id,
             title=title,
@@ -126,7 +151,7 @@ class KnowledgeService:
     async def get_note(self, note_id: str) -> KnowledgeNote | None:
         """Get a knowledge note by ID."""
         result = await self.db.execute(
-            select(KnowledgeNote).where(KnowledgeNote.id == note_id)
+            select(KnowledgeNote).where(KnowledgeNote.id == note_id),
         )
         return result.scalar_one_or_none()
 

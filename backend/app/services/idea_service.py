@@ -5,8 +5,8 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.idea import Idea, IdeaVersion, IdeaScore, IdeaClassification, IdeaDecision
-from ..schemas.idea import IdeaCreate, IdeaUpdate
+from app.models.idea import Idea, IdeaClassification, IdeaDecision, IdeaScore, IdeaVersion
+from app.schemas.idea import IdeaCreate, IdeaUpdate
 
 
 class IdeaService:
@@ -88,7 +88,7 @@ class IdeaService:
                 select(IdeaVersion)
                 .where(IdeaVersion.idea_id == idea_id)
                 .order_by(IdeaVersion.version_number.desc())
-                .limit(1)
+                .limit(1),
             )
             current_version = version_result.scalar_one_or_none()
             next_version = (current_version.version_number + 1) if current_version else 1
@@ -131,7 +131,7 @@ class IdeaService:
         result = await self.db.execute(
             select(IdeaVersion)
             .where(IdeaVersion.idea_id == idea_id)
-            .order_by(IdeaVersion.version_number)
+            .order_by(IdeaVersion.version_number),
         )
         return list(result.scalars().all())
 
@@ -140,7 +140,7 @@ class IdeaService:
         result = await self.db.execute(
             select(IdeaScore)
             .where(IdeaScore.idea_id == idea_id)
-            .order_by(IdeaScore.created_at)
+            .order_by(IdeaScore.created_at),
         )
         return list(result.scalars().all())
 
@@ -149,7 +149,7 @@ class IdeaService:
         result = await self.db.execute(
             select(IdeaDecision)
             .where(IdeaDecision.idea_id == idea_id)
-            .order_by(IdeaDecision.created_at)
+            .order_by(IdeaDecision.created_at),
         )
         return list(result.scalars().all())
 

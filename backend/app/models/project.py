@@ -1,16 +1,22 @@
 """Project model."""
 
-from sqlalchemy import Boolean, Float, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
+from .organization import Organization
 
 
 class Project(BaseModel):
     """A research project with domain, scope, and autonomy settings."""
 
     __tablename__ = "projects"
+
+    # Multi-tenancy
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
 
     # Basic info
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -34,10 +40,11 @@ class Project(BaseModel):
     approval_required_for_external_actions: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Relationships
-    ideas = relationship("Idea", back_populates="project", lazy="selectin")
-    research_runs = relationship("ResearchRun", back_populates="project", lazy="selectin")
-    papers = relationship("Paper", back_populates="project", lazy="selectin")
-    skills = relationship("Skill", back_populates="project", lazy="selectin")
+    organization: Mapped[Organization | None] = relationship(back_populates="projects")
+    ideas = relationship("Idea", back_populates="project", lazy="selectin", cascade="all, delete-orphan")
+    research_runs = relationship("ResearchRun", back_populates="project", lazy="selectin", cascade="all, delete-orphan")
+    papers = relationship("Paper", back_populates="project", lazy="selectin", cascade="all, delete-orphan")
+    skills = relationship("Skill", back_populates="project", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Project {self.name}>"

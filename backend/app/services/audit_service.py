@@ -1,12 +1,11 @@
 """Audit logging service."""
 
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.audit import AuditLog, SystemEvent
-from ..models.research_run import ResearchRunEvent, ToolCall
+from app.models.audit import AuditLog, SystemEvent
+from app.models.research_run import ResearchRunEvent, ToolCall
 
 
 class AuditService:

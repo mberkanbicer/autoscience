@@ -1,24 +1,37 @@
 """Core research engines."""
 
-from .keyword_engine import KeywordExpansionEngine, KeywordExpansion, SearchPlan, SearchQueryPlan
-from .literature_engine import LiteratureEngine, LiteratureResult, RankedPaper
-from .paper_analysis import PaperAnalysisEngine, PaperAnalysisResult, Claim
 from .clustering import ClusteringEngine, ClusteringResult, PaperCluster
-from .conflict_detection import ConflictDetectionEngine, ConflictDetectionResult, Conflict, Gap
-from .question_generation import QuestionGenerationEngine, QuestionGenerationResult, ResearchQuestion
-from .hypothesis_generation import HypothesisGenerationEngine, HypothesisGenerationResult, Hypothesis
-from .validation_planning import ValidationPlanningEngine, ValidationPlanResult, ValidationPlan, DatasetCandidate
-from .scoring import IdeaScoringEngine, IdeaScore, ScoringResult
-from .idle_cognition import IdleCognitionEngine, IdleCycleResult, IdleConfig
+from .conflict_detection import Conflict, ConflictDetectionEngine, ConflictDetectionResult, Gap
 from .deduplication import (
     deduplicate_papers,
-    select_papers_for_analysis,
     group_papers_by_type,
-    group_papers_by_year,
     group_papers_by_venue,
-    titles_are_similar,
-    normalize_title,
+    group_papers_by_year,
     normalize_doi,
+    normalize_title,
+    select_papers_for_analysis,
+    titles_are_similar,
+)
+from .hypothesis_generation import (
+    Hypothesis,
+    HypothesisGenerationEngine,
+    HypothesisGenerationResult,
+)
+from .idle_cognition import IdleCognitionEngine, IdleConfig, IdleCycleResult
+from .keyword_engine import KeywordExpansion, KeywordExpansionEngine, SearchPlan, SearchQueryPlan
+from .literature_engine import LiteratureEngine, LiteratureResult, RankedPaper
+from .paper_analysis import Claim, PaperAnalysisEngine, PaperAnalysisResult
+from .question_generation import (
+    QuestionGenerationEngine,
+    QuestionGenerationResult,
+    ResearchQuestion,
+)
+from .scoring import IdeaScore, IdeaScoringEngine, ScoringResult
+from .validation_planning import (
+    DatasetCandidate,
+    ValidationPlan,
+    ValidationPlanningEngine,
+    ValidationPlanResult,
 )
 
 __all__ = [

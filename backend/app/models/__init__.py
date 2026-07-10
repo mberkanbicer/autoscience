@@ -1,36 +1,43 @@
 """Database models."""
 
+from .audit import ApprovalRequest, AuditLog, SystemEvent
 from .base import Base, BaseModel
-from .project import Project
-from .idea import Idea, IdeaVersion, IdeaScore, IdeaClassification, IdeaDecision
-from .research_run import ResearchRun, ResearchRunEvent, ToolCall, IdleCycle
+from .collaboration import Comment, ProjectMember, ReviewProposal, User
+from .idea import Idea, IdeaClassification, IdeaDecision, IdeaScore, IdeaVersion
+from .organization import Organization, OrganizationMember
 from .paper import (
+    ClusterConflict,
+    ClusterLabel,
     Paper,
-    PaperSource,
-    PaperFulltext,
-    PaperEmbedding,
     PaperAnalysis,
     PaperCluster,
-    ClusterLabel,
-    ClusterConflict,
+    PaperEmbedding,
+    PaperFulltext,
+    PaperSource,
 )
-from .skill import Skill, SkillVersion, SkillUsage, SkillEvaluation
-from .audit import AuditLog, ApprovalRequest, SystemEvent
-from .research_question import ResearchQuestion, Hypothesis, ValidationPlan
+from .project import Project
 from .report import (
-    ResearchReport,
+    AnalysisArtifact,
+    AnalysisRun,
+    ArtifactSectionLink,
+    Dataset,
     KnowledgeNote,
     LiteratureSearch,
+    Manuscript,
+    ResearchReport,
     SearchQuery,
-    Dataset,
-    AnalysisRun,
-    AnalysisArtifact,
 )
+from .research_question import Hypothesis, ResearchQuestion, ValidationPlan
+from .research_run import IdleCycle, ResearchRun, ResearchRunEvent, ToolCall
+from .skill import Skill, SkillEvaluation, SkillUsage, SkillVersion
 
 __all__ = [
     # Base
     "Base",
     "BaseModel",
+    # Organization
+    "Organization",
+    "OrganizationMember",
     # Project
     "Project",
     # Idea
@@ -66,6 +73,11 @@ __all__ = [
     "ResearchQuestion",
     "Hypothesis",
     "ValidationPlan",
+    # Collaboration
+    "User",
+    "ProjectMember",
+    "Comment",
+    "ReviewProposal",
     # Report
     "ResearchReport",
     "KnowledgeNote",
@@ -74,4 +86,6 @@ __all__ = [
     "Dataset",
     "AnalysisRun",
     "AnalysisArtifact",
+    "Manuscript",
+    "ArtifactSectionLink",
 ]

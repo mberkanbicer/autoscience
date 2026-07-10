@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import structlog
 
-from ..llm.base import Message
-from ..llm.router import LLMRouter
+from app.llm.base import Message
+from app.llm.router import LLMRouter
 
 logger = structlog.get_logger()
 
@@ -36,6 +36,8 @@ class ClusteringResult:
     clustering_notes: str = ""
     total_clusters: int = 0
     avg_cluster_size: float = 0.0
+    cognitive_entropy: float = 0.0
+    cognitive_mode: str = "exploring"
 
 
 class ClusteringEngine:
@@ -101,13 +103,46 @@ class ClusteringEngine:
         total_clusters = len(clusters)
         avg_size = sum(c.size for c in clusters) / total_clusters if total_clusters > 0 else 0
 
+        # Calculate cognitive metrics
+        entropy, mode = self.calculate_cognitive_entropy(clusters, len(papers))
+
         return ClusteringResult(
             clusters=clusters,
             paper_to_cluster=paper_to_cluster,
             clustering_notes=notes,
             total_clusters=total_clusters,
             avg_cluster_size=avg_size,
+            cognitive_entropy=entropy,
+            cognitive_mode=mode,
         )
+
+    def calculate_cognitive_entropy(self, clusters: list[PaperCluster], total_papers: int) -> tuple[float, str]:
+        """Calculate research entropy and determine cognitive mode."""
+        import math
+
+        if not clusters or total_papers == 0:
+            return 0.0, "exploration"
+
+        # Distribution of papers across clusters
+        p_i = [c.size / total_papers for c in clusters if c.size > 0]
+
+        # Shannon Entropy: H = -sum(p_i * log2(p_i))
+        # Max entropy is log2(total_clusters)
+        entropy = -sum(p * math.log2(p) for p in p_i)
+
+        # Normalize by max possible entropy for this many clusters
+        max_entropy = math.log2(len(clusters)) if len(clusters) > 1 else 1.0
+        normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
+
+        # Determine mode
+        if normalized_entropy > 0.7:
+            mode = "exploration"  # Papers widely scattered (Broad frontier)
+        elif normalized_entropy < 0.3:
+            mode = "exploitation" # Papers highly concentrated (Deep dive)
+        else:
+            mode = "balanced"
+
+        return round(normalized_entropy, 2), mode
 
     def _simple_cluster(self, papers: list[dict[str, Any]], cluster_type: str = "topic") -> ClusteringResult:
         """Simple keyword-based clustering when no LLM is available."""
@@ -115,18 +150,18 @@ class ClusteringEngine:
         from collections import defaultdict
 
         # Group papers by shared title words
-        stop_words = {'the', 'a', 'an', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'with', 'and', 'or', 'is', 'are', 'a', 'from'}
+        stop_words = {"the", "a", "an", "for", "of", "in", "on", "at", "to", "by", "with", "and", "or", "is", "are", "from"}
         word_papers = defaultdict(list)
-        
+
         for p in papers:
-            title = (p.get('title', '') or '').lower()
-            words = set(re.findall(r'\w+', title)) - stop_words - {w for w in re.findall(r'\w+', title) if len(w) <= 2}
+            title = (p.get("title", "") or "").lower()
+            words = set(re.findall(r"\w+", title)) - stop_words - {w for w in re.findall(r"\w+", title) if len(w) <= 2}
             for word in words:
-                word_papers[word].append(p.get('id', p.get('title', '')))
-        
+                word_papers[word].append(p.get("id", p.get("title", "")))
+
         # Find top keywords by frequency
         top_words = sorted(word_papers.keys(), key=lambda w: len(word_papers[w]), reverse=True)[:8]
-        
+
         clusters = []
         used_papers = set()
         for word in top_words:
@@ -135,7 +170,7 @@ class ClusteringEngine:
                 cluster = PaperCluster(
                     id=str(uuid4()),
                     name=word.title(),
-                    description=f'Papers related to {word}',
+                    description=f"Papers related to {word}",
                     cluster_type=cluster_type,
                     paper_ids=paper_ids,
                     size=len(paper_ids),
@@ -145,7 +180,7 @@ class ClusteringEngine:
 
         return ClusteringResult(
             clusters=clusters[:5],
-            clustering_notes=f'Keyword-based clustering of {len(papers)} papers',
+            clustering_notes=f"Keyword-based clustering of {len(papers)} papers",
             total_clusters=len(clusters[:5]),
         )
 
@@ -294,7 +329,10 @@ Assess the coherence of this cluster."""
         try:
             result = await self.llm.complete_structured(messages, schema={})
             return result.data.get("coherence", 0.5)
-        except Exception:
+        except (ValueError, RuntimeError, KeyError):
+            return 0.5
+        except Exception as exc:
+            logger.warning("coherence_assessment_failed", error=str(exc))
             return 0.5
 
     async def _generate_clustering_notes(
@@ -307,7 +345,7 @@ Assess the coherence of this cluster."""
             [
                 f"- {c.name} ({c.size} papers, coherence: {c.coherence_score:.2f})"
                 for c in clusters
-            ]
+            ],
         )
 
         system = """You are a research literature analyst.
@@ -348,7 +386,7 @@ Provide notes on the clustering results."""
         for i in range(len(clusters)):
             for j in range(i + 1, len(clusters)):
                 similarity = await self._calculate_cluster_similarity(
-                    clusters[i], clusters[j]
+                    clusters[i], clusters[j],
                 )
                 if similarity >= similarity_threshold:
                     merge_pairs.append((i, j))

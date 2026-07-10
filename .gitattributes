@@ -1,0 +1,27 @@
+# Normalize line endings on checkout/commit for consistent cross-platform diffs
+* text=auto eol=lf
+
+*.py text
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.toml text
+*.html text
+*.css text
+*.svg text
+
+# Binary files that should not have line-ending normalization
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.lock binary

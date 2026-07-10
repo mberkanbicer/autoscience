@@ -5,8 +5,8 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.skill import Skill, SkillVersion, SkillUsage
-from ..schemas.skill import SkillCreate, SkillUpdate
+from app.models.skill import Skill, SkillUsage, SkillVersion
+from app.schemas.skill import SkillCreate, SkillUpdate
 
 
 class SkillService:
@@ -114,6 +114,7 @@ class SkillService:
             return False
 
         await self.db.delete(skill)
+        await self.db.flush()
         return True
 
     async def retire_skill(self, skill_id: str) -> Skill | None:
@@ -125,7 +126,7 @@ class SkillService:
         result = await self.db.execute(
             select(SkillVersion)
             .where(SkillVersion.skill_id == skill_id)
-            .order_by(SkillVersion.created_at)
+            .order_by(SkillVersion.created_at),
         )
         return list(result.scalars().all())
 
@@ -134,7 +135,7 @@ class SkillService:
         result = await self.db.execute(
             select(SkillUsage)
             .where(SkillUsage.skill_id == skill_id)
-            .order_by(SkillUsage.used_at)
+            .order_by(SkillUsage.used_at),
         )
         return list(result.scalars().all())
 

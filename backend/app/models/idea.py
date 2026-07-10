@@ -1,7 +1,6 @@
 """Idea models."""
 
-from sqlalchemy import Float, Integer, String, Text, ForeignKey
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
@@ -15,16 +14,16 @@ class Idea(BaseModel):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id", ondelete="SET NULL"), nullable=True, index=True)
     origin: Mapped[str] = mapped_column(
-        String(50), nullable=False
+        String(50), nullable=False,
     )  # user_prompt | idle_generated | literature_gap | skill_generated | revived
     initial_text: Mapped[str] = mapped_column(Text, nullable=False)
     current_text: Mapped[str] = mapped_column(Text, nullable=False)
     flexibility: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(
-        String(50), default="active", index=True
+        String(50), default="active", index=True,
     )  # active | archived | rejected | promoted | under_validation
     classification: Mapped[str | None] = mapped_column(
-        String(50), nullable=True, index=True
+        String(50), nullable=True, index=True,
     )  # high_value | promising | incremental | weak | reject
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     classification_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -32,10 +31,10 @@ class Idea(BaseModel):
     # Relationships
     project = relationship("Project", back_populates="ideas")
     parent = relationship("Idea", remote_side="Idea.id", backref="sub_ideas")
-    versions = relationship("IdeaVersion", back_populates="idea", lazy="selectin")
-    scores = relationship("IdeaScore", back_populates="idea", lazy="selectin")
-    classifications = relationship("IdeaClassification", back_populates="idea", lazy="selectin")
-    decisions = relationship("IdeaDecision", back_populates="idea", lazy="selectin")
+    versions = relationship("IdeaVersion", back_populates="idea", lazy="selectin", cascade="all, delete-orphan")
+    scores = relationship("IdeaScore", back_populates="idea", lazy="selectin", cascade="all, delete-orphan")
+    classifications = relationship("IdeaClassification", back_populates="idea", lazy="selectin", cascade="all, delete-orphan")
+    decisions = relationship("IdeaDecision", back_populates="idea", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Idea {self.id[:8]}... ({self.status})>"
@@ -75,6 +74,7 @@ class IdeaScore(BaseModel):
     cost_risk: Mapped[float | None] = mapped_column(Float, nullable=True)
     overall_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     scoring_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Relationships
     idea = relationship("Idea", back_populates="scores")
@@ -102,7 +102,7 @@ class IdeaDecision(BaseModel):
     idea_id: Mapped[str] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False, index=True)
     run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     decision: Mapped[str] = mapped_column(
-        String(50), nullable=False
+        String(50), nullable=False,
     )  # continue | revise | pivot | archive | reject | promote
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 

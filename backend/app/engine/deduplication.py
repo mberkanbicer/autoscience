@@ -1,10 +1,11 @@
 """Paper deduplication and normalization utilities."""
 
 import re
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any
 
-from ..connectors.base import RawPaper
+from app.connectors.base import RawPaper
 
 
 def normalize_title(title: str) -> str:
@@ -35,7 +36,7 @@ def normalize_doi(doi: str | None) -> str | None:
         return None
 
     # Remove URL prefix
-    doi = re.sub(r"^https?://doi\.org/", "", doi)
+    doi = re.sub(r"^https?://doi\.org/", "", doi, flags=re.IGNORECASE)
 
     # Lowercase
     doi = doi.lower()
@@ -230,6 +231,33 @@ def group_papers_by_venue(papers: list[RawPaper]) -> dict[str, list[RawPaper]]:
         groups[venue].append(paper)
 
     return groups
+
+
+@dataclass
+class ExistingPaperRecord:
+    """Minimal paper record for database deduplication."""
+
+    id: str
+    title: str
+    doi: str | None = None
+
+
+def find_duplicate_in_existing(
+    paper: RawPaper,
+    existing_records: list[ExistingPaperRecord],
+) -> str | None:
+    """Return an existing paper ID if the incoming paper is a duplicate."""
+    normalized_doi = normalize_doi(paper.doi)
+    if normalized_doi:
+        for record in existing_records:
+            if normalize_doi(record.doi) == normalized_doi:
+                return record.id
+
+    for record in existing_records:
+        if titles_are_similar(paper.title, record.title):
+            return record.id
+
+    return None
 
 
 def calculate_deduplication_stats(

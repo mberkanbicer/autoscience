@@ -1,11 +1,13 @@
 """PubMed academic source connector."""
 
+import json
+import xml.etree.ElementTree as ET
+from typing import Any
+
 import httpx
 import structlog
-from typing import Any
-import xml.etree.ElementTree as ET
 
-from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult
+from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult, create_connector_client
 
 logger = structlog.get_logger()
 
@@ -18,14 +20,14 @@ class PubMedConnector(AcademicConnector):
     SUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
 
     def __init__(self, api_key: str | None = None):
-        """
-        Initialize PubMed connector.
+        """Initialize PubMed connector.
 
         Args:
             api_key: Optional NCBI API key for higher rate limits.
+
         """
         self.api_key = api_key
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = create_connector_client()
 
     @property
     def connector_name(self) -> str:
@@ -80,8 +82,17 @@ class PubMedConnector(AcademicConnector):
                 has_more=len(papers) < total,
             )
 
-        except Exception as e:
-            logger.error("pubmed_search_failed", error=str(e), query=query.text)
+        except httpx.HTTPStatusError as e:
+            logger.error("pubmed_search_http_error", status_code=e.response.status_code, query=query.text)
+            raise
+        except httpx.TimeoutException:
+            logger.error("pubmed_search_timeout", query=query.text)
+            raise
+        except httpx.RequestError as e:
+            logger.error("pubmed_search_request_failed", error=str(e), query=query.text)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("pubmed_search_json_failed", error=str(e), query=query.text)
             raise
 
     async def get_paper(self, identifier: str) -> RawPaper | None:
@@ -135,8 +146,17 @@ class PubMedConnector(AcademicConnector):
             pmids = data.get("esearchresult", {}).get("idlist", [])
             return await self._fetch_papers(pmids[:limit])
 
-        except Exception as e:
-            logger.error("pubmed_citations_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("pubmed_citations_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            return []
+        except httpx.TimeoutException:
+            logger.error("pubmed_citations_timeout", paper_id=paper_id)
+            return []
+        except httpx.RequestError as e:
+            logger.error("pubmed_citations_request_failed", error=str(e), paper_id=paper_id)
+            return []
+        except json.JSONDecodeError as e:
+            logger.error("pubmed_citations_json_failed", error=str(e), paper_id=paper_id)
             return []
 
     async def get_references(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -164,8 +184,17 @@ class PubMedConnector(AcademicConnector):
 
             return self._parse_xml_response(response.text)
 
-        except Exception as e:
-            logger.error("pubmed_fetch_failed", error=str(e))
+        except httpx.HTTPStatusError as e:
+            logger.error("pubmed_fetch_http_error", status_code=e.response.status_code)
+            return []
+        except httpx.TimeoutException:
+            logger.error("pubmed_fetch_timeout")
+            return []
+        except httpx.RequestError as e:
+            logger.error("pubmed_fetch_request_failed", error=str(e))
+            return []
+        except ET.ParseError as e:
+            logger.error("pubmed_fetch_parse_failed", error=str(e))
             return []
 
     def _build_search_query(self, query: SearchQuery) -> str:
@@ -199,7 +228,7 @@ class PubMedConnector(AcademicConnector):
                 if paper:
                     papers.append(paper)
 
-        except Exception as e:
+        except ET.ParseError as e:
             logger.error("pubmed_parse_failed", error=str(e))
 
         return papers
@@ -299,7 +328,7 @@ class PubMedConnector(AcademicConnector):
                 raw_metadata={"pmid": pmid, "pmc_id": pmc_id},
             )
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
             logger.error("pubmed_parse_article_failed", error=str(e))
             return None
 
@@ -314,5 +343,5 @@ class PubMedConnector(AcademicConnector):
             }
             response = await self.client.get(self.SEARCH_URL, params=params)
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False

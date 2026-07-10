@@ -1,10 +1,12 @@
 """Semantic Scholar academic source connector."""
 
-import httpx
-import structlog
+import json
 from typing import Any
 
-from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult
+import httpx
+import structlog
+
+from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult, create_connector_client
 
 logger = structlog.get_logger()
 
@@ -15,20 +17,19 @@ class SemanticScholarConnector(AcademicConnector):
     BASE_URL = "https://api.semanticscholar.org"
 
     def __init__(self, api_key: str | None = None):
-        """
-        Initialize Semantic Scholar connector.
+        """Initialize Semantic Scholar connector.
 
         Args:
             api_key: Optional API key for higher rate limits.
+
         """
         self.api_key = api_key
         headers = {"User-Agent": "autoscience/0.1"}
         if api_key:
             headers["x-api-key"] = api_key
 
-        self.client = httpx.AsyncClient(
+        self.client = create_connector_client(
             base_url=self.BASE_URL,
-            timeout=30.0,
             headers=headers,
         )
 
@@ -78,8 +79,17 @@ class SemanticScholarConnector(AcademicConnector):
                 has_more=len(papers) < total,
             )
 
-        except Exception as e:
-            logger.error("semantic_scholar_search_failed", error=str(e), query=query.text)
+        except httpx.HTTPStatusError as e:
+            logger.error("semantic_scholar_search_http_error", status_code=e.response.status_code, query=query.text)
+            raise
+        except httpx.TimeoutException:
+            logger.error("semantic_scholar_search_timeout", query=query.text)
+            raise
+        except httpx.RequestError as e:
+            logger.error("semantic_scholar_search_request_failed", error=str(e), query=query.text)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("semantic_scholar_search_json_failed", error=str(e), query=query.text)
             raise
 
     async def get_paper(self, identifier: str) -> RawPaper | None:
@@ -116,8 +126,17 @@ class SemanticScholarConnector(AcademicConnector):
             response.raise_for_status()
             return self._parse_paper(response.json())
 
-        except Exception as e:
-            logger.error("semantic_scholar_get_paper_failed", error=str(e), identifier=identifier)
+        except httpx.HTTPStatusError as e:
+            logger.error("semantic_scholar_get_paper_http_error", status_code=e.response.status_code, identifier=identifier)
+            raise
+        except httpx.TimeoutException:
+            logger.error("semantic_scholar_get_paper_timeout", identifier=identifier)
+            raise
+        except httpx.RequestError as e:
+            logger.error("semantic_scholar_get_paper_request_failed", error=str(e), identifier=identifier)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("semantic_scholar_get_paper_json_failed", error=str(e), identifier=identifier)
             raise
 
     async def get_citations(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -144,8 +163,17 @@ class SemanticScholarConnector(AcademicConnector):
 
             return papers
 
-        except Exception as e:
-            logger.error("semantic_scholar_citations_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("semantic_scholar_citations_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            raise
+        except httpx.TimeoutException:
+            logger.error("semantic_scholar_citations_timeout", paper_id=paper_id)
+            raise
+        except httpx.RequestError as e:
+            logger.error("semantic_scholar_citations_request_failed", error=str(e), paper_id=paper_id)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("semantic_scholar_citations_json_failed", error=str(e), paper_id=paper_id)
             raise
 
     async def get_references(self, paper_id: str, limit: int = 20) -> list[RawPaper]:
@@ -172,8 +200,17 @@ class SemanticScholarConnector(AcademicConnector):
 
             return papers
 
-        except Exception as e:
-            logger.error("semantic_scholar_references_failed", error=str(e), paper_id=paper_id)
+        except httpx.HTTPStatusError as e:
+            logger.error("semantic_scholar_references_http_error", status_code=e.response.status_code, paper_id=paper_id)
+            raise
+        except httpx.TimeoutException:
+            logger.error("semantic_scholar_references_timeout", paper_id=paper_id)
+            raise
+        except httpx.RequestError as e:
+            logger.error("semantic_scholar_references_request_failed", error=str(e), paper_id=paper_id)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("semantic_scholar_references_json_failed", error=str(e), paper_id=paper_id)
             raise
 
     async def get_paper_batch(self, paper_ids: list[str], batch_size: int = 100) -> list[RawPaper]:
@@ -201,8 +238,17 @@ class SemanticScholarConnector(AcademicConnector):
                         if paper:
                             papers.append(paper)
 
-            except Exception as e:
-                logger.error("semantic_scholar_batch_failed", error=str(e))
+            except httpx.HTTPStatusError as e:
+                logger.error("semantic_scholar_batch_http_error", status_code=e.response.status_code)
+                continue
+            except httpx.TimeoutException:
+                logger.error("semantic_scholar_batch_timeout")
+                continue
+            except httpx.RequestError as e:
+                logger.error("semantic_scholar_batch_request_failed", error=str(e))
+                continue
+            except json.JSONDecodeError as e:
+                logger.error("semantic_scholar_batch_json_failed", error=str(e))
                 continue
 
         return papers
@@ -263,7 +309,7 @@ class SemanticScholarConnector(AcademicConnector):
                 raw_metadata=data,
             )
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError) as e:
             logger.error("semantic_scholar_parse_failed", error=str(e))
             return None
 
@@ -272,5 +318,5 @@ class SemanticScholarConnector(AcademicConnector):
         try:
             response = await self.client.get("/graph/v1/paper/search?query=test&limit=1")
             return response.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False

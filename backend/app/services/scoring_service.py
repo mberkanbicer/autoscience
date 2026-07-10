@@ -1,13 +1,14 @@
 """Idea scoring service for storing and managing scores."""
 
-from uuid import uuid4
 from typing import Any
+from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.idea import Idea, IdeaScore as IdeaScoreModel, IdeaClassification
-from ..engine.scoring import IdeaScore, ScoringResult
+from app.engine.scoring import IdeaScore, ScoringResult
+from app.models.idea import Idea, IdeaClassification
+from app.models.idea import IdeaScore as IdeaScoreModel
 
 
 class IdeaScoringService:
@@ -43,7 +44,7 @@ class IdeaScoringService:
 
         # Update idea with score and classification
         idea_result = await self.db.execute(
-            select(Idea).where(Idea.id == score.idea_id)
+            select(Idea).where(Idea.id == score.idea_id),
         )
         idea = idea_result.scalar_one_or_none()
         if idea:
@@ -82,7 +83,7 @@ class IdeaScoringService:
         result = await self.db.execute(
             select(IdeaScoreModel)
             .where(IdeaScoreModel.idea_id == idea_id)
-            .order_by(IdeaScoreModel.created_at.desc())
+            .order_by(IdeaScoreModel.created_at.desc()),
         )
         return list(result.scalars().all())
 
@@ -125,14 +126,13 @@ class IdeaScoringService:
         """Get classification from score."""
         if score >= 8.0:
             return "high_value"
-        elif score >= 6.5:
+        if score >= 6.5:
             return "promising"
-        elif score >= 5.0:
+        if score >= 5.0:
             return "incremental"
-        elif score >= 3.5:
+        if score >= 3.5:
             return "weak"
-        else:
-            return "reject"
+        return "reject"
 
     async def get_score_statistics(
         self,
@@ -145,7 +145,7 @@ class IdeaScoringService:
         total_result = await self.db.execute(
             select(func.count(IdeaScoreModel.id))
             .join(Idea, IdeaScoreModel.idea_id == Idea.id)
-            .where(Idea.project_id == project_id)
+            .where(Idea.project_id == project_id),
         )
         total = total_result.scalar() or 0
 
@@ -153,7 +153,7 @@ class IdeaScoringService:
         avg_result = await self.db.execute(
             select(func.avg(IdeaScoreModel.overall_value))
             .join(Idea, IdeaScoreModel.idea_id == Idea.id)
-            .where(Idea.project_id == project_id)
+            .where(Idea.project_id == project_id),
         )
         avg_score = avg_result.scalar() or 0
 
@@ -161,14 +161,14 @@ class IdeaScoringService:
         max_result = await self.db.execute(
             select(func.max(IdeaScoreModel.overall_value))
             .join(Idea, IdeaScoreModel.idea_id == Idea.id)
-            .where(Idea.project_id == project_id)
+            .where(Idea.project_id == project_id),
         )
         max_score = max_result.scalar() or 0
 
         min_result = await self.db.execute(
             select(func.min(IdeaScoreModel.overall_value))
             .join(Idea, IdeaScoreModel.idea_id == Idea.id)
-            .where(Idea.project_id == project_id)
+            .where(Idea.project_id == project_id),
         )
         min_score = min_result.scalar() or 0
 

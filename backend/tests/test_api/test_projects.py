@@ -6,12 +6,22 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_health_check(client: AsyncClient):
-    """Test health check endpoint."""
-    response = await client.get("/health")
+    """Test health check endpoint.
+
+    Notes:
+        In test environments, external services (Redis, LLM providers,
+        academic source connectors) are typically not configured or
+        unavailable, so the overall status may be ``"degraded"``.
+        We accept both ``"healthy"`` and ``"degraded"`` and verify that
+        the endpoint structure is correct.
+    """
+    response = await client.get("/api/v1/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "healthy"
-    assert data["service"] == "autoscience"
+    assert data["status"] in ("healthy", "degraded")
+    assert data["version"] == "0.1.0"
+    assert "checks" in data
+    assert "database" in data["checks"]
 
 
 @pytest.mark.asyncio

@@ -1,14 +1,13 @@
 """SearXNG academic connector with caching support."""
 
 from typing import Any
-from datetime import datetime
-from urllib.parse import urlencode
 
 import httpx
 import structlog
 
-from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult
-from ..services.cache_service import CacheService
+from app.services.cache_service import CacheService
+
+from .base import AcademicConnector, RawPaper, SearchQuery, SearchResult, create_connector_client
 
 logger = structlog.get_logger()
 
@@ -62,6 +61,7 @@ class SearXNGConnector(AcademicConnector):
             force_refresh: If True, bypass cache.
             categories: SearXNG categories (e.g., ["science", "general"]).
             engines: SearXNG engines (e.g., ["google scholar", "semantic scholar"]).
+
         """
         cats = categories or self.default_categories
         engs = engines or self.default_engines
@@ -78,7 +78,7 @@ class SearXNGConnector(AcademicConnector):
 
         if self.cache:
             cached, hit = await self.cache.get(
-                "searxng", force_refresh=force_refresh, **cache_kwargs
+                "searxng", force_refresh=force_refresh, **cache_kwargs,
             )
             if hit and cached:
                 return self._deserialize_result(cached, query)
@@ -99,7 +99,7 @@ class SearXNGConnector(AcademicConnector):
         papers = []
         total = 0
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with create_connector_client(timeout=httpx.Timeout(30.0)) as client:
                 url = f"{self.base_url}/search"
                 response = await client.get(url, params=params)
                 response.raise_for_status()
@@ -124,7 +124,7 @@ class SearXNGConnector(AcademicConnector):
         except httpx.HTTPStatusError as e:
             logger.error("searxng_http_error", status=e.response.status_code, query=query.text)
         except Exception as e:
-            logger.error("searxng_search_failed", error=str(e), query=query.text)
+            logger.error("searxng_search_failed", error=str(e), query=query.text, exc_info=True)
 
         result = SearchResult(
             source="searxng",
@@ -139,10 +139,10 @@ class SearXNGConnector(AcademicConnector):
             try:
                 serialized = self._serialize_result(result)
                 await self.cache.set(
-                    "searxng", serialized, ttl_seconds=self.cache_ttl, **cache_kwargs
+                    "searxng", serialized, ttl_seconds=self.cache_ttl, **cache_kwargs,
                 )
             except Exception as e:
-                logger.warning("searxng_cache_set_failed", error=str(e))
+                logger.warning("searxng_cache_set_failed", error=str(e), exc_info=True)
 
         return result
 

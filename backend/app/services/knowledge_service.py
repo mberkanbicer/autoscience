@@ -1,18 +1,16 @@
 """Knowledge base and research wiki system."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
-from datetime import datetime
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-
-from ..models.report import KnowledgeNote
-from ..llm.base import Message
-from ..llm.router import LLMRouter
 
 import structlog
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.llm.router import LLMRouter
+from app.models.report import KnowledgeNote
 
 logger = structlog.get_logger()
 
@@ -45,11 +43,13 @@ class KnowledgeBaseService:
         content: str,
         entity_id: str | None = None,
         linked_notes: list[str] | None = None,
+        run_id: str | None = None,
     ) -> KnowledgeNote:
         """Create a knowledge note."""
         note = KnowledgeNote(
             id=str(uuid4()),
             project_id=project_id,
+            run_id=run_id,
             note_type=note_type,
             entity_id=entity_id,
             title=title,
@@ -60,10 +60,50 @@ class KnowledgeBaseService:
         await self.db.flush()
         return note
 
+    async def upsert_note(
+        self,
+        project_id: str,
+        note_type: str,
+        title: str,
+        content: str,
+        entity_id: str | None = None,
+        run_id: str | None = None,
+        linked_notes: list[str] | None = None,
+    ) -> KnowledgeNote:
+        """Create or update a note keyed by project, type, and entity."""
+        if entity_id:
+            result = await self.db.execute(
+                select(KnowledgeNote).where(
+                    KnowledgeNote.project_id == project_id,
+                    KnowledgeNote.note_type == note_type,
+                    KnowledgeNote.entity_id == entity_id,
+                ),
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                existing.title = title
+                existing.content = content
+                if run_id:
+                    existing.run_id = run_id
+                if linked_notes is not None:
+                    existing.linked_notes = linked_notes
+                await self.db.flush()
+                return existing
+
+        return await self.create_note(
+            project_id=project_id,
+            note_type=note_type,
+            title=title,
+            content=content,
+            entity_id=entity_id,
+            linked_notes=linked_notes,
+            run_id=run_id,
+        )
+
     async def get_note(self, note_id: str) -> KnowledgeNote | None:
         """Get a note by ID."""
         result = await self.db.execute(
-            select(KnowledgeNote).where(KnowledgeNote.id == note_id)
+            select(KnowledgeNote).where(KnowledgeNote.id == note_id),
         )
         return result.scalar_one_or_none()
 
@@ -117,8 +157,8 @@ class KnowledgeBaseService:
             select(KnowledgeNote).where(
                 KnowledgeNote.project_id == project_id,
                 (KnowledgeNote.title.ilike(search_pattern)) |
-                (KnowledgeNote.content.ilike(search_pattern))
-            )
+                (KnowledgeNote.content.ilike(search_pattern)),
+            ),
         )
         return list(result.scalars().all())
 
@@ -129,6 +169,7 @@ class KnowledgeBaseService:
             return False
 
         await self.db.delete(note)
+        await self.db.flush()
         return True
 
     async def generate_project_summary(
@@ -137,13 +178,13 @@ class KnowledgeBaseService:
     ) -> str:
         """Generate a project summary note."""
         # Get project data
-        from ..models.project import Project
-        from ..models.idea import Idea
-        from ..models.paper import Paper
-        from ..models.research_question import Hypothesis
+        from app.models.idea import Idea
+        from app.models.paper import Paper
+        from app.models.project import Project
+        from app.models.research_question import Hypothesis
 
         project_result = await self.db.execute(
-            select(Project).where(Project.id == project_id)
+            select(Project).where(Project.id == project_id),
         )
         project = project_result.scalar_one_or_none()
         if not project:
@@ -151,13 +192,13 @@ class KnowledgeBaseService:
 
         # Get counts
         ideas_count = await self.db.execute(
-            select(func.count(Idea.id)).where(Idea.project_id == project_id)
+            select(func.count(Idea.id)).where(Idea.project_id == project_id),
         )
         papers_count = await self.db.execute(
-            select(func.count(Paper.id)).where(Paper.project_id == project_id)
+            select(func.count(Paper.id)).where(Paper.project_id == project_id),
         )
         hypotheses_count = await self.db.execute(
-            select(func.count(Hypothesis.id)).where(Hypothesis.project_id == project_id)
+            select(func.count(Hypothesis.id)).where(Hypothesis.project_id == project_id),
         )
 
         summary = f"""# Project Summary: {project.name}

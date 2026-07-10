@@ -16,7 +16,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="space-y-1">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
+          <label htmlFor={inputId} className="block text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 mb-2 ml-2">
             {label}
           </label>
         )}
@@ -24,16 +24,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            'w-full px-3 py-2 border rounded-lg shadow-sm transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'placeholder:text-gray-400',
-            error ? 'border-red-300 text-red-900' : 'border-gray-300',
+            'w-full px-5 py-4 bg-white/40 backdrop-blur-xl border rounded-2xl shadow-lg transition-all duration-500 ease-out',
+            'focus:outline-none focus:ring-4 focus:ring-primary/30 focus:border-primary/50 focus:bg-white focus:scale-[1.01]',
+            'placeholder:text-muted-foreground/30 font-bold text-foreground/80',
+            error ? 'border-error/40 text-error placeholder:text-error/20' : 'border-white/20',
             className
           )}
           {...props}
         />
         {(error || helperText) && (
-          <p className={cn('text-sm', error ? 'text-red-600' : 'text-gray-500')}>
+          <p className={cn('text-[10px] mt-2 ml-2 font-black uppercase tracking-wider', error ? 'text-error animate-pulse' : 'text-muted-foreground/40')}>
             {error || helperText}
           </p>
         )}
@@ -57,7 +57,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <div className="space-y-1">
         {label && (
-          <label htmlFor={textareaId} className="block text-sm font-medium text-gray-700">
+          <label htmlFor={textareaId} className="block text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 mb-2 ml-2">
             {label}
           </label>
         )}
@@ -65,16 +65,16 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           className={cn(
-            'w-full px-3 py-2 border rounded-lg shadow-sm transition-colors resize-none',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'placeholder:text-gray-400',
-            error ? 'border-red-300 text-red-900' : 'border-gray-300',
+            'w-full px-5 py-4 bg-white/40 backdrop-blur-xl border rounded-2xl shadow-lg transition-all duration-500 ease-out resize-none',
+            'focus:outline-none focus:ring-4 focus:ring-primary/30 focus:border-primary/50 focus:bg-white focus:scale-[1.01]',
+            'placeholder:text-muted-foreground/30 font-bold text-foreground/80 leading-relaxed',
+            error ? 'border-error/40 text-error placeholder:text-error/20' : 'border-white/20',
             className
           )}
           {...props}
         />
         {(error || helperText) && (
-          <p className={cn('text-sm', error ? 'text-red-600' : 'text-gray-500')}>
+          <p className={cn('text-[10px] mt-2 ml-2 font-black uppercase tracking-wider', error ? 'text-error animate-pulse' : 'text-muted-foreground/40')}>
             {error || helperText}
           </p>
         )}
@@ -98,7 +98,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="space-y-1">
         {label && (
-          <label htmlFor={selectId} className="block text-sm font-medium text-gray-700">
+          <label htmlFor={selectId} className="block text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 mb-2 ml-2">
             {label}
           </label>
         )}
@@ -106,20 +106,21 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'w-full px-3 py-2 border rounded-lg shadow-sm transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            error ? 'border-red-300 text-red-900' : 'border-gray-300',
+            'w-full px-5 py-4 bg-white/40 backdrop-blur-xl border rounded-2xl shadow-lg transition-all duration-500 ease-out',
+            'focus:outline-none focus:ring-4 focus:ring-primary/30 focus:border-primary/50 focus:bg-white focus:scale-[1.01]',
+            'font-bold text-foreground/80 appearance-none',
+            error ? 'border-error/40 text-error' : 'border-white/20',
             className
           )}
           {...props}
         >
           {options.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={option.value} value={option.value} className="bg-white text-foreground">
               {option.label}
             </option>
           ))}
         </select>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-[10px] mt-2 ml-2 font-black uppercase tracking-wider text-error animate-pulse">{error}</p>}
       </div>
     );
   }

@@ -1,16 +1,14 @@
 """Idea ledger service for comprehensive idea management."""
 
-from uuid import uuid4
 from typing import Any
-from datetime import datetime
+from uuid import uuid4
 
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
 
-from ..models.idea import Idea, IdeaVersion, IdeaScore, IdeaClassification, IdeaDecision
-from ..models.paper import Paper
-from ..models.research_question import ResearchQuestion, Hypothesis
-from ..models.skill import Skill
+from app.models.idea import Idea, IdeaDecision, IdeaScore, IdeaVersion
+from app.models.paper import Paper
+from app.models.research_question import Hypothesis, ResearchQuestion
 
 
 class IdeaLedgerService:
@@ -36,7 +34,7 @@ class IdeaLedgerService:
             select(Idea).where(
                 Idea.project_id == project_id,
                 Idea.current_text == normalized_text,
-            ).limit(1)
+            ).limit(1),
         )
         existing = result.scalar_one_or_none()
         if existing:
@@ -87,7 +85,7 @@ class IdeaLedgerService:
             select(IdeaVersion)
             .where(IdeaVersion.idea_id == idea_id)
             .order_by(IdeaVersion.version_number.desc())
-            .limit(1)
+            .limit(1),
         )
         current_version = version_result.scalar_one_or_none()
         next_version = (current_version.version_number + 1) if current_version else 1
@@ -113,6 +111,7 @@ class IdeaLedgerService:
         idea_id: str,
         scores: dict[str, float],
         rationale: str | None = None,
+        cost_usd: float | None = None,
     ) -> IdeaScore:
         """Add a score record to an idea."""
         score = IdeaScore(
@@ -132,6 +131,7 @@ class IdeaLedgerService:
             cost_risk=scores.get("cost_risk"),
             overall_value=scores.get("overall_value"),
             scoring_rationale=rationale,
+            cost_usd=cost_usd,
         )
         self.db.add(score)
 
@@ -190,7 +190,7 @@ class IdeaLedgerService:
         result = await self.db.execute(
             select(IdeaVersion)
             .where(IdeaVersion.idea_id == idea_id)
-            .order_by(IdeaVersion.version_number)
+            .order_by(IdeaVersion.version_number),
         )
         return list(result.scalars().all())
 
@@ -199,7 +199,7 @@ class IdeaLedgerService:
         result = await self.db.execute(
             select(IdeaScore)
             .where(IdeaScore.idea_id == idea_id)
-            .order_by(IdeaScore.created_at)
+            .order_by(IdeaScore.created_at),
         )
         return list(result.scalars().all())
 
@@ -208,17 +208,17 @@ class IdeaLedgerService:
         result = await self.db.execute(
             select(IdeaDecision)
             .where(IdeaDecision.idea_id == idea_id)
-            .order_by(IdeaDecision.created_at)
+            .order_by(IdeaDecision.created_at),
         )
         return list(result.scalars().all())
 
     async def get_linked_papers(self, idea_id: str) -> list[Paper]:
         """Get papers linked to an idea through research runs."""
-        from ..models.research_run import ResearchRun
+        from app.models.research_run import ResearchRun
 
         # Get runs for this idea
         runs_result = await self.db.execute(
-            select(ResearchRun.id).where(ResearchRun.idea_id == idea_id)
+            select(ResearchRun.id).where(ResearchRun.idea_id == idea_id),
         )
         run_ids = [r[0] for r in runs_result.all()]
 
@@ -231,21 +231,21 @@ class IdeaLedgerService:
             return []
 
         papers_result = await self.db.execute(
-            select(Paper).where(Paper.project_id == idea.project_id).limit(50)
+            select(Paper).where(Paper.project_id == idea.project_id).limit(50),
         )
         return list(papers_result.scalars().all())
 
     async def get_linked_hypotheses(self, idea_id: str) -> list[Hypothesis]:
         """Get hypotheses linked to an idea."""
         result = await self.db.execute(
-            select(Hypothesis).where(Hypothesis.idea_id == idea_id)
+            select(Hypothesis).where(Hypothesis.idea_id == idea_id),
         )
         return list(result.scalars().all())
 
     async def get_linked_questions(self, idea_id: str) -> list[ResearchQuestion]:
         """Get research questions linked to an idea."""
         result = await self.db.execute(
-            select(ResearchQuestion).where(ResearchQuestion.idea_id == idea_id)
+            select(ResearchQuestion).where(ResearchQuestion.idea_id == idea_id),
         )
         return list(result.scalars().all())
 
@@ -291,8 +291,8 @@ class IdeaLedgerService:
                 or_(
                     Idea.initial_text.ilike(search_pattern),
                     Idea.current_text.ilike(search_pattern),
-                )
-            )
+                ),
+            ),
         )
         return list(result.scalars().all())
 
@@ -300,7 +300,7 @@ class IdeaLedgerService:
         """Get comprehensive idea statistics."""
         # Total ideas
         total_result = await self.db.execute(
-            select(func.count(Idea.id)).where(Idea.project_id == project_id)
+            select(func.count(Idea.id)).where(Idea.project_id == project_id),
         )
         total = total_result.scalar() or 0
 
@@ -308,7 +308,7 @@ class IdeaLedgerService:
         status_result = await self.db.execute(
             select(Idea.status, func.count(Idea.id))
             .where(Idea.project_id == project_id)
-            .group_by(Idea.status)
+            .group_by(Idea.status),
         )
         by_status = {row[0] or "unknown": row[1] for row in status_result.all()}
 
@@ -316,7 +316,7 @@ class IdeaLedgerService:
         class_result = await self.db.execute(
             select(Idea.classification, func.count(Idea.id))
             .where(Idea.project_id == project_id)
-            .group_by(Idea.classification)
+            .group_by(Idea.classification),
         )
         by_classification = {row[0] or "unknown": row[1] for row in class_result.all()}
 
@@ -324,7 +324,7 @@ class IdeaLedgerService:
         origin_result = await self.db.execute(
             select(Idea.origin, func.count(Idea.id))
             .where(Idea.project_id == project_id)
-            .group_by(Idea.origin)
+            .group_by(Idea.origin),
         )
         by_origin = {row[0] or "unknown": row[1] for row in origin_result.all()}
 
@@ -332,7 +332,7 @@ class IdeaLedgerService:
         avg_result = await self.db.execute(
             select(func.avg(Idea.overall_score))
             .where(Idea.project_id == project_id)
-            .where(Idea.overall_score.isnot(None))
+            .where(Idea.overall_score.isnot(None)),
         )
         avg_score = avg_result.scalar() or 0
 

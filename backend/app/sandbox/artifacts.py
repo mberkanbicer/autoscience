@@ -1,15 +1,15 @@
 """Artifact storage for analysis results."""
 
 import json
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
-from datetime import datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.report import AnalysisRun, AnalysisArtifact
+from app.models.report import AnalysisArtifact, AnalysisRun
 
 
 class ArtifactStorage:
@@ -67,7 +67,7 @@ class ArtifactStorage:
             "filepath": str(filepath),
             "description": description,
             "size_bytes": len(figure_data),
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     def save_table(
@@ -93,7 +93,7 @@ class ArtifactStorage:
             "format": format,
             "description": description,
             "size_bytes": len(table_data),
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     def get_run_artifacts(self, run_dir: Path) -> list[dict[str, Any]]:
@@ -148,7 +148,7 @@ class ArtifactService:
     ) -> AnalysisRun | None:
         """Update run status."""
         result = await self.db.execute(
-            select(AnalysisRun).where(AnalysisRun.id == run_id)
+            select(AnalysisRun).where(AnalysisRun.id == run_id),
         )
         run = result.scalar_one_or_none()
 
@@ -186,8 +186,8 @@ class ArtifactService:
         """Get all artifacts for a run."""
         result = await self.db.execute(
             select(AnalysisArtifact).where(
-                AnalysisArtifact.analysis_run_id == run_id
-            )
+                AnalysisArtifact.analysis_run_id == run_id,
+            ),
         )
         return list(result.scalars().all())
 
@@ -198,7 +198,7 @@ class ArtifactService:
         """Get all runs for a hypothesis."""
         result = await self.db.execute(
             select(AnalysisRun).where(
-                AnalysisRun.hypothesis_id == hypothesis_id
-            )
+                AnalysisRun.hypothesis_id == hypothesis_id,
+            ),
         )
         return list(result.scalars().all())

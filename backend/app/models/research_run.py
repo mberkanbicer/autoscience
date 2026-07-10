@@ -15,11 +15,12 @@ class ResearchRun(BaseModel):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id", ondelete="SET NULL"), nullable=True, index=True)
     run_type: Mapped[str] = mapped_column(
-        String(50), nullable=False
+        String(50), nullable=False,
     )  # user_directed | flexible_user | idle_autonomous | validation | skill_refinement
     state: Mapped[str] = mapped_column(
-        String(50), default="created", index=True
+        String(50), default="created", index=True,
     )  # created | running | paused | waiting_for_approval | completed | failed | cancelled
+    current_phase: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Timing
     started_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -30,10 +31,17 @@ class ResearchRun(BaseModel):
     max_sources: Mapped[int] = mapped_column(Integer, default=50)
     max_cost_usd: Mapped[float] = mapped_column(Float, default=5.0)
 
+    # Cognitive health metrics
+    cognitive_entropy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cognitive_mode: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Workflow observability
+    step_history: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
     # Relationships
     project = relationship("Project", back_populates="research_runs")
-    events = relationship("ResearchRunEvent", back_populates="run", lazy="selectin")
-    tool_calls = relationship("ToolCall", back_populates="run", lazy="selectin")
+    events = relationship("ResearchRunEvent", back_populates="run", lazy="selectin", cascade="all, delete-orphan")
+    tool_calls = relationship("ToolCall", back_populates="run", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<ResearchRun {self.id[:8]}... ({self.state})>"
@@ -79,7 +87,7 @@ class IdleCycle(BaseModel):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     run_id: Mapped[str | None] = mapped_column(ForeignKey("research_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     idle_mode: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # frontier_scan | citation_conflict | revisit_rejected | cross_domain | skill_improvement | dataset_discovery
     trigger_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     ideas_generated: Mapped[int] = mapped_column(Integer, default=0)

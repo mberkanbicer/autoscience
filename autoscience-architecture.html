@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoscience — Complete Architecture Diagram</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #1c1917;
+  color: #fdfaf6;
+  overflow-x: hidden;
+}
+header {
+  background: linear-gradient(135deg, #d97706, #b45309, #92400e);
+  padding: 24px 32px;
+  position: sticky; top: 0; z-index: 100;
+  border-bottom: 1px solid rgba(253,250,246,0.1);
+}
+header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+header p { font-size: 14px; color: rgba(253,250,246,0.7); margin-top: 4px; }
+.controls {
+  display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+}
+.controls button {
+  background: rgba(253,250,246,0.1); border: 1px solid rgba(253,250,246,0.2);
+  color: #fdfaf6; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 500; transition: all 0.2s;
+}
+.controls button:hover { background: rgba(253,250,246,0.2); }
+.controls button.active { background: #d97706; border-color: #d97706; }
+#container {
+  width: 100%;
+  height: calc(100vh - 160px);
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 50%, rgba(217,119,6,0.03) 0%, transparent 70%);
+}
+svg { width: 100%; height: 100%; }
+.tooltip {
+  position: absolute; padding: 16px; background: rgba(28,25,23,0.95);
+  border: 1px solid rgba(217,119,6,0.3); border-radius: 10px;
+  font-size: 13px; max-width: 360px;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.2s; backdrop-filter: blur(8px);
+  color: #fdfaf6; line-height: 1.5;
+}
+.tooltip.visible { opacity: 1; }
+.tooltip h3 { color: #d97706; font-size: 14px; margin-bottom: 6px; }
+.tooltip .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+.badge-orange { background: rgba(217,119,6,0.2); color: #d97706; }
+.badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+.badge-green { background: rgba(34,197,94,0.2); color: #22c55e; }
+.badge-purple { background: rgba(168,85,247,0.2); color: #a855f7; }
+.badge-red { background: rgba(239,68,68,0.2); color: #ef4444; }
+.badge-gray { background: rgba(253,250,246,0.1); color: #a8a29e; }
+.node rect { transition: all 0.3s; }
+.node:hover rect { filter: brightness(1.3); }
+.node text { pointer-events: none; }
+.edgePath path { transition: all 0.3s; }
+.label-bg { fill: rgba(28,25,23,0.8); rx: 4; }
+.legend {
+  position: absolute; bottom: 20px; right: 20px;
+  background: rgba(28,25,23,0.9); border: 1px solid rgba(253,250,246,0.1);
+  border-radius: 10px; padding: 14px 18px; font-size: 12px; line-height: 1.8;
+}
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-line { width: 20px; height: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔬 Autoscience – System Architecture</h1>
+  <p>Complete component diagram with relationships, data flow, and layer organization</p>
+  <div class="controls">
+    <button class="active" data-view="full">Full Architecture</button>
+    <button data-view="backend">Backend Core</button>
+    <button data-view="data">Data Layer</button>
+    <button data-view="flow">Data Flow</button>
+  </div>
+</header>
+<div id="container">
+  <div class="tooltip" id="tooltip"></div>
+  <div class="legend" id="legend"></div>
+</div>
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────
+const layers = [
+  { id: "ui",        label: "User Interface",       y: 30,  color: "#d97706" },
+  { id: "api",       label: "API Gateway",           y: 130, color: "#b45309" },
+  { id: "services",  label: "Service Layer",         y: 230, color: "#92400e" },
+  { id: "orchestra", label: "Orchestrator & Workflow", y: 330, color: "#78350f" },
+  { id: "engines",   label: "Core Engines",          y: 430, color: "#44403c" },
+  { id: "llm",       label: "LLM & Connectors",      y: 530, color: "#44403c" },
+  { id: "data",      label: "Data Layer",            y: 630, color: "#292524" },
+  { id: "infra",     label: "Infrastructure",        y: 730, color: "#1c1917" },
+];
+
+const views = {
+  full: {
+    legend: [
+      { label: "Frontend / UI", color: "#d97706" },
+      { label: "Backend Services", color: "#b45309" },
+      { label: "Core Logic (Engines)", color: "#44403c" },
+      { label: "Data / Storage", color: "#292524" },
+    ],
+    edges: [
+      [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],
+      [2,8],[3,9],[3,10],[4,11],[4,12],[4,13],[4,14],[4,15],[4,16],[4,17],[4,18],[4,19],[4,20],[4,21],[5,22],[5,23],[5,24],[5,25],[5,26],[5,27],[5,28],[5,29],[5,30],[5,31],[6,32],[6,33],[6,34],[7,35],[7,36],[4,37]
+    ],
+    nodes: [
+      { id: 0,  label: "Next.js Dashboard",          layer: 0, color: "#d97706" },
+      { id: 1,  label: "FastAPI Router",              layer: 1, color: "#d97706" },
+      { id: 2,  label: "ResearchOrchestrator",        layer: 2, color: "#b45309" },
+      { id: 3,  label: "ResearchWorkflow",           layer: 3, color: "#b45309" },
+      { id: 4,  label: "Literature Engine",           layer: 4, color: "#92400e" },
+      { id: 5,  label: "Paper Analysis Engine",       layer: 4, color: "#92400e" },
+      { id: 6,  label: "Clustering Engine",           layer: 4, color: "#92400e" },
+      { id: 7,  label: "Conflict Detection",          layer: 4, color: "#92400e" },
+      { id: 8,  label: "Project Service",             layer: 2, color: "#b45309" },
+      { id: 9,  label: "Safety Gates",                layer: 3, color: "#b45309", warning: true },
+      { id: 10, label: "Snapshot Service",            layer: 3, color: "#b45309" },
+      { id: 11, label: "Question Engine",             layer: 4, color: "#44403c" },
+      { id: 12, label: "Hypothesis Engine",           layer: 4, color: "#44403c" },
+      { id: 13, label: "Validation Engine",           layer: 4, color: "#44403c" },
+      { id: 14, label: "Idea Scoring Engine",         layer: 4, color: "#44403c" },
+      { id: 15, label: "Keyword Engine",              layer: 4, color: "#44403c" },
+      { id: 16, label: "Idle Cognition Engine",       layer: 4, color: "#44403c" },
+      { id: 17, label: "Manuscript Engine",           layer: 4, color: "#44403c" },
+      { id: 18, label: "Domain Packs",                layer: 4, color: "#44403c" },
+      { id: 19, label: "Power Analysis",              layer: 4, color: "#44403c" },
+      { id: 20, label: "Sandbox Generator",           layer: 4, color: "#44403c" },
+      { id: 21, label: "Papers & Clusters",           layer: 4, color: "#44403c" },
+      { id: 22, label: "LLM Router",                  layer: 5, color: "#57534e" },
+      { id: 23, label: "OpenAI Provider",             layer: 5, color: "#57534e" },
+      { id: 24, label: "Anthropic Provider",          layer: 5, color: "#57534e" },
+      { id: 25, label: "OpenRouter Provider",         layer: 5, color: "#57534e" },
+      { id: 26, label: "Local / Ollama",              layer: 5, color: "#57534e" },
+      { id: 27, label: "Academic Connectors (8+)",    layer: 5, color: "#57534e" },
+      { id: 28, label: "SearXNG",                     layer: 5, color: "#57534e" },
+      { id: 29, label: "Firecrawl",                   layer: 5, color: "#57534e" },
+      { id: 30, label: "Embedding Service",           layer: 5, color: "#57534e" },
+      { id: 31, label: "Sandbox Executor",            layer: 5, color: "#57534e" },
+      { id: 32, label: "PostgreSQL + pgvector",       layer: 6, color: "#292524" },
+      { id: 33, label: "30+ SQLAlchemy Models",       layer: 6, color: "#292524" },
+      { id: 34, label: "Research State",              layer: 6, color: "#292524" },
+      { id: 35, label: "Redis (Cache + Lock)",        layer: 7, color: "#1c1917" },
+      { id: 36, label: "Docker Sandbox",              layer: 7, color: "#1c1917" },
+      { id: 37, label: "Idle Scheduler",              layer: 4, color: "#92400e" },
+    ],
+    edgeLabels: [
+      { src: 0, dst: 1, label: "HTTP / SSE" },
+      { src: 1, dst: 2, label: "API calls" },
+      { src: 2, dst: 3, label: "Runs → Workflow" },
+      { src: 2, dst: 8, label: "CRUD" },
+      { src: 3, dst: 9, label: "Pre-step checks" },
+      { src: 3, dst: 10, label: "Checkpoint" },
+      { src: 3, dst: 15, label: "Step 1" },
+      { src: 3, dst: 4, label: "Step 2" },
+      { src: 3, dst: 5, label: "Step 3" },
+      { src: 3, dst: 6, label: "Step 4" },
+      { src: 3, dst: 7, label: "Step 5" },
+      { src: 3, dst: 11, label: "Step 6" },
+      { src: 3, dst: 12, label: "Step 7" },
+      { src: 3, dst: 13, label: "Step 8" },
+      { src: 3, dst: 14, label: "Step 9" },
+      { src: 3, dst: 37, label: "Background" },
+      { src: 4, dst: 27, label: "search()" },
+      { src: 14, dst: 34, label: "scores" },
+      { src: 30, dst: 32, label: "vectors" },
+      { src: 31, dst: 36, label: "Docker" },
+      { src: 22, dst: 23, label: "GPT-4o" },
+      { src: 22, dst: 24, label: "Claude" },
+      { src: 22, dst: 25, label: "Fallback" },
+      { src: 22, dst: 26, label: "Local" },
+    ]
+  },
+  backend: {
+    legend: [
+      { label: "Orchestrator", color: "#d97706" },
+      { label: "Workflow", color: "#b45309" },
+      { label: "Services", color: "#92400e" },
+      { label: "Engines", color: "#44403c" },
+    ],
+    edges: [[0,1],[1,2],[2,3],[2,4],[1,5],[1,6],[2,7],[0,8],[3,9],[3,10],[3,11],[3,12],[3,13],[3,14],[1,15]],
+    nodes: [
+      { id: 0, label: "Research Orc-\nhestrator", layer: 0, color: "#d97706", desc: "Central coordinator wiring 10 engines + 18 services + 15 agents. Handles run lifecycle: create → execute → finalize. Supports resume with snapshot recovery." },
+      { id: 1, label: "Research\nWorkflow", layer: 1, color: "#b45309", desc: "Durable step engine (17 steps). 3 run types: user_directed, flexible_user, idle_autonomous. Step history serialized/restored. SSE events per step." },
+      { id: 2, label: "Run Service", layer: 2, color: "#92400e", desc: "CRUD for runs, events, tool calls. State transition tracking. Budget enforcement." },
+      { id: 3, label: "Persistence\nService", layer: 2, color: "#92400e", desc: "Batch dedup for papers, clusters, conflicts. Text-based dedup for questions/hypotheses. Embedding creation." },
+      { id: 4, label: "Snapshot\nService", layer: 2, color: "#92400e", desc: "Full state reconstruction from DB. Restores papers, clusters, conflicts, events, tool calls for resume." },
+      { id: 5, label: "Idea Ledger", layer: 2, color: "#92400e", desc: "Version tracking, score history, decision history. Sub-idea capture from hypotheses." },
+      { id: 6, label: "Audit Service", layer: 2, color: "#92400e", desc: "Complete event logging. Tamper-proof (same transaction as state changes)." },
+      { id: 7, label: "Safety\nService", layer: 2, color: "#92400e", desc: "Approval gates, cost limits, quality checks. Halts workflow for spend>$10 or hallucination loops." },
+      { id: 8, label: "Idle\nScheduler", layer: 0, color: "#d97706", desc: "Background trigger every 5 min. Distributed lock via Redis. Weighted mode selection (6 modes)." },
+      { id: 9, label: "Literature\nEngine", layer: 3, color: "#44403c", desc: "Federated search → conn_manager.search_and_merge() → rank by citations/recency/venue. LLM refinements." },
+      { id: 10, label: "Scoring\nEngine", layer: 3, color: "#44403c", desc: "12-dimension weighted formula (0-10). Classification: strong→promising→moderate→weak→poor." },
+      { id: 11, label: "Clustering\nEngine", layer: 3, color: "#44403c", desc: "LLM-based topic clustering. Shannon entropy for cognitive health. Simple keyword fallback." },
+      { id: 12, label: "Conflict\nEngine", layer: 3, color: "#44403c", desc: "9 conflict types: finding, method, dataset, metric, assumption, scope, theory-practice, recency, replication." },
+      { id: 13, label: "Question /\nHypothesis", layer: 3, color: "#44403c", desc: "Template-based question gen → LLM hypothesis formation. Dedup by text similarity." },
+      { id: 14, label: "Manuscript\nEngine", layer: 3, color: "#44403c", desc: "IMRaD structure generation. Citation manager (APA/MLA/Chicago/IEEE). BibTeX export." },
+      { id: 15, label: "LLM Router →\n5 Providers", layer: 1, color: "#b45309", desc: "OpenAI, Anthropic, OpenRouter, Local/Ollama, Llama.cpp. Fallback chain. Cost tracking." },
+    ],
+    edgeLabels: [
+      { src: 0, dst: 1, label: "build_workflow()" },
+      { src: 1, dst: 2, label: "update_run()" },
+      { src: 1, dst: 3, label: "persist_run_results()" },
+      { src: 0, dst: 4, label: "create_snapshot()" },
+      { src: 0, dst: 5, label: "create_idea()" },
+      { src: 0, dst: 6, label: "log_event()" },
+      { src: 0, dst: 7, label: "check_safety()" },
+      { src: 0, dst: 8, label: "run_idle_cycle()" },
+    ]
+  },
+  data: {
+    legend: [
+      { label: "Core Entities", color: "#d97706" },
+      { label: "Research Output", color: "#b45309" },
+      { label: "Learning", color: "#92400e" },
+    ],
+    edges: [[0,1],[0,2],[2,3],[3,6],[2,4],[2,5],[3,7],[7,8],[5,9],[2,10],[10,11],[11,12],[13,14],[13,15]],
+    nodes: [
+      { id: 0, label: "Projects", layer: 0, color: "#d97706", desc: "Domain, scope, flexibility, idle settings, approval config, safety settings" },
+      { id: 1, label: "Project\nMembers", layer: 0, color: "#d97706", desc: "Role-based access (viewer/member/admin/owner)" },
+      { id: 2, label: "Ideas", layer: 0, color: "#d97706", desc: "Versions, scores, classifications, decisions. Origin: user_prompt | idle | skill" },
+      { id: 3, label: "Research\nRuns", layer: 1, color: "#b45309", desc: "Run type, state, budget. Step history, cognitive metrics. Events + tool calls" },
+      { id: 4, label: "Reports", layer: 1, color: "#b45309", desc: "Markdown/HTML. Types: cycle | idle | validation | summary" },
+      { id: 5, label: "Knowledge\nNotes", layer: 1, color: "#b45309", desc: "Paper, cluster, conflict, hypothesis notes. pgvector embeddings for semantic search" },
+      { id: 6, label: "Papers +\nAnalyses", layer: 1, color: "#b45309", desc: "Sources, fulltext, embeddings, analyses. Dedup by DOI and title" },
+      { id: 7, label: "Clusters +\nConflicts", layer: 1, color: "#b45309", desc: "Topic/method/dataset/claim clusters. 9 conflict types with severity" },
+      { id: 8, label: "Questions +\nHypotheses", layer: 1, color: "#b45309", desc: "Auto-generated from conflicts. Validation plans with feasibility scores" },
+      { id: 9, label: "Skills", layer: 2, color: "#92400e", desc: "8 types. Lifecycle: candidate→tested→active→deprecated→retired" },
+      { id: 10, label: "Idle\nCycles", layer: 1, color: "#b45309", desc: "6 idle modes. Ideas/questions generated per cycle. Duration + cost tracking" },
+      { id: 11, label: "Audit Logs", layer: 2, color: "#a8a29e", desc: "All events, tool calls, approval requests. Immutable" },
+      { id: 12, label: "Approvals", layer: 2, color: "#a8a29e", desc: "Spend, publish, pivot gates. Status: pending|approved|denied" },
+      { id: 13, label: "Dataset", layer: 2, color: "#92400e", desc: "Uploaded data with schema. Linked to analysis runs" },
+      { id: 14, label: "Analysis\nRuns", layer: 2, color: "#92400e", desc: "Sandbox execution results. Artifacts: figures, tables, stdout" },
+      { id: 15, label: "Manuscripts", layer: 1, color: "#b45309", desc: "LaTeX content with bibtex. Multi-format export: tex pdf zip docx" },
+    ],
+    edgeLabels: [
+      { src: 0, dst: 1, label: "org members" },
+      { src: 0, dst: 2, label: "has ideas" },
+      { src: 2, dst: 3, label: "research runs" },
+      { src: 3, dst: 6, label: "papers found" },
+      { src: 6, dst: 7, label: "clustered" },
+      { src: 7, dst: 8, label: "conflicts→questions" },
+      { src: 3, dst: 4, label: "generates" },
+      { src: 3, dst: 10, label: "idle" },
+      { src: 3, dst: 11, label: "audited" },
+      { src: 2, dst: 9, label: "skills from" },
+    ]
+  },
+  flow: {
+    legend: [
+      { label: "User-Directed Path", color: "#d97706" },
+      { label: "Data Products", color: "#b45309" },
+    ],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,15],[15,16]],
+    nodes: [
+      { id: 0, label: "User Prompt", type: "input", layer: 0, color: "#d97706" },
+      { id: 1, label: "Intent\nAnalysis", layer: 0, color: "#d97706" },
+      { id: 2, label: "Search\nPlanning", layer: 0, color: "#d97706" },
+      { id: 3, label: "Literature\nRetrieval", layer: 0, color: "#d97706" },
+      { id: 4, label: "Paper\nAnalysis", layer: 0, color: "#d97706" },
+      { id: 5, label: "Clustering", layer: 0, color: "#d97706" },
+      { id: 6, label: "Conflict\nDetection", layer: 0, color: "#d97706" },
+      { id: 7, label: "Question\nGeneration", layer: 0, color: "#d97706" },
+      { id: 8, label: "Hypothesis\nFormation", layer: 0, color: "#d97706" },
+      { id: 9, label: "Validation\nPlanning", layer: 0, color: "#d97706" },
+      { id: 10, label: "Idea\nScoring", layer: 0, color: "#d97706" },
+      { id: 11, label: "Decision", layer: 0, color: "#d97706" },
+      { id: 12, label: "Skill\nCreation", layer: 0, color: "#d97706" },
+      { id: 13, label: "Manuscript\nGeneration", layer: 0, color: "#d97706" },
+      { id: 14, label: "Report\nGeneration", layer: 0, color: "#d97706" },
+      { id: 15, label: "Wiki\nUpdate", layer: 0, color: "#d97706" },
+      { id: 16, label: "Audit\nLog", layer: 0, color: "#d97706" },
+    ],
+    edgeLabels: [
+      { src: 0, dst: 1, label: "interpret" },
+      { src: 1, dst: 2, label: "expand keywords" },
+      { src: 2, dst: 3, label: "search (8 sources)" },
+      { src: 6, dst: 7, label: "bridge gaps" },
+      { src: 7, dst: 8, label: "convert to testable" },
+      { src: 9, dst: 10, label: "feasibility check" },
+      { src: 10, dst: 11, label: "classify decision" },
+      { src: 11, dst: 12, label: "extract patterns" },
+      { src: 12, dst: 13, label: "write LaTeX" },
+    ]
+  }
+};
+
+// ─── LAYOUT ENGINE ──────────────────────────────────────────────────────
+const LAYER_GAP = 80;
+const NODE_W = 140, NODE_H = 52;
+const LV = [0,0,0,0,0,0,0,0]; // items per layer
+
+function build_graph_data(viewKey) {
+  const v = views[viewKey];
+  const nodes = v.nodes.map((n, i) => {
+    const l = layers[n.layer];
+    const col = LV[n.layer]++;
+    const x = 60 + col * (NODE_W + 20);
+    const y = l.y + 10;
+    return { ...n, index: i, x, y, lx: x + NODE_W/2, ly: y + NODE_H/2 };
+  });
+  const edges = v.edges.map(e => {
+    const src = nodes[e[0]], dst = nodes[e[1]];
+    const el = (v.edgeLabels || []).find(el => el.src === e[0] && el.dst === e[1]);
+    return { source: src, target: dst, label: el ? el.label : "" };
+  });
+  nodes.forEach(n => {
+    n.fx = n.x; n.fy = n.y;
+  });
+  return { nodes, edges, legend: v.legend, v };
+}
+
+function draw(viewKey) {
+  const { nodes, edges, legend } = build_graph_data(viewKey);
+  const tooltip = d3.select("#tooltip");
+  const width = document.getElementById("container").clientWidth;
+  const height = document.getElementById("container").clientHeight;
+
+  const svg = d3.select("#container").selectAll("svg").remove();
+  const svgEl = d3.select("#container").append("svg").attr("width", width).attr("height", height);
+
+  // Layer backgrounds
+  const maxCol = d3.max(nodes, n => {
+    const l = layers[n.layer];
+    return nodes.filter(m => m.layer === n.layer).length;
+  }) || 5;
+  const svgW = 60 + maxCol * (NODE_W + 20) + 20 + 40;
+
+  svgEl.append("defs").html(`
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="20" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="rgba(253,250,246,0.3)"/></marker>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  `);
+
+  // Layers
+  var gLayer = svgEl.append("g");
+  layers.forEach(l => {
+    const count = nodes.filter(n => n.layer === l.idx !== undefined ? n.layer : layers.indexOf(layers.find(ll => ll.id === l.id))).length;
+  });
+
+  // Recalculate per view
+  const layerCounts = {};
+  nodes.forEach(n => {
+    const lid = layers[n.layer]?.id || `l${n.layer}`;
+    layerCounts[lid] = (layerCounts[lid] || 0) + 1;
+  });
+
+  Object.keys(layerCounts).forEach(lid => {
+    const l = layers.find(ll => ll.id === lid);
+    if (!l) return;
+    const cnt = layerCounts[lid];
+    const bgW = Math.max(cnt * (NODE_W + 20) + 40, 150);
+    const bgH = 70;
+    gLayer.append("rect")
+      .attr("x", 10)
+      .attr("y", l.y - 8)
+      .attr("width", Math.min(bgW, svgW - 20))
+      .attr("height", bgH)
+      .attr("fill", l.color)
+      .attr("opacity", 0.08)
+      .attr("rx", 8);
+    gLayer.append("text")
+      .attr("x", 20)
+      .attr("y", l.y + 14)
+      .attr("fill", "rgba(253,250,246,0.4)")
+      .attr("font-size", "11px")
+      .attr("font-weight", "600")
+      .text(l.label);
+  });
+
+  // Edges
+  var gEdge = svgEl.append("g");
+  edges.forEach(e => {
+    const sx = e.source.x + NODE_W/2, sy = e.source.y + NODE_H;
+    const tx = e.target.x + NODE_W/2, ty = e.target.y;
+    gEdge.append("path")
+      .attr("d", `M${sx},${sy} Q${(sx+tx)/2},${(sy+ty)/2} ${tx},${ty}`)
+      .attr("fill", "none")
+      .attr("stroke", "rgba(253,250,246,0.25)")
+      .attr("stroke-width", 1.5)
+      .attr("marker-end", "url(#arrowhead)");
+    if (e.label) {
+      const mx = (sx+tx)/2, my = (sy+ty)/2;
+      gEdge.append("rect")
+        .attr("x", mx - 4)
+        .attr("y", my - 10)
+        .attr("width", e.label.length * 6 + 8)
+        .attr("height", 16)
+        .attr("fill", "rgba(28,25,23,0.7)")
+        .attr("rx", 3);
+      gEdge.append("text")
+        .attr("x", mx)
+        .attr("y", my + 3)
+        .attr("fill", "rgba(253,250,246,0.5)")
+        .attr("font-size", "10px")
+        .attr("text-anchor", "middle")
+        .text(e.label);
+    }
+  });
+
+  // Nodes
+  var gNode = svgEl.append("g");
+  nodes.forEach(n => {
+    const g = gNode.append("g")
+      .attr("class", "node")
+      .attr("transform", `translate(${n.x},${n.y})`)
+      .on("mouseover", () => {
+        const desc = n.desc || `${n.label} — ${layers[n.layer]?.label || ""}`;
+        tooltip.style("opacity", 1)
+          .html(`<h3>${n.label.replace(/\n/g, ' ')}</h3><div class="badge badge-orange">${layers[n.layer]?.label || ""}</div><div>${desc}</div>`);
+      })
+      .on("mousemove", (e) => {
+        const t = tooltip.node();
+        const rect = document.getElementById("container").getBoundingClientRect();
+        let lx = e.clientX - rect.left + 12, ly = e.clientY - rect.top - 10;
+        if (lx + 360 > rect.width) lx = e.clientX - rect.left - 360;
+        if (ly < 10) ly = 10;
+        t.style.left = lx + "px";
+        t.style.top = ly + "px";
+      })
+      .on("mouseout", () => tooltip.style("opacity", 0));
+
+    const w = NODE_W, h = n.label.includes("\n") ? NODE_H + 12 : NODE_H;
+    const isWarning = n.warning;
+    g.append("rect")
+      .attr("width", w)
+      .attr("height", h)
+      .attr("rx", 8)
+      .attr("fill", n.color)
+      .attr("opacity", 0.85)
+      .attr("stroke", isWarning ? "#ef4444" : "rgba(253,250,246,0.1)")
+      .attr("stroke-width", isWarning ? 2 : 1)
+      .attr("filter", isWarning ? "url(#glow)" : null);
+
+    const lines = n.label.split("\n");
+    g.selectAll("text")
+      .data(lines)
+      .enter()
+      .append("text")
+      .attr("x", w/2)
+      .attr("y", (d,i) => (h/2) + (i - (lines.length-1)/2) * 16)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#fff")
+      .attr("font-size", "11px")
+      .attr("font-weight", "500")
+      .text(d => d);
+  });
+
+  // Legend
+  const legendEl = d3.select("#legend");
+  legendEl.html(`
+    ${legend.map(l => `<div class="legend-item"><div class="legend-dot" style="background:${l.color}"></div>${l.label}</div>`).join("")}
+    <div class="legend-item" style="margin-top:6px;border-top:1px solid rgba(253,250,246,0.1);padding-top:6px;">
+      <div class="legend-dot" style="background:rgba(239,68,68,0.7)"></div>Safety Gate / Risk
+    </div>
+  `);
+}
+
+// ─── VIEW SWITCH ────────────────────────────────────────────────────────
+document.querySelectorAll(".controls button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".controls button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    draw(btn.dataset.view);
+  });
+});
+
+window.addEventListener("resize", () => {
+  const active = document.querySelector(".controls button.active");
+  if (active) draw(active.dataset.view);
+});
+
+draw("full");
+</script>
+</body>
+</html>

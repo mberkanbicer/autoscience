@@ -24,6 +24,7 @@ class ResearchRunUpdate(BaseSchema):
         None,
         pattern="^(created|running|paused|waiting_for_approval|completed|failed|cancelled)$",
     )
+    current_phase: str | None = None
 
 
 class ResearchRunResponse(TimestampSchema):
@@ -33,11 +34,15 @@ class ResearchRunResponse(TimestampSchema):
     idea_id: str | None = None
     run_type: str
     state: str
+    current_phase: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     max_minutes: int
     max_sources: int
     max_cost_usd: float
+    cognitive_entropy: float | None = None
+    cognitive_mode: str | None = None
+    step_history: list[dict] | None = None
 
 
 class ResearchRunEventResponse(TimestampSchema):

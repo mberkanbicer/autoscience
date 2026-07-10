@@ -1,13 +1,12 @@
 """Validation plan service for storing and managing plans."""
 
-from uuid import uuid4
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.research_question import ValidationPlan as ValidationPlanModel
-from ..engine.validation_planning import ValidationPlan, ValidationPlanResult
+from app.engine.validation_planning import ValidationPlan, ValidationPlanResult
+from app.models.research_question import ValidationPlan as ValidationPlanModel
 
 
 class ValidationPlanService:
@@ -105,7 +104,7 @@ class ValidationPlanService:
     async def get_plan(self, plan_id: str) -> ValidationPlanModel | None:
         """Get a validation plan by ID."""
         result = await self.db.execute(
-            select(ValidationPlanModel).where(ValidationPlanModel.id == plan_id)
+            select(ValidationPlanModel).where(ValidationPlanModel.id == plan_id),
         )
         return result.scalar_one_or_none()
 
@@ -116,8 +115,8 @@ class ValidationPlanService:
         """Get validation plan for a hypothesis."""
         result = await self.db.execute(
             select(ValidationPlanModel).where(
-                ValidationPlanModel.hypothesis_id == hypothesis_id
-            )
+                ValidationPlanModel.hypothesis_id == hypothesis_id,
+            ),
         )
         return result.scalar_one_or_none()
 
@@ -126,12 +125,12 @@ class ValidationPlanService:
         project_id: str,
     ) -> list[ValidationPlanModel]:
         """Get all validation plans for a project."""
-        from ..models.research_question import Hypothesis
+        from app.models.research_question import Hypothesis
 
         result = await self.db.execute(
             select(ValidationPlanModel)
             .join(Hypothesis, ValidationPlanModel.hypothesis_id == Hypothesis.id)
-            .where(Hypothesis.project_id == project_id)
+            .where(Hypothesis.project_id == project_id),
         )
         return list(result.scalars().all())
 
@@ -171,8 +170,6 @@ class ValidationPlanService:
         project_id: str,
     ) -> dict[str, Any]:
         """Get statistics about validation plans."""
-        from sqlalchemy import func
-
         plans = await self.get_project_plans(project_id)
 
         if not plans:

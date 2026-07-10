@@ -2,10 +2,9 @@
 
 from typing import Any
 
-import anthropic
 from anthropic import AsyncAnthropic
 
-from .base import LLMProvider, Message, CompletionResult, StructuredOutput
+from .base import CompletionResult, LLMProvider, Message, StructuredOutput
 
 # Model pricing per 1M tokens (as of 2025)
 MODEL_PRICING = {
@@ -136,12 +135,8 @@ class AnthropicProvider(LLMProvider):
             if hasattr(block, "text"):
                 content += block.text
 
-        import json
-
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            data = {"error": "Failed to parse JSON", "raw": content}
+        from app.utils.json_utils import parse_llm_json
+        data = parse_llm_json(content)
 
         usage = {
             "prompt_tokens": response.usage.input_tokens,

@@ -72,17 +72,24 @@ class BenchmarkRunner:
         cycle: int = 0,
     ) -> dict[str, Any]:
         """Run a single research cycle and collect metrics."""
-        from ..services.orchestrator import ResearchOrchestrator
-        from ..database import AsyncSessionLocal
+        from app.database import AsyncSessionLocal
+        from app.services.orchestrator import ResearchOrchestrator
 
         start_time = time.time()
 
         async with AsyncSessionLocal() as db:
-            from ..llm.router import create_default_router
-            from ..connectors.manager import create_default_manager
+            from app.config import get_settings
+            from app.connectors.manager import create_default_manager
+            from app.llm.router import create_default_router
 
+            settings = get_settings()
             llm = create_default_router()
-            connectors = create_default_manager()
+            connectors = create_default_manager(
+                openalex_email=settings.unpaywall_email,
+                semantic_scholar_api_key=settings.semantic_scholar_api_key,
+                searxng_url=settings.searxng_url,
+                firecrawl_api_key=settings.firecrawl_api_key,
+            )
 
             orchestrator = ResearchOrchestrator(
                 db=db,
@@ -123,6 +130,7 @@ class BenchmarkRunner:
                     "success": False,
                     "error": str(e),
                 }
+                logger.error("benchmark_run_failed", idea=idea[:60], duration_seconds=round(elapsed, 2), exc_info=True)
 
         return metrics
 
@@ -196,7 +204,7 @@ class BenchmarkRunner:
                 f"- {status} {r.get('idea', '')[:60]}... "
                 f"({r.get('duration_seconds', 0):.1f}s, "
                 f"{r.get('papers_found', 0)} papers, "
-                f"{r.get('hypotheses', 0)} hypotheses)"
+                f"{r.get('hypotheses', 0)} hypotheses)",
             )
 
         report.extend([

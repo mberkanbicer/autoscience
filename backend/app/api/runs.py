@@ -1,32 +1,37 @@
 """Research run API endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies import get_db
-from ..services.research_run_service import ResearchRunService
-from ..services.audit_service import AuditService
-from ..services.snapshot_service import SnapshotService
-from ..schemas.research_run import (
+from app.dependencies import get_db
+from app.dependencies.auth import get_current_user, require_project_role
+from app.models.collaboration import User
+from app.schemas.audit import AuditLogResponse
+from app.schemas.research_run import (
     ResearchRunCreate,
-    ResearchRunResponse,
     ResearchRunEventResponse,
+    ResearchRunResponse,
+    ResearchRunUpdate,
     ToolCallResponse,
 )
-from ..schemas.research_state import ResearchState
-from ..schemas.audit import AuditLogResponse
+from app.schemas.research_state import ResearchState
+from app.services.audit_service import AuditService
+from app.services.research_run_service import ResearchRunService
+from app.services.snapshot_service import SnapshotService
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[ResearchRunResponse])
 async def list_runs(
-    project_id: str = Query(...),
-    state: str | None = Query(None),
-    run_type: str | None = Query(None),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    project_id: Annotated[str, Query()],
+    state: Annotated[str | None, Query()] = None,
+    run_type: Annotated[str | None, Query()] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
     """List research runs for a project."""
     service = ResearchRunService(db)
@@ -42,11 +47,13 @@ async def list_runs(
 
 @router.post("", response_model=ResearchRunResponse, status_code=201)
 async def create_run(
-    project_id: str = Query(...),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    project_id: Annotated[str, Query()],
     run_in: ResearchRunCreate = ...,
-    db: AsyncSession = Depends(get_db),
 ):
     """Create a new research run."""
+    await require_project_role(db, project_id, user.id, "editor")
     service = ResearchRunService(db)
     run = await service.create_run(project_id=project_id, data=run_in)
 
@@ -66,7 +73,7 @@ async def create_run(
 @router.get("/{run_id}", response_model=ResearchRunResponse)
 async def get_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get a research run."""
     service = ResearchRunService(db)
@@ -79,10 +86,15 @@ async def get_run(
 @router.post("/{run_id}/start", response_model=ResearchRunResponse)
 async def start_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Start a research run."""
     service = ResearchRunService(db)
+    existing = await service.get_run(run_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Run not found")
+    await require_project_role(db, existing.project_id, user.id, "editor")
     run = await service.start_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -101,7 +113,7 @@ async def start_run(
 @router.post("/{run_id}/pause", response_model=ResearchRunResponse)
 async def pause_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Pause a research run."""
     service = ResearchRunService(db)
@@ -123,15 +135,37 @@ async def pause_run(
 @router.post("/{run_id}/resume", response_model=ResearchRunResponse)
 async def resume_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Resume a research run."""
+    """Resume a research run. If waiting for approval, continues the workflow."""
+    import asyncio
+
     service = ResearchRunService(db)
+    run = await service.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    if run.state == "waiting_for_approval":
+        from .approvals import _resume_run_after_approval
+
+        await service.update_run(run_id, ResearchRunUpdate(state="running"))
+        await db.commit()
+        asyncio.create_task(_resume_run_after_approval(run_id))
+
+        audit = AuditService(db)
+        await audit.log_run_event(
+            run_id=run_id,
+            event_type="run_resumed",
+            actor="user",
+            details={"reason": "approval_resume"},
+        )
+        run = await service.get_run(run_id)
+        return run
+
     run = await service.resume_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    # Log the resume
     audit = AuditService(db)
     await audit.log_run_event(
         run_id=run_id,
@@ -145,7 +179,7 @@ async def resume_run(
 @router.post("/{run_id}/complete", response_model=ResearchRunResponse)
 async def complete_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Complete a research run."""
     service = ResearchRunService(db)
@@ -167,10 +201,15 @@ async def complete_run(
 @router.post("/{run_id}/cancel", response_model=ResearchRunResponse)
 async def cancel_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Cancel a research run."""
     service = ResearchRunService(db)
+    existing = await service.get_run(run_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Run not found")
+    await require_project_role(db, existing.project_id, user.id, "editor")
     run = await service.cancel_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -189,7 +228,7 @@ async def cancel_run(
 @router.get("/{run_id}/events", response_model=list[ResearchRunEventResponse])
 async def get_run_events(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get events for a research run."""
     service = ResearchRunService(db)
@@ -200,7 +239,7 @@ async def get_run_events(
 @router.get("/{run_id}/tools", response_model=list[ToolCallResponse])
 async def get_tool_calls(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get tool calls for a research run."""
     service = ResearchRunService(db)
@@ -211,7 +250,7 @@ async def get_tool_calls(
 @router.get("/{run_id}/status")
 async def get_run_status(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get live status of a research run with current phase, recent events, and tool calls."""
     service = ResearchRunService(db)
@@ -229,7 +268,7 @@ async def get_run_status(
             if event.event_type == "step_started" and event.details:
                 current_phase = event.details.get("step", "unknown")
                 break
-            elif event.event_type == "step_completed" and event.details:
+            if event.event_type == "step_completed" and event.details:
                 current_phase = event.details.get("step", "unknown") + " (done)"
                 break
 
@@ -269,13 +308,14 @@ async def get_run_status(
 @router.get("/by-idea/{idea_id}")
 async def get_runs_by_idea(
     idea_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get runs for a specific idea."""
     from sqlalchemy import select
-    from ..models.research_run import ResearchRun
+
+    from app.models.research_run import ResearchRun
     result = await db.execute(
-        select(ResearchRun).where(ResearchRun.idea_id == idea_id).order_by(ResearchRun.created_at.desc())
+        select(ResearchRun).where(ResearchRun.idea_id == idea_id).order_by(ResearchRun.created_at.desc()),
     )
     return list(result.scalars().all())
 
@@ -283,31 +323,33 @@ async def get_runs_by_idea(
 @router.delete("/{run_id}", status_code=204)
 async def delete_run(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
     """Delete a research run and its associated events and tool calls."""
     from sqlalchemy import delete as sql_delete
-    from ..models.research_run import ResearchRun, ResearchRunEvent, ToolCall
+
+    from app.models.research_run import ResearchRun, ResearchRunEvent, ToolCall
 
     # Check run exists
     service = ResearchRunService(db)
     run = await service.get_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+    await require_project_role(db, run.project_id, user.id, "editor")
 
     # Delete associated tool calls
     await db.execute(
-        sql_delete(ToolCall).where(ToolCall.run_id == run_id)
+        sql_delete(ToolCall).where(ToolCall.run_id == run_id),
     )
     # Delete associated events
     await db.execute(
-        sql_delete(ResearchRunEvent).where(ResearchRunEvent.run_id == run_id)
+        sql_delete(ResearchRunEvent).where(ResearchRunEvent.run_id == run_id),
     )
     # Delete the run itself
     await db.execute(
-        sql_delete(ResearchRun).where(ResearchRun.id == run_id)
+        sql_delete(ResearchRun).where(ResearchRun.id == run_id),
     )
-    await db.flush()
 
     # Log the deletion
     audit = AuditService(db)
@@ -318,12 +360,79 @@ async def delete_run(
         actor="user",
         action=f"Deleted research run {run_id}",
     )
+    await db.commit()
+
+
+@router.get("/{run_id}/notebook")
+async def export_run_notebook(
+    run_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Export sandbox experiment as a Jupyter notebook (.ipynb JSON)."""
+    from fastapi.responses import JSONResponse
+
+    from app.services.manuscript_context_service import ManuscriptContextService
+    from app.services.notebook_export_service import build_notebook
+
+    service = ResearchRunService(db)
+    run = await service.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    context = ManuscriptContextService(db)
+    experiment = await context.get_experiment_for_run(run_id)
+    if not experiment:
+        raise HTTPException(status_code=404, detail="No experiment results for this run")
+
+    notebook = build_notebook(
+        title=f"Experiment — {run_id[:8]}",
+        script=experiment.get("script") or "",
+        stdout=experiment.get("stdout") or "",
+        stderr=experiment.get("stderr") or "",
+        artifacts=experiment.get("artifacts"),
+    )
+    return JSONResponse(
+        content=notebook,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="experiment-{run_id[:8]}.ipynb"',
+        },
+    )
+
+
+@router.get("/{run_id}/experiment")
+async def get_run_experiment(
+    run_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get sandbox experiment results persisted for a research run."""
+    from app.services.manuscript_context_service import ManuscriptContextService
+
+    service = ResearchRunService(db)
+    run = await service.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    context = ManuscriptContextService(db)
+    experiment = await context.get_experiment_for_run(run_id)
+    if not experiment:
+        return {
+            "run_id": run_id,
+            "available": False,
+            "message": "No experiment results persisted for this run yet.",
+        }
+
+    return {
+        "run_id": run_id,
+        "available": True,
+        **experiment,
+    }
 
 
 @router.get("/{run_id}/snapshot", response_model=ResearchState)
 async def get_run_snapshot(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get a complete snapshot of the run's current state."""
     snapshot_service = SnapshotService(db)
@@ -336,9 +445,9 @@ async def get_run_snapshot(
 @router.get("/{run_id}/audit", response_model=list[AuditLogResponse])
 async def get_run_audit_logs(
     run_id: str,
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ):
     """Get audit logs for a specific run."""
     audit = AuditService(db)

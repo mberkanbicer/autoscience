@@ -34,6 +34,7 @@ class KnowledgeNoteResponse(TimestampSchema):
     """Schema for knowledge note response."""
 
     project_id: str
+    run_id: str | None = None
     note_type: str
     entity_id: str | None = None
     title: str | None = None

@@ -2,16 +2,16 @@
 
 from uuid import uuid4
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.project import Project
-from ..models.idea import Idea
-from ..models.research_run import ResearchRun
-from ..models.paper import Paper, ClusterConflict
-from ..models.skill import Skill
-from ..models.research_question import ResearchQuestion, Hypothesis
-from ..schemas.project import ProjectCreate, ProjectUpdate, ProjectStats
+from app.models.idea import Idea
+from app.models.paper import ClusterConflict, Paper
+from app.models.project import Project
+from app.models.research_question import Hypothesis, ResearchQuestion
+from app.models.research_run import ResearchRun
+from app.models.skill import Skill
+from app.schemas.project import ProjectCreate, ProjectStats, ProjectUpdate
 
 
 class ProjectService:
@@ -89,7 +89,7 @@ class ProjectService:
                 func.count(Idea.id).label("total"),
                 func.count(Idea.id).filter(Idea.status == "active").label("active"),
                 func.count(Idea.id).filter(Idea.status == "rejected").label("rejected"),
-            ).where(Idea.project_id == project_id)
+            ).where(Idea.project_id == project_id),
         )
         idea_row = idea_counts.one()
 
@@ -98,33 +98,33 @@ class ProjectService:
             select(
                 func.count(ResearchRun.id).label("total"),
                 func.count(ResearchRun.id).filter(ResearchRun.state == "running").label("active"),
-            ).where(ResearchRun.project_id == project_id)
+            ).where(ResearchRun.project_id == project_id),
         )
         run_row = run_counts.one()
 
         # Count papers
         paper_count = await self.db.execute(
-            select(func.count(Paper.id)).where(Paper.project_id == project_id)
+            select(func.count(Paper.id)).where(Paper.project_id == project_id),
         )
 
         # Count skills
         skill_count = await self.db.execute(
-            select(func.count(Skill.id)).where(Skill.project_id == project_id)
+            select(func.count(Skill.id)).where(Skill.project_id == project_id),
         )
 
         # Count conflicts
         conflict_count = await self.db.execute(
-            select(func.count(ClusterConflict.id)).where(ClusterConflict.project_id == project_id)
+            select(func.count(ClusterConflict.id)).where(ClusterConflict.project_id == project_id),
         )
 
         # Count questions
         question_count = await self.db.execute(
-            select(func.count(ResearchQuestion.id)).where(ResearchQuestion.project_id == project_id)
+            select(func.count(ResearchQuestion.id)).where(ResearchQuestion.project_id == project_id),
         )
 
         # Count hypotheses
         hypothesis_count = await self.db.execute(
-            select(func.count(Hypothesis.id)).where(Hypothesis.project_id == project_id)
+            select(func.count(Hypothesis.id)).where(Hypothesis.project_id == project_id),
         )
 
         return ProjectStats(

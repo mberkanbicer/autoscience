@@ -1,13 +1,12 @@
 """Conflict service for storing and managing detected conflicts."""
 
-from uuid import uuid4
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.paper import ClusterConflict
-from ..engine.conflict_detection import Conflict, Gap, ConflictDetectionResult
+from app.engine.conflict_detection import ConflictDetectionResult
+from app.models.paper import ClusterConflict
 
 
 class ConflictService:
@@ -51,7 +50,7 @@ class ConflictService:
     ) -> list[ClusterConflict]:
         """Get all conflicts for a project."""
         query = select(ClusterConflict).where(
-            ClusterConflict.project_id == project_id
+            ClusterConflict.project_id == project_id,
         )
 
         if conflict_type:
@@ -68,14 +67,14 @@ class ConflictService:
     async def get_conflict(self, conflict_id: str) -> ClusterConflict | None:
         """Get a conflict by ID."""
         result = await self.db.execute(
-            select(ClusterConflict).where(ClusterConflict.id == conflict_id)
+            select(ClusterConflict).where(ClusterConflict.id == conflict_id),
         )
         return result.scalar_one_or_none()
 
     async def get_cluster_conflicts(self, cluster_id: str) -> list[ClusterConflict]:
         """Get all conflicts for a cluster."""
         result = await self.db.execute(
-            select(ClusterConflict).where(ClusterConflict.cluster_id == cluster_id)
+            select(ClusterConflict).where(ClusterConflict.cluster_id == cluster_id),
         )
         return list(result.scalars().all())
 
@@ -117,8 +116,8 @@ class ConflictService:
         # Total conflicts
         total_result = await self.db.execute(
             select(func.count(ClusterConflict.id)).where(
-                ClusterConflict.project_id == project_id
-            )
+                ClusterConflict.project_id == project_id,
+            ),
         )
         total = total_result.scalar() or 0
 
@@ -126,7 +125,7 @@ class ConflictService:
         type_result = await self.db.execute(
             select(ClusterConflict.conflict_type, func.count(ClusterConflict.id))
             .where(ClusterConflict.project_id == project_id)
-            .group_by(ClusterConflict.conflict_type)
+            .group_by(ClusterConflict.conflict_type),
         )
         by_type = {row[0] or "unknown": row[1] for row in type_result.all()}
 
@@ -135,7 +134,7 @@ class ConflictService:
             select(
                 func.avg(ClusterConflict.severity).label("avg_severity"),
                 func.max(ClusterConflict.severity).label("max_severity"),
-            ).where(ClusterConflict.project_id == project_id)
+            ).where(ClusterConflict.project_id == project_id),
         )
         severity_stats = severity_result.one()
 
@@ -144,7 +143,7 @@ class ConflictService:
             select(func.count(ClusterConflict.id)).where(
                 ClusterConflict.project_id == project_id,
                 ClusterConflict.severity >= 0.7,
-            )
+            ),
         )
         high_severity = high_severity_result.scalar() or 0
 
@@ -168,6 +167,6 @@ class ConflictService:
             select(ClusterConflict).where(
                 ClusterConflict.project_id == project_id,
                 ClusterConflict.description.ilike(search_pattern),
-            )
+            ),
         )
         return list(result.scalars().all())

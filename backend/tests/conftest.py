@@ -1,8 +1,13 @@
 """Test configuration and fixtures."""
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 from uuid import uuid4
+
+# Force test DB before app imports (shell DATABASE_URL may be sync postgres).
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
+os.environ["DATABASE_URL_SYNC"] = "sqlite:///./test.db"
 
 import pytest
 import pytest_asyncio
@@ -44,6 +49,23 @@ async def setup_database():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
+async def sample_project(db_session: AsyncSession):
+    """Create a minimal project for service/API tests."""
+    from app.models.project import Project
+
+    project = Project(
+        id=str(uuid4()),
+        name="Test Project",
+        domain="AI research",
+        description="Fixture project",
+    )
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+    return project
 
 
 @pytest_asyncio.fixture

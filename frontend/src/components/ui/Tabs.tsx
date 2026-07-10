@@ -42,7 +42,7 @@ export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1 p-1 bg-gray-100 rounded-xl',
+        'inline-flex items-center gap-1.5 p-1.5 bg-white/20 backdrop-blur-xl border border-white/10 rounded-2xl shadow-inner',
         className
       )}
     >
@@ -55,9 +55,10 @@ interface TabsTriggerProps {
   value: string;
   children: ReactNode;
   className?: string;
+  onMouseEnter?: () => void;
 }
 
-export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
+export function TabsTrigger({ value, children, className, onMouseEnter }: TabsTriggerProps) {
   const context = useContext(TabsContext);
   if (!context) throw new Error('TabsTrigger must be used within Tabs');
 
@@ -66,11 +67,12 @@ export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
   return (
     <button
       onClick={() => context.onValueChange(value)}
+      onMouseEnter={onMouseEnter}
       className={cn(
-        'px-4 py-2 text-sm font-medium rounded-lg transition-all',
+        'px-6 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-500 ease-out',
         isActive
-          ? 'bg-white text-gray-900 shadow-sm'
-          : 'text-gray-600 hover:text-gray-900',
+          ? 'bg-primary text-white shadow-2xl shadow-primary/40 scale-[1.05]'
+          : 'text-muted-foreground/60 hover:text-foreground hover:bg-white/40',
         className
       )}
     >
@@ -91,7 +93,7 @@ export function TabsContent({ value, children, className }: TabsContentProps) {
 
   if (context.value !== value) return null;
 
-  return <div className={cn('mt-4', className)}>{children}</div>;
+  return <div className={cn('mt-6 animate-in fade-in zoom-in-[0.98] slide-in-from-top-4 duration-700 ease-out', className)}>{children}</div>;
 }
 
 // Accordion component
@@ -105,18 +107,22 @@ export function AccordionItem({ title, children, defaultOpen = false }: Accordio
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div className="border border-white/10 rounded-2xl overflow-hidden glass transition-all duration-500 hover:shadow-2xl">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+        className="w-full flex items-center justify-between px-6 py-5 bg-white/40 hover:bg-white/60 transition-colors group"
       >
-        <span className="font-medium text-gray-900">{title}</span>
+        <span className="font-black text-foreground uppercase tracking-wider text-xs group-hover:text-primary transition-colors">{title}</span>
         <ChevronDown
           size={20}
-          className={cn('text-gray-500 transition-transform', isOpen && 'rotate-180')}
+          className={cn('text-muted-foreground transition-all duration-500', isOpen && 'rotate-180 text-primary')}
         />
       </button>
-      {isOpen && <div className="px-4 py-3">{children}</div>}
+      {isOpen && (
+        <div className="px-8 py-8 animate-in slide-in-from-top-4 duration-700 ease-out border-t border-white/5">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
