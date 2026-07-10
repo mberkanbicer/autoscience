@@ -250,7 +250,7 @@ Readable persistent memory generated from structured data:
 
 ### 17. Multi-Agent Runtime
 
-15 specialized agents with defined roles:
+17 specialized agents with defined roles:
 
 | Agent | Responsibility |
 |---|---|

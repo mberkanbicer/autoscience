@@ -54,26 +54,25 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
 
 export function getVaultPassphrase(): string {
   if (typeof window === 'undefined') return '';
-  return (
-    sessionStorage.getItem(VAULT_PASSPHRASE_KEY) ||
-    localStorage.getItem(VAULT_PASSPHRASE_KEY) ||
-    ''
-  );
+  // Passphrase is only ever held in sessionStorage (never persisted to
+  // localStorage) so it cannot be exfiltrated via XSS after a page reload.
+  return sessionStorage.getItem(VAULT_PASSPHRASE_KEY) || '';
 }
 
-export function setVaultPassphrase(passphrase: string, persist = false) {
+export function setVaultPassphrase(passphrase: string) {
   sessionStorage.setItem(VAULT_PASSPHRASE_KEY, passphrase);
-  if (persist) {
-    localStorage.setItem(VAULT_PASSPHRASE_KEY, passphrase);
-  } else {
-    localStorage.removeItem(VAULT_PASSPHRASE_KEY);
-  }
+  // Never persist the passphrase to localStorage — doing so would let any
+  // injected script read it and decrypt the stored API keys.
+  localStorage.removeItem(VAULT_PASSPHRASE_KEY);
 }
 
 export async function encryptSettings(
   data: Record<string, unknown>,
   passphrase: string,
 ): Promise<VaultPayload> {
+  if (!passphrase) {
+    throw new Error('A non-empty passphrase is required to encrypt settings');
+  }
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(passphrase, salt);

@@ -84,7 +84,7 @@ User Prompt or Idle Trigger
 
 ### Prerequisites
 - Docker & Docker Compose
-- (Dev mode only) Python 3.11+ and Node.js 18+
+- (Dev mode only) Python 3.11+ and Node.js 20+
 
 ### Docker (recommended)
 

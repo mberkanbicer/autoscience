@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [vaultLocked, setVaultLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -48,7 +49,7 @@ export default function SettingsPage() {
 
   const handleUnlock = async () => {
     if (!vaultPassphrase.trim()) return;
-    setVaultPassphrase(vaultPassphrase, persistPassphrase);
+    setVaultPassphrase(vaultPassphrase.trim());
     const stored = await loadStoredSettings();
     if (stored) {
       setSettings({ ...defaultApiSettings, ...(stored as Partial<ApiSettings>) });
@@ -57,12 +58,16 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    const passphrase = vaultPassphrase.trim() || 'autoscience-local-vault';
+    if (!vaultPassphrase.trim()) {
+      setError('A vault passphrase is required to save API settings');
+      return;
+    }
     setSaving(true);
+    setError(null);
     try {
-      setVaultPassphrase(passphrase, persistPassphrase);
-      await migrateLegacySettings(passphrase);
-      await saveStoredSettings(settings as unknown as Record<string, unknown>, passphrase);
+      setVaultPassphrase(vaultPassphrase.trim());
+      await migrateLegacySettings(vaultPassphrase.trim());
+      await saveStoredSettings(settings as unknown as Record<string, unknown>, vaultPassphrase.trim());
       await refreshApiSettings();
       setSaved(true);
       setVaultLocked(false);
@@ -92,6 +97,8 @@ export default function SettingsPage() {
           </Button>
         }
       />
+
+      {error && <p className="text-sm text-error">{error}</p>}
 
       <div className="p-4 lg:p-6 space-y-6 max-w-4xl">
         <Card className="glass overflow-hidden border-border/20">

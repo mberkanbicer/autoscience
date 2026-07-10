@@ -42,3 +42,19 @@ def create_async_redis_client(*, decode_responses: bool = True):
             decode_responses=decode_responses,
         )
     return aioredis.from_url(settings.redis_url, decode_responses=decode_responses)
+
+
+_shared_client = None
+
+
+def get_shared_redis_client(*, decode_responses: bool = True):
+    """Return a process-wide shared Redis client.
+
+    Reusing a single client avoids leaking a connection pool on every request
+    (the previous per-request client in the connector-manager dependency was
+    never closed). The client lives for the application lifetime.
+    """
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = create_async_redis_client(decode_responses=decode_responses)
+    return _shared_client

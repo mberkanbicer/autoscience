@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -83,8 +84,8 @@ class Settings(BaseSettings):
     kaggle_username: str = ""
     kaggle_key: str = ""
 
-    # SearXNG
-    searxng_url: str = "https://search.bicers.me"
+    # SearXNG (leave empty to disable the SearXNG connector)
+    searxng_url: str = ""
     searxng_categories: str = "science,general"
     searxng_engines: str = ""
     cache_ttl_seconds: int = 3600
@@ -120,6 +121,25 @@ class Settings(BaseSettings):
     next_public_api_url: str = "http://localhost:8000"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @model_validator(mode="after")
+    def _validate_security(self) -> "Settings":
+        """Fail closed in non-development environments.
+
+        Production/staging must set a strong ``app_secret_key`` and an ``api_key``.
+        """
+        if self.app_env == "development":
+            return self
+        if not self.app_secret_key or self.app_secret_key == "change-me-to-a-random-secret":
+            raise ValueError(
+                "app_secret_key must be set to a strong random value "
+                "when app_env is not 'development'"
+            )
+        if not self.api_key:
+            raise ValueError(
+                "api_key must be configured when app_env is not 'development'"
+            )
+        return self
 
 
 @lru_cache

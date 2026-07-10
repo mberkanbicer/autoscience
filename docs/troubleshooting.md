@@ -44,7 +44,7 @@ docker compose exec backend alembic upgrade head
 ```
 
 ### PostgreSQL connection error
-- Verify PostgreSQL is running: `docker compose ps db`
+- Verify PostgreSQL is running: `docker compose ps postgres`
 - Check `DATABASE_URL` in backend env matches Docker compose config
 - Default dev: `postgresql+asyncpg://autoscience:autoscience@localhost:5433/autoscience`
 

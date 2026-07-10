@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import structlog
 from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings

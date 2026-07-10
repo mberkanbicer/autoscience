@@ -107,9 +107,11 @@ export function AnalysisToolsPanel({ projectId, runId }: AnalysisToolsPanelProps
             Render Figure
           </Button>
           {plotlyResult?.html && (
-            <div
-              className="rounded-xl border border-border/10 overflow-hidden bg-white"
-              dangerouslySetInnerHTML={{ __html: plotlyResult.html }}
+            <iframe
+              title="Plotly figure"
+              sandbox="allow-scripts"
+              srcDoc={plotlyResult.html}
+              className="w-full h-80 rounded-xl border border-border/10 bg-white"
             />
           )}
         </div>

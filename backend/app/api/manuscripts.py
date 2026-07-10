@@ -1,6 +1,7 @@
 """Manuscript API endpoints."""
 
 from pathlib import Path
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -365,6 +366,7 @@ async def download_manuscript(
     manuscript_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     format: Annotated[str, Query(pattern="^(tex|bib|zip|pdf|docx|md|html)$")] = "tex",
+    user: Annotated[User, Depends(get_current_user)] = None,
 ):
     """Download manuscript assets as LaTeX, BibTeX, or a zip bundle."""
     result = await db.execute(
@@ -374,7 +376,12 @@ async def download_manuscript(
     if not manuscript:
         raise HTTPException(status_code=404, detail="Manuscript not found")
 
-    safe_title = manuscript.title.replace(" ", "_")
+    await require_project_role(db, manuscript.project_id, user.id, "viewer")
+
+    # Sanitize the filename: strip control chars, quotes and path separators to
+    # prevent header/response-splitting and path traversal via the title.
+    raw_title = (manuscript.title or "manuscript").replace(" ", "_")
+    safe_title = re.sub(r'[\x00-\x1f\x7f"\\/]', "", raw_title)[:120] or "manuscript"
 
     if format == "md":
         md_content = ManuscriptService.export_markdown(manuscript)

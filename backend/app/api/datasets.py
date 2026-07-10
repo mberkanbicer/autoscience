@@ -50,8 +50,10 @@ async def export_datasets(
     db: Annotated[AsyncSession, Depends(get_db)],
     project_id: Annotated[str, Query()],
     format: Annotated[str, Query(pattern="^(json|csv)$")] = "json",
+    user: Annotated[User, Depends(get_current_user)] = None,
 ):
     """Export project datasets as JSON or CSV."""
+    await require_project_role(db, project_id, user.id, "viewer")
     result = await db.execute(
         select(DatasetModel)
         .where(DatasetModel.project_id == project_id)
@@ -93,8 +95,10 @@ async def export_datasets(
 async def list_datasets(
     project_id: Annotated[str, Query()],
     db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)] = None,
 ):
     """List datasets for a project."""
+    await require_project_role(db, project_id, user.id, "viewer")
     result = await db.execute(
         select(DatasetModel)
         .where(DatasetModel.project_id == project_id)
@@ -151,6 +155,11 @@ async def upload_dataset(
 
     try:
         content_bytes = await file.read()
+        if len(content_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Uploaded file too large (max 10MB)",
+            )
         content = content_bytes.decode("utf-8-sig")  # handles BOM
     except UnicodeDecodeError as exc:
         raise HTTPException(
@@ -180,8 +189,16 @@ async def upload_dataset(
 async def get_dataset(
     dataset_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)] = None,
 ):
     """Get a dataset by ID."""
+    dataset = (
+        await db.execute(select(DatasetModel).where(DatasetModel.id == dataset_id))
+    ).scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    await require_project_role(db, dataset.project_id, user.id, "viewer")
+    return dataset
     result = await db.execute(
         select(DatasetModel).where(DatasetModel.id == dataset_id),
     )

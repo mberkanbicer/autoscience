@@ -114,15 +114,15 @@ class OpenAIProvider(LLMProvider):
 
         cost = self.estimate_cost(usage, model)
 
-        return StructuredOutput(
-            data=data,
+        completion = CompletionResult(
+            content=content,
             model=model,
+            provider=self.provider_name,
             usage=usage,
             cost_usd=cost,
             finish_reason=choice.finish_reason,
             raw_response=response,
         )
-
         return StructuredOutput(data=data, completion=completion)
 
     def count_tokens(self, text: str) -> int:

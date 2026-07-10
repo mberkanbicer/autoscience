@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import asyncio
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession

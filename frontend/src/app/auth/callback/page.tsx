@@ -26,8 +26,13 @@ function AuthCallbackContent() {
         setAuthSession(response.access_token, response.user);
         localStorage.removeItem('oauth_provider');
         localStorage.removeItem('oauth_state');
-        const returnTo = localStorage.getItem('oauth_return_to') || '/projects';
+        const returnToRaw = localStorage.getItem('oauth_return_to') || '/projects';
         localStorage.removeItem('oauth_return_to');
+        // Validate against a same-origin path allowlist to prevent open
+        // redirects (e.g. "//evil.com", "http://...", "javascript:...").
+        const returnTo = /^\/[^\/]/.test(returnToRaw)
+          ? returnToRaw
+          : '/projects';
         router.replace(returnTo);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'OAuth sign-in failed');

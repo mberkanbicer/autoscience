@@ -18,11 +18,13 @@ logger = structlog.get_logger()
 
 router = APIRouter()
 
-# CORS headers for SSE
+# CORS headers for SSE — echo a configured origin (never "*" with credentials)
+_ALLOWED_ORIGIN = (get_settings().cors_origins or ["http://localhost:3000"])[0]
+
 SSE_CORS_HEADERS = {
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": _ALLOWED_ORIGIN,
     "Access-Control-Allow-Credentials": "true",
 }
 

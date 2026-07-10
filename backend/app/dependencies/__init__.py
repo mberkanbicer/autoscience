@@ -36,9 +36,9 @@ def get_connector_manager() -> "ConnectorManager":
     settings = get_settings()
     cache_service = None
     try:
-        from app.utils.redis_client import create_async_redis_client
+        from app.utils.redis_client import get_shared_redis_client
 
-        redis_client = create_async_redis_client(decode_responses=True)
+        redis_client = get_shared_redis_client(decode_responses=True)
         cache_service = CacheService(
             redis_client,
             default_ttl_seconds=settings.cache_ttl_seconds,

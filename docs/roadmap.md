@@ -1,5 +1,10 @@
 # Roadmap
 
+> **Status note:** This roadmap records the original 32-phase build plan. The
+> system has since been implemented end-to-end (backend, frontend, CI, and a
+> comprehensive test suite). Treat the phase table below as historical context
+> rather than a live status board.
+
 ## Overview
 
 This document outlines the development phases for the Background Scientific Cognition System. The project is built in 32 sequential phases, each producing a verifiable layer of the final architecture.

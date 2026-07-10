@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,46 +15,31 @@ from app.services.auth_service import decode_access_token
 ROLE_RANK = {"viewer": 1, "editor": 2, "owner": 3}
 
 
-async def resolve_user(
-    db: AsyncSession,
-    *,
-    email: str,
-    display_name: str | None = None,
-) -> User:
-    normalized = email.strip().lower()
-    name = (display_name or normalized.split("@")[0]).strip()
-    result = await db.execute(select(User).where(User.email == normalized))
-    user = result.scalar_one_or_none()
-    if user:
-        if display_name and user.display_name != name:
-            user.display_name = name
-            await db.flush()
-        return user
-    user = User(id=str(uuid4()), email=normalized, display_name=name)
-    db.add(user)
-    await db.flush()
-    return user
-
-
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
     authorization: str | None = Header(None),
-    x_user_email: str | None = Header(None, alias="X-User-Email"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
 ) -> User:
-    """Resolve user from JWT Bearer token or legacy headers."""
+    """Resolve the current user from a verified JWT Bearer token.
+
+    Identity is derived ONLY from the signed JWT. Client-supplied headers
+    (previously ``X-User-Email``) are never trusted, which prevented identity
+    spoofing. Requests without a valid token fall back to a fixed system
+    anonymous user so local development without a login flow still works;
+    unauthenticated access to protected resources must be enforced via JWT in
+    production deployments.
+    """
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
         try:
             payload = decode_access_token(token)
-            user = await db.get(User, payload["sub"])
-            if user:
-                return user
         except Exception as exc:
             raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
+        user = await db.get(User, payload.get("sub"))
+        if user:
+            return user
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    email = x_user_email or "anonymous@local"
-    return await resolve_user(db, email=email, display_name=x_user_name)
+    return await resolve_user(db, email="anonymous@local", display_name="Anonymous")
 
 
 async def get_project_role(

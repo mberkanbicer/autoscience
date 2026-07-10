@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import shlex
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -86,7 +87,16 @@ class SandboxExecutor:
                 req_path = tmp_path / "requirements.txt"
                 req_path.write_text("\n".join(requirements))
 
-            # Docker command
+            # Docker command. Requirements are shell-quoted individually so a
+            # malicious/LLM-controlled package name cannot inject shell metachars.
+            if requirements:
+                install_part = "pip install --user --quiet " + " ".join(
+                    shlex.quote(req) for req in requirements
+                )
+                shell_cmd = f"{install_part} && python experiment.py"
+            else:
+                shell_cmd = "python experiment.py"
+
             docker_cmd = [
                 "docker", "run", "--rm",
                 "--network", "none",
@@ -101,11 +111,7 @@ class SandboxExecutor:
                 "-w", "/app",
                 self.docker_image,
                 "sh", "-c",
-                (
-                    f"pip install --user --quiet {' '.join(requirements or [])} && python experiment.py"
-                    if requirements
-                    else "python experiment.py"
-                ),
+                shell_cmd,
             ]
 
             try:

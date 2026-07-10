@@ -34,6 +34,7 @@ async def compile_latex_to_pdf(
             "pdflatex",
             "-interaction=nonstopmode",
             "-halt-on-error",
+            "-no-shell-escape",
             "main.tex",
         ]
 

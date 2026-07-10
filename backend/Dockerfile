@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir \
     asyncpg>=0.29.0 \
     psycopg2-binary>=2.9.9 \
     redis>=5.0.0 \
+    pyjwt>=2.8.0 \
     pydantic>=2.5.0 \
     pydantic-settings>=2.1.0 \
     openai>=1.12.0 \

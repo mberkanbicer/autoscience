@@ -64,7 +64,7 @@ const USER_NAME_KEY = 'autoscience_user_name';
 export function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   const headers: Record<string, string> = {};
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   } else {
@@ -77,13 +77,13 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 export function setAuthSession(token: string, user: CollaborationUser) {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
   localStorage.setItem(USER_EMAIL_KEY, user.email);
   localStorage.setItem(USER_NAME_KEY, user.display_name);
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+  sessionStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
 async function request<T>(

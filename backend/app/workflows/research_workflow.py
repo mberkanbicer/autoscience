@@ -1510,21 +1510,18 @@ _VP_DESIGN = VALIDATION_PLAN.get("experimental_design", "")
                 requirements=state.experiment_requirements or None,
             )
         except FileNotFoundError:
-            # Docker not available — use local subprocess fallback in dev mode only
-            if settings.app_env == "production":
-                logger.error("sandbox_docker_unavailable", env="production")
-                result = SandboxResult(
-                    success=False,
-                    stdout="",
-                    stderr="Docker is required for sandbox execution in production mode.",
-                    exit_code=-1,
-                    duration_ms=0,
-                    error_message="Docker unavailable",
-                )
-            else:
-                logger.warning("sandbox_docker_unavailable", env=settings.app_env,
-                               msg="Falling back to local subprocess execution")
-                result = await self._run_experiment_local(code)
+            # Docker is required for isolated sandbox execution. Never fall back
+            # to running experiment code on the host (would be a remote-code
+            # execution risk). Fail the experiment instead.
+            logger.error("sandbox_docker_unavailable", env=settings.app_env)
+            result = SandboxResult(
+                success=False,
+                stdout="",
+                stderr="Docker is required to execute experiments in an isolated sandbox.",
+                exit_code=-1,
+                duration_ms=0,
+                error_message="Docker unavailable",
+            )
 
         state.experiment_result = {
             "success": result.success,
@@ -1579,61 +1576,6 @@ _VP_DESIGN = VALIDATION_PLAN.get("experimental_design", "")
         )
         return state
 
-    async def _run_experiment_local(
-        self,
-        code: str,
-        timeout_seconds: int = 30,
-    ) -> "SandboxResult":
-        """Fallback: run Python code via local subprocess (dev mode only).
-
-        Security: this runs on the host and should never be used in production.
-        """
-        import asyncio
-        import time
-
-        from app.sandbox.executor import SandboxResult
-
-        start = time.time()
-        try:
-            process = await asyncio.create_subprocess_exec(
-                "python3", "-c", code,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=timeout_seconds,
-                )
-                exit_code = process.returncode or 0
-            except TimeoutError:
-                process.kill()
-                return SandboxResult(
-                    success=False,
-                    stdout="",
-                    stderr="Execution timed out",
-                    exit_code=-1,
-                    duration_ms=int((time.time() - start) * 1000),
-                    error_message=f"Local fallback timeout after {timeout_seconds}s",
-                )
-
-            duration_ms = int((time.time() - start) * 1000)
-            return SandboxResult(
-                success=(exit_code == 0),
-                stdout=stdout.decode(),
-                stderr=stderr.decode(),
-                exit_code=exit_code,
-                duration_ms=duration_ms,
-            )
-        except Exception as e:
-            logger.error("local_experiment_fallback_failed", error=str(e), exc_info=True)
-            return SandboxResult(
-                success=False,
-                stdout="",
-                stderr=str(e),
-                exit_code=-1,
-                duration_ms=int((time.time() - start) * 1000),
-                error_message=str(e),
-            )
 
     async def _validate_hypotheses(self, state: ResearchState) -> ResearchState:
         """Validate hypotheses against experiment results.

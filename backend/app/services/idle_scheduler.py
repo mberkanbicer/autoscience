@@ -187,6 +187,11 @@ async def _check_and_run_idle_cycles(db_factory):
     finally:
         if redis_client and lock_value:
             await _release_distributed_lock(redis_client, lock_value)
+        if redis_client:
+            try:
+                await redis_client.aclose()
+            except Exception:
+                pass
 
 
 async def _run_idle_for_project(project_id: str, db_factory):
